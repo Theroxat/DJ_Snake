@@ -10,9 +10,11 @@ services:
       - COMMAND_PREFIX=${COMMAND_PREFIX:-!}
       - MAX_PLAYLIST_SIZE=${MAX_PLAYLIST_SIZE:-30}
       - AUDIO_FORMAT=${AUDIO_FORMAT:-bestaudio/best}
+      - TEMP_DIR=/app/temp
     volumes:
       - ./logs:/app/logs
-      - bot_temp:/tmp/bot_audio
+      - ./temp:/app/temp
+      - bot_temp:/tmp
     env_file:
       - .env
     networks:

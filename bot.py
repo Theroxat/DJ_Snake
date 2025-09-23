@@ -251,6 +251,10 @@ async def join_voice_channel(ctx):
 
 def download_audio(url):
     try:
+        # Ensure temp directory exists
+        os.makedirs(temp_dir, exist_ok=True)
+        print(f"📁 Using temp directory: {temp_dir}")
+
         # Simplified but robust configuration
         ydl_opts = {
             "format": AUDIO_FORMAT,
@@ -268,10 +272,18 @@ def download_audio(url):
 
             # Find the downloaded file
             temp_files = os.listdir(temp_dir)
+            print(f"📋 Files in temp directory: {temp_files}")
+
             for f in temp_files:
                 if video_id in f:
                     filepath = os.path.join(temp_dir, f)
-                    return filepath, title
+                    print(f"✅ Found file: {filepath}")
+                    # Verify file exists and has content
+                    if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
+                        print(f"📊 File size: {os.path.getsize(filepath)} bytes")
+                        return filepath, title
+                    else:
+                        print(f"⚠️ File exists but is empty or corrupted")
 
             # If not found by ID, take the most recent
             if temp_files:
@@ -282,9 +294,12 @@ def download_audio(url):
                     key=lambda f: os.path.getctime(os.path.join(temp_dir, f)),
                 )
                 filepath = os.path.join(temp_dir, latest_file)
-                return filepath, title
+                print(f"📎 Using latest file: {filepath}")
+                if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
+                    print(f"📊 File size: {os.path.getsize(filepath)} bytes")
+                    return filepath, title
 
-            raise RuntimeError(f"File not found after download")
+            raise RuntimeError(f"File not found after download in {temp_dir}")
 
     except Exception as e:
         print(f"Download error: {str(e)}")
@@ -362,11 +377,21 @@ async def play_next(ctx):
         title = next_track["title"]
         filepath = next_track["filepath"]
 
-        # Check that file exists
+        # Check that file exists and has content
         if not os.path.exists(filepath):
+            print(f"❌ File not found: {filepath}")
             await ctx.send(f"❌ File not found for {title}")
             await play_next(ctx)  # Try next song
             return
+
+        file_size = os.path.getsize(filepath)
+        if file_size == 0:
+            print(f"❌ File is empty: {filepath}")
+            await ctx.send(f"❌ File is corrupted for {title}")
+            await play_next(ctx)  # Try next song
+            return
+
+        print(f"🎵 Playing file: {filepath} ({file_size} bytes)")
 
         player.is_playing = True
 
