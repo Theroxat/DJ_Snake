@@ -8,7 +8,14 @@
       "WebSearch",
       "Bash(python3:*)",
       "Bash(timeout:*)",
-      "Bash(pip show:*)"
+      "Bash(pip show:*)",
+      "Bash(git push:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(black:*)",
+      "Bash(git reset:*)",
+      "Bash(git restore:*)"
     ],
     "deny": []
   }

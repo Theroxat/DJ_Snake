@@ -142,7 +142,7 @@ def get_playlist_info(url):
 
 
 # Simplified voice connection function to avoid error 4006
-async def safe_voice_connect(voice_channel, max_attempts=2):
+async def safe_voice_connect(voice_channel, max_attempts=3):
     """Secure voice connection that avoids error 4006"""
     guild = voice_channel.guild
 
@@ -160,15 +160,15 @@ async def safe_voice_connect(voice_channel, max_attempts=2):
                 f"🔌 Attempt {attempt + 1}/{max_attempts} to connect to {voice_channel.name}"
             )
 
-            # Wait between attempts to avoid error 4006
+            # Wait between attempts to avoid error 4006 and WebSocket issues
             if attempt > 0:
-                wait_time = 3 + attempt
+                wait_time = 5 + (attempt * 2)  # Longer waits for WebSocket stability
                 print(f"⏳ Waiting {wait_time} seconds...")
                 await asyncio.sleep(wait_time)
 
-            # Connection with optimal parameters to avoid 4006
+            # Connection with optimal parameters for Docker/WebSocket
             voice_client = await voice_channel.connect(
-                timeout=60.0,  # Generous timeout
+                timeout=90.0,  # Longer timeout for Docker
                 reconnect=False,  # No auto reconnect to avoid loops
                 self_deaf=True,  # Mute ourselves
                 self_mute=False,  # But can speak (play music)
@@ -200,9 +200,17 @@ async def safe_voice_connect(voice_channel, max_attempts=2):
             print(f"❌ Client error: {e}")
 
         except Exception as e:
-            print(f"❌ Unexpected error: {e}")
+            error_msg = str(e)
+            if "522" in error_msg or "Invalid response status" in error_msg:
+                print(f"🌐 WebSocket error (attempt {attempt + 1}): {e}")
+                print("💡 This is often caused by network issues in Docker")
+            else:
+                print(f"❌ Unexpected error: {e}")
 
     print("❌ All connection attempts failed")
+    print(
+        "💡 If running in Docker, try using 'network_mode: host' in docker-compose.yml"
+    )
     return None
 
 
