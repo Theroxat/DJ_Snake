@@ -87,8 +87,9 @@ All bot messages, error messages, and user interactions are now in English.
 - FFmpeg (system dependency)
 - discord.py==2.3.2
 - yt-dlp>=2024.1.0
+- python-dotenv==1.0.0 (Environment variables)
 - PyNaCl==1.5.0 (Discord voice support)
-- PyOpus>=1.0.1 (Audio codec support)
+- PyOpus==0.9 (Optional: Audio performance enhancement)
 
 ## Error Handling Strategies
 

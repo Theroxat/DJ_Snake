@@ -17,13 +17,14 @@ intents.guilds = True
 intents.guild_messages = True
 
 # Configuration from environment variables
-COMMAND_PREFIX = os.getenv('COMMAND_PREFIX', '!')
-MAX_PLAYLIST_SIZE = int(os.getenv('MAX_PLAYLIST_SIZE', '30'))
-AUDIO_FORMAT = os.getenv('AUDIO_FORMAT', 'bestaudio/best')
-TEMP_DIR = os.getenv('TEMP_DIR', tempfile.mkdtemp())
+COMMAND_PREFIX = os.getenv("COMMAND_PREFIX", "!")
+MAX_PLAYLIST_SIZE = int(os.getenv("MAX_PLAYLIST_SIZE", "30"))
+AUDIO_FORMAT = os.getenv("AUDIO_FORMAT", "bestaudio/best")
+TEMP_DIR = os.getenv("TEMP_DIR", tempfile.mkdtemp())
 
 bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
 temp_dir = TEMP_DIR
+
 
 class MusicPlayer:
     def __init__(self):
@@ -72,7 +73,9 @@ class MusicPlayer:
             finally:
                 self.voice_client = None
 
+
 music_players = {}
+
 
 def get_playlist_info(url):
     """Extract playlist information without downloading."""
@@ -81,11 +84,11 @@ def get_playlist_info(url):
 
         # Configuration to extract playlist
         ydl_opts = {
-            'extract_flat': 'in_playlist',  # Important: use 'in_playlist' for playlists
-            'quiet': True,  # Reduce log spam
-            'no_warnings': True,
-            'ignoreerrors': True,  # Continue even if some videos have errors
-            'playlistend': MAX_PLAYLIST_SIZE,  # Limit based on config
+            "extract_flat": "in_playlist",  # Important: use 'in_playlist' for playlists
+            "quiet": True,  # Reduce log spam
+            "no_warnings": True,
+            "ignoreerrors": True,  # Continue even if some videos have errors
+            "playlistend": MAX_PLAYLIST_SIZE,  # Limit based on config
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -96,13 +99,13 @@ def get_playlist_info(url):
                 return []
 
             # Debug: display the type of info received
-            info_type = info.get('_type', 'video')
+            info_type = info.get("_type", "video")
             print(f"Info type: {info_type}")
             print(f"Title: {info.get('title', 'Not found')}")
 
             # Handle different types of results
-            if info_type == 'playlist' or 'entries' in info:
-                entries = info.get('entries', [])
+            if info_type == "playlist" or "entries" in info:
+                entries = info.get("entries", [])
 
                 if entries:
                     print(f"Number of entries found: {len(entries)}")
@@ -112,12 +115,15 @@ def get_playlist_info(url):
                     for entry in entries:
                         if entry is not None:
                             processed_entry = {
-                                'id': entry.get('id'),
-                                'title': entry.get('title', 'Unknown title'),
-                                'url': entry.get('url') or entry.get('webpage_url') or f"https://www.youtube.com/watch?v={entry.get('id')}",
-                                'webpage_url': entry.get('webpage_url') or entry.get('url')
+                                "id": entry.get("id"),
+                                "title": entry.get("title", "Unknown title"),
+                                "url": entry.get("url")
+                                or entry.get("webpage_url")
+                                or f"https://www.youtube.com/watch?v={entry.get('id')}",
+                                "webpage_url": entry.get("webpage_url")
+                                or entry.get("url"),
                             }
-                            if processed_entry['id']:
+                            if processed_entry["id"]:
                                 valid_entries.append(processed_entry)
 
                     print(f"Number of valid entries: {len(valid_entries)}")
@@ -134,6 +140,7 @@ def get_playlist_info(url):
         print(f"Error extracting playlist: {e}")
         return []
 
+
 # Simplified voice connection function to avoid error 4006
 async def safe_voice_connect(voice_channel, max_attempts=2):
     """Secure voice connection that avoids error 4006"""
@@ -143,11 +150,15 @@ async def safe_voice_connect(voice_channel, max_attempts=2):
     if guild.voice_client:
         print(f"🔄 Disconnecting from {guild.voice_client.channel.name}")
         await guild.voice_client.disconnect(force=True)
-        await asyncio.sleep(2)  # Important: wait for Discord to process the disconnection
+        await asyncio.sleep(
+            2
+        )  # Important: wait for Discord to process the disconnection
 
     for attempt in range(max_attempts):
         try:
-            print(f"🔌 Attempt {attempt + 1}/{max_attempts} to connect to {voice_channel.name}")
+            print(
+                f"🔌 Attempt {attempt + 1}/{max_attempts} to connect to {voice_channel.name}"
+            )
 
             # Wait between attempts to avoid error 4006
             if attempt > 0:
@@ -157,10 +168,10 @@ async def safe_voice_connect(voice_channel, max_attempts=2):
 
             # Connection with optimal parameters to avoid 4006
             voice_client = await voice_channel.connect(
-                timeout=60.0,     # Generous timeout
+                timeout=60.0,  # Generous timeout
                 reconnect=False,  # No auto reconnect to avoid loops
-                self_deaf=True,   # Mute ourselves
-                self_mute=False   # But can speak (play music)
+                self_deaf=True,  # Mute ourselves
+                self_mute=False,  # But can speak (play music)
             )
 
             # Check that the connection works
@@ -194,6 +205,7 @@ async def safe_voice_connect(voice_channel, max_attempts=2):
     print("❌ All connection attempts failed")
     return None
 
+
 async def join_voice_channel(ctx):
     """Simplified voice connection function"""
     if not ctx.author.voice:
@@ -215,25 +227,28 @@ async def join_voice_channel(ctx):
         player.voice_client = voice_client
         return True
     else:
-        await ctx.send("❌ Unable to connect to voice channel. This is probably due to a temporary issue with Discord.")
+        await ctx.send(
+            "❌ Unable to connect to voice channel. This is probably due to a temporary issue with Discord."
+        )
         return False
+
 
 def download_audio(url):
     try:
         # Simplified but robust configuration
         ydl_opts = {
-            'format': AUDIO_FORMAT,
-            'noplaylist': True,
-            'outtmpl': os.path.join(temp_dir, '%(id)s.%(ext)s'),
-            'quiet': False,
+            "format": AUDIO_FORMAT,
+            "noplaylist": True,
+            "outtmpl": os.path.join(temp_dir, "%(id)s.%(ext)s"),
+            "quiet": False,
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             print(f"Downloading: {url}")
             info = ydl.extract_info(url, download=True)
 
-            video_id = info.get('id', '')
-            title = info.get('title', 'Unknown')
+            video_id = info.get("id", "")
+            title = info.get("title", "Unknown")
 
             # Find the downloaded file
             temp_files = os.listdir(temp_dir)
@@ -245,7 +260,11 @@ def download_audio(url):
             # If not found by ID, take the most recent
             if temp_files:
                 import time
-                latest_file = max(temp_files, key=lambda f: os.path.getctime(os.path.join(temp_dir, f)))
+
+                latest_file = max(
+                    temp_files,
+                    key=lambda f: os.path.getctime(os.path.join(temp_dir, f)),
+                )
                 filepath = os.path.join(temp_dir, latest_file)
                 return filepath, title
 
@@ -254,6 +273,7 @@ def download_audio(url):
     except Exception as e:
         print(f"Download error: {str(e)}")
         raise RuntimeError(f"Error during download: {str(e)}")
+
 
 async def download_and_queue_song(ctx, player, url, skip_voice_check=False):
     try:
@@ -285,11 +305,12 @@ async def download_and_queue_song(ctx, player, url, skip_voice_check=False):
 
     except Exception as e:
         await ctx.send(f"❌ Download error: {str(e)}")
-        if 'status_message' in locals():
+        if "status_message" in locals():
             try:
                 await status_message.delete()
             except:
                 pass
+
 
 async def play_next(ctx):
     try:
@@ -298,9 +319,9 @@ async def play_next(ctx):
             return
 
         # Clean up previous file
-        if player.now_playing and os.path.exists(player.now_playing['filepath']):
+        if player.now_playing and os.path.exists(player.now_playing["filepath"]):
             try:
-                os.remove(player.now_playing['filepath'])
+                os.remove(player.now_playing["filepath"])
             except:
                 pass
         player.now_playing = None
@@ -314,7 +335,7 @@ async def play_next(ctx):
             return
 
         player.now_playing = next_track
-        player.current_file = next_track['filepath']
+        player.current_file = next_track["filepath"]
 
         # Check voice connection
         if not player.voice_client or not player.voice_client.is_connected():
@@ -322,8 +343,8 @@ async def play_next(ctx):
                 await ctx.send("❌ Unable to join voice channel!")
                 return
 
-        title = next_track['title']
-        filepath = next_track['filepath']
+        title = next_track["title"]
+        filepath = next_track["filepath"]
 
         # Check that file exists
         if not os.path.exists(filepath):
@@ -354,15 +375,19 @@ async def play_next(ctx):
             player.is_playing = False
         await ctx.send(f"❌ Playback error: {str(e)}")
 
+
 @bot.event
 async def on_ready():
-    print(f'{bot.user} is connected and ready!')
-    print(f'Bot ID: {bot.user.id}')
-    print(f'Connected to {len(bot.guilds)} guilds')
-    await bot.change_presence(activity=discord.Activity(
-        type=discord.ActivityType.listening,
-        name=f"{COMMAND_PREFIX}help for command list"
-    ))
+    print(f"{bot.user} is connected and ready!")
+    print(f"Bot ID: {bot.user.id}")
+    print(f"Connected to {len(bot.guilds)} guilds")
+    await bot.change_presence(
+        activity=discord.Activity(
+            type=discord.ActivityType.listening,
+            name=f"{COMMAND_PREFIX}help for command list",
+        )
+    )
+
 
 @bot.event
 async def on_voice_state_update(member, before, after):
@@ -376,7 +401,8 @@ async def on_voice_state_update(member, before, after):
             player.voice_client = None
             player.is_playing = False
 
-@bot.command(name='play')
+
+@bot.command(name="play")
 async def play(ctx, url: str):
     if not await join_voice_channel(ctx):
         return
@@ -414,19 +440,25 @@ async def play(ctx, url: str):
                     return
 
                 # Build video URL
-                video_id = entry.get('id') or entry.get('url') or entry.get('webpage_url')
+                video_id = (
+                    entry.get("id") or entry.get("url") or entry.get("webpage_url")
+                )
                 if not video_id:
                     continue
 
-                if isinstance(video_id, str) and video_id.startswith('http'):
+                if isinstance(video_id, str) and video_id.startswith("http"):
                     video_url = video_id
                 else:
                     video_url = f"https://www.youtube.com/watch?v={video_id}"
 
-                title = entry.get('title', 'Unknown title')
-                await ctx.send(f"⏳ [{i}/{len(playlist_entries)}] Adding **{title}**...")
+                title = entry.get("title", "Unknown title")
+                await ctx.send(
+                    f"⏳ [{i}/{len(playlist_entries)}] Adding **{title}**..."
+                )
 
-                await download_and_queue_song(ctx, player, video_url, skip_voice_check=True)
+                await download_and_queue_song(
+                    ctx, player, video_url, skip_voice_check=True
+                )
 
             if not player.should_stop:
                 await ctx.send("✅ All playlist tracks have been added!")
@@ -438,13 +470,14 @@ async def play(ctx, url: str):
 
     except Exception as e:
         await ctx.send(f"❌ An error occurred: {str(e)}")
-        if 'wait_msg' in locals():
+        if "wait_msg" in locals():
             try:
                 await wait_msg.delete()
             except:
                 pass
 
-@bot.command(name='stop')
+
+@bot.command(name="stop")
 async def stop(ctx):
     player = music_players.get(ctx.guild.id)
     if not player:
@@ -455,7 +488,8 @@ async def stop(ctx):
     await player.disconnect_voice_client()
     await ctx.send("⏹️ Music stopped and queue cleared.")
 
-@bot.command(name='reset')
+
+@bot.command(name="reset")
 async def reset_voice(ctx):
     """Force reset the voice connection"""
     await ctx.send("🔧 Resetting voice connection...")
@@ -474,7 +508,8 @@ async def reset_voice(ctx):
     await asyncio.sleep(2)
     await ctx.send("✅ Voice connection reset!")
 
-@bot.command(name='list')
+
+@bot.command(name="list")
 async def list_queue(ctx):
     player = music_players.get(ctx.guild.id)
     if not player or not player.queue:
@@ -489,7 +524,8 @@ async def list_queue(ctx):
 
     await ctx.send(message)
 
-@bot.command(name='next')
+
+@bot.command(name="next")
 async def next_track(ctx):
     player = music_players.get(ctx.guild.id)
     if not player or not player.is_playing:
@@ -501,6 +537,7 @@ async def next_track(ctx):
     else:
         await ctx.send("❌ No music is currently being played.")
 
+
 @bot.event
 async def on_disconnect():
     for file in os.listdir(temp_dir):
@@ -509,20 +546,29 @@ async def on_disconnect():
         except:
             pass
 
-# Get Discord token from environment variables or token file (fallback)
-TOKEN = os.getenv('DISCORD_TOKEN')
-if not TOKEN:
-    try:
-        with open('token', 'r') as f:
-            TOKEN = f.read().strip()
-        print("⚠️  Warning: Using token file. Consider using DISCORD_TOKEN environment variable for better security.")
-    except FileNotFoundError:
-        print("❌ Error: No Discord token found!")
-        print("Please set DISCORD_TOKEN environment variable or create a 'token' file.")
-        print("Get your token from: https://discord.com/developers/applications")
-        exit(1)
+
+def get_discord_token():
+    """Get Discord token from environment variables or token file (fallback)"""
+    TOKEN = os.getenv("DISCORD_TOKEN")
+    if not TOKEN:
+        try:
+            with open("token", "r") as f:
+                TOKEN = f.read().strip()
+            print(
+                "⚠️  Warning: Using token file. Consider using DISCORD_TOKEN environment variable for better security."
+            )
+        except FileNotFoundError:
+            print("❌ Error: No Discord token found!")
+            print(
+                "Please set DISCORD_TOKEN environment variable or create a 'token' file."
+            )
+            print("Get your token from: https://discord.com/developers/applications")
+            exit(1)
+    return TOKEN
+
 
 if __name__ == "__main__":
     print("Starting Discord Music Bot (fixed version)")
     print("-" * 50)
+    TOKEN = get_discord_token()
     bot.run(TOKEN)
