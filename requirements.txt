@@ -1,0 +1,15 @@
+# Discord Music Bot Dependencies
+
+# Core Dependencies
+discord.py==2.3.2
+yt-dlp>=2024.1.0
+python-dotenv==1.0.0
+
+# Audio Processing
+PyNaCl==1.5.0
+PyOpus>=1.0.1
+
+# Optional: Development and Testing
+# pytest==7.4.3
+# black==23.11.0
+# flake8==6.1.0

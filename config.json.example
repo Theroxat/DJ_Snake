@@ -1,0 +1,24 @@
+{
+  "bot": {
+    "token": "your_bot_token_here",
+    "prefix": "!",
+    "activity": "!help for commands"
+  },
+  "music": {
+    "max_playlist_size": 30,
+    "audio_format": "bestaudio/best",
+    "temp_directory": null,
+    "default_volume": 50
+  },
+  "features": {
+    "auto_disconnect": true,
+    "auto_disconnect_timeout": 300,
+    "delete_messages": false,
+    "require_voice_channel": true
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "bot.log",
+    "max_size_mb": 10
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 test_playlist.py:*)",
+      "Bash(pip install:*)",
+      "Bash(source:*)",
+      "Bash(python test:*)",
+      "WebSearch",
+      "Bash(python3:*)",
+      "Bash(timeout:*)",
+      "Bash(pip show:*)"
+    ],
+    "deny": []
+  }
+}
