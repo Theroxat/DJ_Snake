@@ -5,7 +5,6 @@ services:
     build: .
     container_name: discord-music-bot
     restart: unless-stopped
-    network_mode: "host"  # Use host network to avoid WebSocket issues
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
       - COMMAND_PREFIX=${COMMAND_PREFIX:-!}
@@ -16,6 +15,18 @@ services:
       - bot_temp:/tmp/bot_audio
     env_file:
       - .env
+    networks:
+      - discord-network
+
+    # DNS configuration for better Discord connectivity
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+      - 208.67.222.222
+
+    # Security and capability options
+    cap_add:
+      - NET_ADMIN
 
     # Optional: Add resource limits
     deploy:
@@ -28,3 +39,11 @@ services:
 volumes:
   bot_temp:
     driver: local
+
+networks:
+  discord-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+      com.docker.network.driver.mtu: "1500"

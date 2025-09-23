@@ -15,7 +15,8 @@
       "Bash(git commit:*)",
       "Bash(black:*)",
       "Bash(git reset:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(chmod:*)"
     ],
     "deny": []
   }

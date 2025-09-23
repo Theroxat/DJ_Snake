@@ -146,13 +146,21 @@ async def safe_voice_connect(voice_channel, max_attempts=3):
     """Secure voice connection that avoids error 4006"""
     guild = voice_channel.guild
 
-    # Clean any existing connection first
-    if guild.voice_client:
-        print(f"🔄 Disconnecting from {guild.voice_client.channel.name}")
+    # Check if we already have a working connection to the same channel
+    if guild.voice_client and guild.voice_client.is_connected():
+        if guild.voice_client.channel == voice_channel:
+            print(f"✅ Already connected to {voice_channel.name}")
+            return guild.voice_client
+        else:
+            print(
+                f"🔄 Switching from {guild.voice_client.channel.name} to {voice_channel.name}"
+            )
+            await guild.voice_client.disconnect(force=True)
+            await asyncio.sleep(2)
+    elif guild.voice_client:
+        print(f"🔄 Cleaning up disconnected voice client")
         await guild.voice_client.disconnect(force=True)
-        await asyncio.sleep(
-            2
-        )  # Important: wait for Discord to process the disconnection
+        await asyncio.sleep(2)
 
     for attempt in range(max_attempts):
         try:
