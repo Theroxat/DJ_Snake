@@ -8,6 +8,12 @@ This is a Discord music bot built with discord.py that downloads and plays music
 
 ## Key Commands for Development
 
+### Setup Virtual Environment
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
 ### Installing Dependencies
 ```bash
 pip install -r requirements.txt

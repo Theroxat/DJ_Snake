@@ -13,13 +13,11 @@ A powerful and easy-to-use Discord bot that plays music from YouTube in voice ch
 - 🔧 **Robust voice connection** system with error recovery
 - 🌐 **Multi-server support** - each server has its own independent queue
 - 🛡️ **Security-focused** with environment variable configuration
-- 🐳 **Docker support** for easy deployment
 - 🔄 **Auto-cleanup** of temporary files and voice connections
 - ⚡ **Fast and responsive** with asynchronous processing
+- 🐍 **Virtual environment** support for clean Python setup
 
 ## 🚀 Quick Start
-
-### Option 1: Standard Installation
 
 1. **Clone the repository**
 ```bash
@@ -27,7 +25,13 @@ git clone https://github.com/Theroxat/DJ_Snake.git
 cd DJ_Snake
 ```
 
-2. **Install dependencies**
+2. **Create and activate virtual environment**
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+3. **Install dependencies**
 ```bash
 # Install FFmpeg (required)
 sudo apt install ffmpeg  # Ubuntu/Debian
@@ -37,30 +41,15 @@ brew install ffmpeg      # macOS
 pip install -r requirements.txt
 ```
 
-3. **Configure the bot**
+4. **Configure the bot**
 ```bash
 cp .env.example .env
 # Edit .env and add your Discord bot token
 ```
 
-4. **Run the bot**
+5. **Run the bot**
 ```bash
 python bot.py
-```
-
-### Option 2: Docker Deployment (Recommended)
-
-1. **Clone and configure**
-```bash
-git clone https://github.com/Theroxat/DJ_Snake.git
-cd DJ_Snake
-cp .env.example .env
-# Edit .env with your bot token
-```
-
-2. **Run with Docker Compose**
-```bash
-docker-compose up -d
 ```
 
 📖 **For detailed setup instructions, see [INSTALLATION.md](INSTALLATION.md)**
