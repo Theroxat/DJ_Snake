@@ -223,30 +223,45 @@ async def safe_voice_connect(voice_channel, max_attempts=3):
 
 
 async def join_voice_channel(ctx):
-    """Simplified voice connection function"""
+    """Simplified voice connection function optimized for Docker"""
     if not ctx.author.voice:
         await ctx.send("❌ You must be in a voice channel!")
         return False
 
     voice_channel = ctx.author.voice.channel
+    guild = ctx.guild
 
     # Initialize player if necessary
-    if ctx.guild.id not in music_players:
-        music_players[ctx.guild.id] = MusicPlayer()
+    if guild.id not in music_players:
+        music_players[guild.id] = MusicPlayer()
 
-    player = music_players[ctx.guild.id]
+    player = music_players[guild.id]
 
-    # Use our secure connection function
-    voice_client = await safe_voice_connect(voice_channel)
+    # For Docker: Check if we're already connected and working
+    if player.voice_client and player.voice_client.is_connected():
+        if player.voice_client.channel == voice_channel:
+            print(f"✅ Already connected to {voice_channel.name}")
+            return True
 
-    if voice_client:
-        player.voice_client = voice_client
-        return True
-    else:
-        await ctx.send(
-            "❌ Unable to connect to voice channel. This is probably due to a temporary issue with Discord."
-        )
-        return False
+    # Simplified connection for Docker stability - bypass safe_voice_connect
+    try:
+        if guild.voice_client:
+            await guild.voice_client.disconnect(force=True)
+            await asyncio.sleep(1)
+
+        print(f"🔌 Direct connection to {voice_channel.name}...")
+        voice_client = await voice_channel.connect(timeout=30.0, reconnect=False)
+
+        if voice_client and voice_client.is_connected():
+            player.voice_client = voice_client
+            print(f"✅ Connected to {voice_channel.name}")
+            return True
+
+    except Exception as e:
+        print(f"❌ Connection error: {e}")
+
+    await ctx.send("❌ Unable to connect to voice channel.")
+    return False
 
 
 def download_audio(url):
