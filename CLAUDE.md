@@ -8,23 +8,19 @@ This is a Discord music bot built with discord.py that downloads and plays music
 
 ## Key Commands for Development
 
+### Installing Dependencies
+```bash
+pip install -r requirements.txt
+```
+
 ### Running the Bot
 ```bash
 python3 bot.py
 ```
 
-### Installing Dependencies
-```bash
-pip install -r requirements.txt
-# Current versions: discord.py==2.3.2, yt-dlp>=2024.1.0, PyNaCl==1.5.0, PyOpus>=1.0.1
-```
-
 ### Testing Functionality
 ```bash
-# Run the bot
-python3 bot.py
-
-# Test with a Discord command
+# Test with a Discord command in Discord
 # !play https://www.youtube.com/watch?v=dQw4w9WgXcQ
 ```
 
@@ -106,7 +102,6 @@ All bot messages, error messages, and user interactions are now in English.
 - `token`: Bot token file (not in git)
 - `README.md`: English documentation for users
 - `.env.example`: Environment configuration template
-- `Dockerfile` & `docker-compose.yml`: Docker deployment files
 - `INSTALLATION.md`: Detailed setup instructions
 
 All code comments, user messages, and documentation are in English.
@@ -119,5 +114,6 @@ The voice connection system has been completely rewritten to prevent Discord err
 2. **Simplified command structure**: Removed complex error handling that was causing session conflicts
 3. **Automatic cleanup**: Proper disconnection and session management
 4. **Enhanced diagnostics**: Better error reporting and troubleshooting tools
+5. **Direct execution**: Simplified deployment without Docker complexity
 
-The bot now uses a much more reliable connection pattern that avoids the rapid reconnection issues that were causing error 4006.
+The bot now uses a much more reliable connection pattern that works best when run directly on the system.

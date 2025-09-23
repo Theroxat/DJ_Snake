@@ -211,64 +211,43 @@ async def safe_voice_connect(voice_channel, max_attempts=3):
             error_msg = str(e)
             if "522" in error_msg or "Invalid response status" in error_msg:
                 print(f"🌐 WebSocket error (attempt {attempt + 1}): {e}")
-                print("💡 This is often caused by network issues in Docker")
+                print("💡 This is often caused by network connectivity issues")
             else:
                 print(f"❌ Unexpected error: {e}")
 
     print("❌ All connection attempts failed")
-    print(
-        "💡 If running in Docker, try using 'network_mode: host' in docker-compose.yml"
-    )
     return None
 
 
 async def join_voice_channel(ctx):
-    """Simplified voice connection function optimized for Docker"""
+    """Simplified voice connection function"""
     if not ctx.author.voice:
         await ctx.send("❌ You must be in a voice channel!")
         return False
 
     voice_channel = ctx.author.voice.channel
-    guild = ctx.guild
 
     # Initialize player if necessary
-    if guild.id not in music_players:
-        music_players[guild.id] = MusicPlayer()
+    if ctx.guild.id not in music_players:
+        music_players[ctx.guild.id] = MusicPlayer()
 
-    player = music_players[guild.id]
+    player = music_players[ctx.guild.id]
 
-    # For Docker: Check if we're already connected and working
-    if player.voice_client and player.voice_client.is_connected():
-        if player.voice_client.channel == voice_channel:
-            print(f"✅ Already connected to {voice_channel.name}")
-            return True
+    # Use our secure connection function
+    voice_client = await safe_voice_connect(voice_channel)
 
-    # Simplified connection for Docker stability - bypass safe_voice_connect
-    try:
-        if guild.voice_client:
-            await guild.voice_client.disconnect(force=True)
-            await asyncio.sleep(1)
-
-        print(f"🔌 Direct connection to {voice_channel.name}...")
-        voice_client = await voice_channel.connect(timeout=30.0, reconnect=False)
-
-        if voice_client and voice_client.is_connected():
-            player.voice_client = voice_client
-            print(f"✅ Connected to {voice_channel.name}")
-            return True
-
-    except Exception as e:
-        print(f"❌ Connection error: {e}")
-
-    await ctx.send("❌ Unable to connect to voice channel.")
-    return False
+    if voice_client:
+        player.voice_client = voice_client
+        return True
+    else:
+        await ctx.send("❌ Unable to connect to voice channel.")
+        return False
 
 
 def download_audio(url):
     try:
         # Ensure temp directory exists
         os.makedirs(temp_dir, exist_ok=True)
-        print(f"📁 Using temp directory: {temp_dir}")
 
         # Simplified but robust configuration
         ydl_opts = {
@@ -287,18 +266,13 @@ def download_audio(url):
 
             # Find the downloaded file
             temp_files = os.listdir(temp_dir)
-            print(f"📋 Files in temp directory: {temp_files}")
 
             for f in temp_files:
                 if video_id in f:
                     filepath = os.path.join(temp_dir, f)
-                    print(f"✅ Found file: {filepath}")
                     # Verify file exists and has content
                     if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
-                        print(f"📊 File size: {os.path.getsize(filepath)} bytes")
                         return filepath, title
-                    else:
-                        print(f"⚠️ File exists but is empty or corrupted")
 
             # If not found by ID, take the most recent
             if temp_files:
@@ -309,12 +283,10 @@ def download_audio(url):
                     key=lambda f: os.path.getctime(os.path.join(temp_dir, f)),
                 )
                 filepath = os.path.join(temp_dir, latest_file)
-                print(f"📎 Using latest file: {filepath}")
                 if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
-                    print(f"📊 File size: {os.path.getsize(filepath)} bytes")
                     return filepath, title
 
-            raise RuntimeError(f"File not found after download in {temp_dir}")
+            raise RuntimeError(f"File not found after download")
 
     except Exception as e:
         print(f"Download error: {str(e)}")
@@ -392,21 +364,11 @@ async def play_next(ctx):
         title = next_track["title"]
         filepath = next_track["filepath"]
 
-        # Check that file exists and has content
+        # Check that file exists
         if not os.path.exists(filepath):
-            print(f"❌ File not found: {filepath}")
             await ctx.send(f"❌ File not found for {title}")
             await play_next(ctx)  # Try next song
             return
-
-        file_size = os.path.getsize(filepath)
-        if file_size == 0:
-            print(f"❌ File is empty: {filepath}")
-            await ctx.send(f"❌ File is corrupted for {title}")
-            await play_next(ctx)  # Try next song
-            return
-
-        print(f"🎵 Playing file: {filepath} ({file_size} bytes)")
 
         player.is_playing = True
 
