@@ -7,8 +7,18 @@ export PYTHONUNBUFFERED=1
 export PYTHONDONTWRITEBYTECODE=1
 
 # Ensure temp directory exists and has proper permissions
-mkdir -p /app/temp
-chmod 755 /app/temp
+mkdir -p /app/temp /app/logs
+chmod 755 /app/temp /app/logs
+
+# Test write permissions
+echo "🧪 Testing temp directory permissions..."
+if touch /app/temp/test-write.tmp 2>/dev/null; then
+    rm -f /app/temp/test-write.tmp
+    echo "✅ Temp directory writable"
+else
+    echo "❌ Temp directory not writable!"
+    ls -la /app/temp
+fi
 
 # Show network configuration
 echo "🌐 Network configuration:"

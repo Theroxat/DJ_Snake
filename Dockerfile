@@ -32,7 +32,9 @@ RUN chmod +x /app/docker-start.sh
 
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash bot && \
-    chown -R bot:bot /app
+    mkdir -p /app/temp /app/logs && \
+    chown -R bot:bot /app && \
+    chmod -R 755 /app/temp /app/logs
 USER bot
 
 # Expose port (if needed for web interface in future)
