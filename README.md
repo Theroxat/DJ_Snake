@@ -1,8 +1,8 @@
-# 🎵Discord MusicMusic BotBot
+# 🎵 Discord Music Bot
 
-AApowerful and easy-to-use Discord botbot thatthat allowsplays playingmusic musicfrom YouTube inin voicevoice channelschannels.Built with discord.py and yt-dlp for reliable music streaming.
+A powerful and easy-to-use Discord bot that plays music from YouTube in voice channels. Built with discord.py and yt-dlp for reliable music streaming.
 
-[![CI/CD PrerequisitesPipeline](https://github.com/yourusername/discord-music-bot/workflows/CI/CD%20Pipeline/badge.svg)](https://github.com/yourusername/discord-music-bot/actions)
+[![CI/CD Pipeline](https://github.com/Theroxat/DJ_Snake/workflows/CI/CD%20Pipeline/badge.svg)](https://github.com/Theroxat/DJ_Snake/actions)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -17,44 +17,43 @@ AApowerful and easy-to-use Discord botbot thatthat allowsplays playingmusic musi
 - 🔄 **Auto-cleanup** of temporary files and voice connections
 - ⚡ **Fast and responsive** with asynchronous processing
 
-## Install🚀 QuickStart
+## 🚀 Quick Start
 
-### ConfigureOption the1: CreateStandard a DiscordInstallation
+### Option 1: Standard Installation
 
-1. Available**Clone Commandsthe repository**
+1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/discord-music-bot.git
-cd discord-music-bot
+git clone https://github.com/Theroxat/DJ_Snake.git
+cd DJ_Snake
 ```
 
 2. **Install dependencies**
 ```bash
-# InstallFFmpeg Skip(required)
-sudo toapt theinstall nextffmpeg  # musicUbuntu/Debian
-brew ininstall theffmpeg      # queue
--macOS
+# Install FFmpeg (required)
+sudo apt install ffmpeg  # Ubuntu/Debian
+brew install ffmpeg      # macOS
 
-# FeaturesInstall Python dependencies
+# Install Python dependencies
 pip install -r requirements.txt
 ```
 
-3. Play**Configure musicthe frombot**
+3. **Configure the bot**
 ```bash
-cp Automatic.env.example voice.env
-# AutomaticEdit cleanup.env ofand temporaryadd filesyour Discord bot token
+cp .env.example .env
+# Edit .env and add your Discord bot token
 ```
 
-4. Main**Run Dependenciesthe bot**
+4. **Run the bot**
 ```bash
 python bot.py
 ```
 
-### Option2: DockerDeployment (Recommended)
+### Option 2: Docker Deployment (Recommended)
 
-1. Technical**Clone Notesand configure**
+1. **Clone and configure**
 ```bash
-git clone https://github.com/yourusername/discord-music-bot.git
-cd discord-music-bot
+git clone https://github.com/Theroxat/DJ_Snake.git
+cd DJ_Snake
 cp .env.example .env
 # Edit .env with your bot token
 ```
@@ -110,8 +109,8 @@ AUDIO_FORMAT=bestaudio/best
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/discord-music-bot.git
-cd discord-music-bot
+git clone https://github.com/Theroxat/DJ_Snake.git
+cd DJ_Snake
 
 # Configure environment
 cp .env.example .env
@@ -147,8 +146,8 @@ docker run -d \
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/discord-music-bot.git
-cd discord-music-bot
+git clone https://github.com/Theroxat/DJ_Snake.git
+cd DJ_Snake
 
 # Create virtual environment
 python -m venv venv
@@ -246,9 +245,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 - **Documentation**: [Installation Guide](INSTALLATION.md)
-- **Issues**: [GitHub Issues](https://github.com/yourusername/discord-music-bot/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/discord-music-bot/discussions)
+- **Issues**: [GitHub Issues](https://github.com/Theroxat/DJ_Snake/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Theroxat/DJ_Snake/discussions)
 
 ---
 
-**⭐ If you find this project useful, please consider giving it a star!**- Automatic error recovery and reconnection handling
+**⭐ If you find this project useful, please consider giving it a star!**
