@@ -1,0 +1,14 @@
+services:
+  dj-snake:
+    build: .
+    image: dj-snake:latest
+    container_name: dj-snake
+    restart: unless-stopped
+    # Reads DISCORD_TOKEN and the optional COMMAND_PREFIX / MAX_PLAYLIST_SIZE /
+    # AUDIO_FORMAT variables from your local .env file (never committed).
+    env_file:
+      - .env
+    # Outbound bridge networking is enough for Discord voice (UDP) with the
+    # current discord.py. If voice ever fails behind a restrictive NAT, you can
+    # switch to the host network by uncommenting the next line.
+    # network_mode: host

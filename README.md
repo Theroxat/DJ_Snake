@@ -96,6 +96,9 @@ AUDIO_FORMAT=bestaudio/best
 
 ### Using Docker Compose (Recommended)
 
+The image bundles everything the bot needs: FFmpeg, the Opus codec (Discord
+voice) and Deno (JS runtime required by recent yt-dlp for YouTube).
+
 ```bash
 # Clone the repository
 git clone https://github.com/Theroxat/DJ_Snake.git
@@ -103,30 +106,37 @@ cd DJ_Snake
 
 # Configure environment
 cp .env.example .env
-# Edit .env with your settings
+# Edit .env and add your DISCORD_TOKEN
 
-# Start the bot
-docker-compose up -d
+# Build and start the bot in the background
+docker compose up -d --build
 
-# View logs
-docker-compose logs -f discord-bot
+# View live logs
+docker compose logs -f
 
 # Stop the bot
-docker-compose down
+docker compose down
 ```
+
+The container reads your token (and the optional settings) from `.env` via
+`env_file`, so the secret is never baked into the image. It restarts
+automatically unless you stop it (`restart: unless-stopped`).
+
+> If voice ever fails to connect behind a restrictive NAT, uncomment
+> `network_mode: host` in `docker-compose.yml`.
 
 ### Using Docker directly
 
 ```bash
 # Build the image
-docker build -t discord-music-bot .
+docker build -t dj-snake .
 
 # Run the container
 docker run -d \
-  --name discord-music-bot \
+  --name dj-snake \
   --env-file .env \
   --restart unless-stopped \
-  discord-music-bot
+  dj-snake
 ```
 
 ## 🛠️ Development

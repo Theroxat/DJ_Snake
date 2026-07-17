@@ -1,0 +1,31 @@
+# Keep secrets out of the image (the token is injected at runtime via env_file).
+.env
+token
+*.key
+
+# Python virtualenv / caches
+venv/
+.venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Git & CI
+.git/
+.github/
+.gitignore
+
+# Docs & local files
+*.md
+LICENSE
+config.json
+.claude/
+
+# Downloaded audio
+*.mp3
+*.mp4
+*.wav
+*.m4a
+*.webm
