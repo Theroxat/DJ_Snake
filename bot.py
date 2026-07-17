@@ -4,6 +4,7 @@ import yt_dlp
 import discord
 from discord.ext import commands
 import tempfile
+from urllib.parse import urlparse, parse_qs
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -80,6 +81,53 @@ class MusicPlayer:
 
 
 music_players = {}
+
+
+def get_video_id_from_url(url):
+    """Return the specific video id (the `v=` param) if the URL points to one,
+    else None. A URL like watch?v=XXX&list=YYY targets a specific song *inside*
+    a playlist/radio, which is the ambiguous case we want to ask the user about."""
+    try:
+        query = parse_qs(urlparse(url).query)
+        video_id = query.get("v", [None])[0]
+        return video_id or None
+    except Exception:
+        return None
+
+
+class PlaylistChoiceView(discord.ui.View):
+    """Buttons shown when a link contains both a specific song and a playlist,
+    letting the user pick just the song or the whole playlist."""
+
+    def __init__(self, author_id, timeout=30):
+        super().__init__(timeout=timeout)
+        self.author_id = author_id
+        self.choice = None  # "single" | "playlist" | None (timeout)
+
+    async def interaction_check(self, interaction):
+        # Only the person who ran the command may use the buttons.
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message(
+                "❌ This isn't your command.", ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(
+        label="This track only", emoji="🎵", style=discord.ButtonStyle.primary
+    )
+    async def single(self, interaction, button):
+        self.choice = "single"
+        await interaction.response.defer()
+        self.stop()
+
+    @discord.ui.button(
+        label="Whole playlist", emoji="📋", style=discord.ButtonStyle.secondary
+    )
+    async def playlist(self, interaction, button):
+        self.choice = "playlist"
+        await interaction.response.defer()
+        self.stop()
 
 
 def get_playlist_info(url):
@@ -455,6 +503,30 @@ async def play(ctx, url: str = None):
         if playlist_entries:
             # It's a playlist
             await wait_msg.delete()
+
+            # If the link targets a specific song *and* carries a playlist/radio
+            # (e.g. watch?v=XXX&list=RD...), ask the user what they want.
+            specific_video_id = get_video_id_from_url(url)
+            if specific_video_id:
+                view = PlaylistChoiceView(ctx.author.id)
+                prompt = await ctx.send(
+                    f"🎧 This link contains a playlist of **{len(playlist_entries)}** tracks.\n"
+                    "Do you want just this track or the whole playlist?",
+                    view=view,
+                )
+                await view.wait()
+                try:
+                    await prompt.delete()
+                except Exception:
+                    pass
+
+                # Default to the single track on timeout (choice is None).
+                if view.choice != "playlist":
+                    single_url = f"https://www.youtube.com/watch?v={specific_video_id}"
+                    if not player.should_stop:
+                        await download_and_queue_song(ctx, player, single_url)
+                    return
+                # Otherwise fall through and load the whole playlist.
 
             # Make sure we're connected
             if not player.voice_client or not player.voice_client.is_connected():

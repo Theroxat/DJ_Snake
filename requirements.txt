@@ -10,6 +10,9 @@ python-dotenv==1.0.0
 # Audio Processing
 PyNaCl==1.5.0
 
+# Required by discord.py 2.7+ for voice (Discord's DAVE end-to-end encryption).
+davey>=0.1.6
+
 # audioop was removed from Python 3.13; this backport restores it for voice.
 audioop-lts>=0.2.1; python_version >= "3.13"
 
