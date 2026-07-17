@@ -1,12 +1,17 @@
 # Discord Music Bot Dependencies
 
 # Core Dependencies
-discord.py==2.3.2
+# discord.py 2.5+ is required for Python 3.13+ (older versions import the
+# `audioop` module, which was removed from the standard library in Python 3.13).
+discord.py>=2.5.2
 yt-dlp>=2024.1.0
 python-dotenv==1.0.0
 
 # Audio Processing
 PyNaCl==1.5.0
+
+# audioop was removed from Python 3.13; this backport restores it for voice.
+audioop-lts>=0.2.1; python_version >= "3.13"
 
 # Optional Audio Enhancement (improves performance but not required)
 # PyOpus==0.9

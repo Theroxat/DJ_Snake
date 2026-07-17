@@ -20,7 +20,10 @@ intents.guild_messages = True
 COMMAND_PREFIX = os.getenv("COMMAND_PREFIX", "!")
 MAX_PLAYLIST_SIZE = int(os.getenv("MAX_PLAYLIST_SIZE", "30"))
 AUDIO_FORMAT = os.getenv("AUDIO_FORMAT", "bestaudio/best")
-TEMP_DIR = os.getenv("TEMP_DIR", tempfile.mkdtemp())
+# Only create a temp directory if one wasn't provided. Using tempfile.mkdtemp()
+# directly as the default argument would create an orphan directory on every run
+# because default arguments are evaluated eagerly.
+TEMP_DIR = os.getenv("TEMP_DIR") or tempfile.mkdtemp()
 
 bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
 temp_dir = TEMP_DIR
@@ -34,6 +37,7 @@ class MusicPlayer:
         self.is_playing = False
         self.should_stop = False
         self.now_playing = None
+        self.loading = False  # True while a playlist is still being downloaded
 
     def cleanup(self):
         if self.current_file and os.path.exists(self.current_file):
@@ -54,6 +58,7 @@ class MusicPlayer:
 
     def stop_and_clear(self):
         self.should_stop = True
+        self.loading = False
         self.queue.clear()
         if self.voice_client and self.voice_client.is_playing():
             self.voice_client.stop()
@@ -347,6 +352,11 @@ async def play_next(ctx):
         next_track = player.next_in_queue()
         if next_track is None:
             player.is_playing = False
+            # A playlist may still be downloading its next tracks. Stay connected
+            # and idle instead of disconnecting; the next queued track will
+            # trigger play_next() again once it finishes downloading.
+            if player.loading:
+                return
             if player.voice_client and player.voice_client.is_connected():
                 await player.voice_client.disconnect()
             await ctx.send("🎵 Queue is empty!")
@@ -421,7 +431,11 @@ async def on_voice_state_update(member, before, after):
 
 
 @bot.command(name="play")
-async def play(ctx, url: str):
+async def play(ctx, url: str = None):
+    if url is None:
+        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}play <YouTube URL>`")
+        return
+
     if not await join_voice_channel(ctx):
         return
 
@@ -452,9 +466,13 @@ async def play(ctx, url: str):
             playlist_entries = playlist_entries[:MAX_PLAYLIST_SIZE]
             await ctx.send(f"📋 Adding {len(playlist_entries)} tracks to queue...")
 
+            # Mark the player as loading so play_next() doesn't disconnect while
+            # tracks are still being downloaded one by one.
+            player.loading = True
             for i, entry in enumerate(playlist_entries, 1):
                 if player.should_stop:
                     await ctx.send("⏹️ Download stopped.")
+                    player.loading = False
                     return
 
                 # Build video URL
@@ -478,8 +496,13 @@ async def play(ctx, url: str):
                     ctx, player, video_url, skip_voice_check=True
                 )
 
+            player.loading = False
             if not player.should_stop:
                 await ctx.send("✅ All playlist tracks have been added!")
+                # The last track may have finished playing while the queue was
+                # empty during loading; kick playback off again if idle.
+                if not player.is_playing and player.queue:
+                    await play_next(ctx)
         else:
             # It's a single video
             await wait_msg.delete()
@@ -487,6 +510,7 @@ async def play(ctx, url: str):
                 await download_and_queue_song(ctx, player, url)
 
     except Exception as e:
+        player.loading = False
         await ctx.send(f"❌ An error occurred: {str(e)}")
         if "wait_msg" in locals():
             try:
@@ -546,14 +570,28 @@ async def list_queue(ctx):
 @bot.command(name="next")
 async def next_track(ctx):
     player = music_players.get(ctx.guild.id)
-    if not player or not player.is_playing:
+    if not player or not player.voice_client or not player.voice_client.is_playing():
         await ctx.send("❌ No music is currently playing.")
         return
 
-    if player.voice_client and player.voice_client.is_playing():
-        player.voice_client.stop()
-    else:
-        await ctx.send("❌ No music is currently being played.")
+    # Stopping triggers the after_playing callback, which plays the next track.
+    await ctx.send("⏭️ Skipping...")
+    player.voice_client.stop()
+
+
+@bot.event
+async def on_command_error(ctx, error):
+    """Global command error handler to avoid ugly tracebacks."""
+    if isinstance(error, commands.CommandNotFound):
+        return
+    if isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(f"❌ Missing argument. Try `{COMMAND_PREFIX}help`.")
+        return
+    print(f"Command error in '{ctx.command}': {error}")
+    try:
+        await ctx.send(f"❌ Error: {error}")
+    except Exception:
+        pass
 
 
 @bot.event
