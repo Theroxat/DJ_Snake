@@ -23,6 +23,10 @@ LICENSE
 config.json
 .claude/
 
+# Host-side helpers and their logs (they run on the server, not in the image)
+scripts/
+logs/
+
 # Downloaded audio
 *.mp3
 *.mp4

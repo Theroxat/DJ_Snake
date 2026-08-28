@@ -21,6 +21,11 @@ intents.guild_messages = True
 COMMAND_PREFIX = os.getenv("COMMAND_PREFIX", "!")
 MAX_PLAYLIST_SIZE = int(os.getenv("MAX_PLAYLIST_SIZE", "30"))
 AUDIO_FORMAT = os.getenv("AUDIO_FORMAT", "bestaudio/best")
+# YouTube signs stream URLs with a JS challenge. yt-dlp needs both a JS
+# runtime (deno, installed in the image) and the EJS solver script, which it
+# fetches on first use. Without it, signature/n solving fails and some
+# formats are unavailable.
+REMOTE_COMPONENTS = ["ejs:github"]
 # Only create a temp directory if one wasn't provided. Using tempfile.mkdtemp()
 # directly as the default argument would create an orphan directory on every run
 # because default arguments are evaluated eagerly.
@@ -142,6 +147,7 @@ def get_playlist_info(url):
             "no_warnings": True,
             "ignoreerrors": True,  # Continue even if some videos have errors
             "playlistend": MAX_PLAYLIST_SIZE,  # Limit based on config
+            "remote_components": REMOTE_COMPONENTS,
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -308,6 +314,7 @@ def download_audio(url):
             "noplaylist": True,
             "outtmpl": os.path.join(temp_dir, "%(id)s.%(ext)s"),
             "quiet": False,
+            "remote_components": REMOTE_COMPONENTS,
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:

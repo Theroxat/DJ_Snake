@@ -210,9 +210,21 @@ For detailed architecture information, see [CLAUDE.md](CLAUDE.md).
 - Ensure the bot has Connect and Speak permissions
 - Check if the voice channel is full
 
-**YouTube download errors**
-- Update yt-dlp: `pip install --upgrade yt-dlp`
-- Some videos may be region-locked or age-restricted
+**`HTTP Error 403: Forbidden` on download**
+
+This almost always means yt-dlp is out of date. YouTube changes its extraction
+every few weeks and older versions stop working, even though they still read
+the video page fine.
+
+- Running directly: `pip install --upgrade yt-dlp`
+- Running in Docker: `docker compose restart dj-snake`. The container updates
+  yt-dlp on every start, so a restart is enough — no rebuild needed. On a
+  server, `scripts/refresh-dj-snake.sh` does this weekly from cron.
+
+**Other YouTube download errors**
+- Some videos are region-locked or age-restricted
+- `Signature solving failed` means the Deno JS runtime is missing; it is
+  included in the Docker image, but a direct install needs it on the PATH
 
 ## 📋 Requirements
 

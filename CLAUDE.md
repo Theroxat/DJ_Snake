@@ -87,11 +87,36 @@ All bot messages, error messages, and user interactions are now in English.
 
 - Python 3.8+
 - FFmpeg (system dependency)
-- discord.py==2.3.2
-- yt-dlp>=2024.1.0
+- discord.py>=2.5.2
+- yt-dlp>=2026.8.19 (older versions get HTTP 403 from YouTube)
 - python-dotenv==1.0.0 (Environment variables)
 - PyNaCl==1.5.0 (Discord voice support)
 - PyOpus==0.9 (Optional: Audio performance enhancement)
+
+## Keeping YouTube Downloads Working
+
+YouTube breaks older yt-dlp extractors every few weeks. The symptom is always
+the same: `HTTP Error 403: Forbidden` on the media download, while extraction
+itself still succeeds. A Docker image freezes yt-dlp at build time, so the bot
+has two defenses:
+
+1. **`docker-entrypoint.sh`** upgrades yt-dlp on every container start. It is
+   best effort: if PyPI is unreachable the bot boots with the bundled version.
+   Set `YTDLP_AUTO_UPDATE=0` to skip it. Note that pip exits 0 even offline, so
+   the script reports the result by comparing versions before and after.
+2. **`scripts/refresh-dj-snake.sh`**, run weekly from cron, restarts the
+   container so that upgrade actually happens on a long-running deployment.
+
+`REMOTE_COMPONENTS = ["ejs:github"]` in `bot.py` lets yt-dlp fetch the EJS
+challenge solver. Without it, signature and `n` challenge solving fail and some
+formats become unavailable. It needs the `deno` runtime, installed in the image.
+
+To diagnose a download failure, reproduce it directly:
+
+```bash
+docker exec dj-snake python -m yt_dlp --remote-components ejs:github \
+    -f bestaudio/best -o /tmp/t.%(ext)s --no-playlist "<url>"
+```
 
 ## Error Handling Strategies
 
@@ -105,6 +130,9 @@ All bot messages, error messages, and user interactions are now in English.
 
 - `bot.py`: Main bot implementation with all core functionality
 - `requirements.txt`: Python dependencies
+- `Dockerfile` / `docker-compose.yml`: Container build and deployment
+- `docker-entrypoint.sh`: Refreshes yt-dlp at container start (see below)
+- `scripts/refresh-dj-snake.sh`: Host-side weekly restart, run from cron
 - `token`: Bot token file (not in git)
 - `README.md`: English documentation for users
 - `.env.example`: Environment configuration template

@@ -22,6 +22,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Application code.
 COPY bot.py .
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Run as an unprivileged user.
 RUN useradd --create-home botuser \
@@ -31,4 +32,7 @@ USER botuser
 # Unbuffered output so logs show up immediately in `docker compose logs`.
 ENV PYTHONUNBUFFERED=1
 
+# The entrypoint refreshes yt-dlp before launching (see docker-entrypoint.sh);
+# `pip install --user` writes here, which is why botuser owns its home.
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["python", "bot.py"]
