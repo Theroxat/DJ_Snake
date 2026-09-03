@@ -9,6 +9,16 @@ discord.py>=2.5.2
 yt-dlp>=2026.8.19
 python-dotenv==1.0.0
 
+# Supplies the Proof-of-Origin tokens YouTube demands from datacenter IPs.
+# Without it yt-dlp reports `PO Token Providers: none` and downloads get
+# challenged with "Sign in to confirm you're not a bot".
+#
+# Pinned on purpose: this must match the `pot-provider` image tag in
+# docker-compose.yml. Bump both together, never one alone -- a version mismatch
+# between plugin and server breaks token minting. This is also why the
+# entrypoint auto-updates yt-dlp but deliberately leaves this alone.
+bgutil-ytdlp-pot-provider==1.3.2
+
 # Audio Processing
 PyNaCl==1.5.0
 

@@ -221,6 +221,20 @@ the video page fine.
   yt-dlp on every start, so a restart is enough — no rebuild needed. On a
   server, `scripts/refresh-dj-snake.sh` does this weekly from cron.
 
+**`Sign in to confirm you're not a bot`**
+
+YouTube challenges traffic from server IPs. The `pot-provider` service answers
+those challenges with a Proof-of-Origin token, so make sure it is running:
+
+```bash
+docker compose ps            # pot-provider should be "healthy"
+docker compose up -d         # start it if it is not
+```
+
+If it is healthy and the error persists, check that the plugin and the server
+are on the same version — `bgutil-ytdlp-pot-provider` in `requirements.txt` must
+match the `pot-provider` image tag in `docker-compose.yml`.
+
 **Other YouTube download errors**
 - Some videos are region-locked or age-restricted
 - `Signature solving failed` means the Deno JS runtime is missing; it is

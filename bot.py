@@ -1,5 +1,6 @@
 import os
 import asyncio
+import time
 import yt_dlp
 import discord
 from discord.ext import commands
@@ -26,6 +27,31 @@ AUDIO_FORMAT = os.getenv("AUDIO_FORMAT", "bestaudio/best")
 # fetches on first use. Without it, signature/n solving fails and some
 # formats are unavailable.
 REMOTE_COMPONENTS = ["ejs:github"]
+
+# YouTube challenges requests coming from datacenter IPs with "Sign in to
+# confirm you're not a bot". Answering it requires a Proof-of-Origin token;
+# without a provider yt-dlp reports `PO Token Providers: none` and the download
+# fails. The provider runs as the `pot-provider` service in docker-compose.
+#
+# The extractor arg key matters: `youtube:getpot_bgutil_baseurl` is deprecated
+# and rejected by the plugin, which then silently falls back to its default.
+POT_BASE_URL = os.getenv("POT_BASE_URL", "http://pot-provider:4416")
+EXTRACTOR_ARGS = {"youtubepot-bgutilhttp": {"base_url": [POT_BASE_URL]}}
+
+# A challenge that still slips through should cost a few seconds of retry, not
+# the whole track. One entry in the backoff tuple per retry.
+DOWNLOAD_ATTEMPTS = 3
+RETRY_BACKOFF_SECONDS = (3, 8)
+
+# Retrying these is pointless: the video will not become available.
+PERMANENT_ERROR_MARKERS = (
+    "video unavailable",
+    "private video",
+    "removed by the uploader",
+    "members-only",
+    "who has blocked it",
+    "copyright",
+)
 # Only create a temp directory if one wasn't provided. Using tempfile.mkdtemp()
 # directly as the default argument would create an orphan directory on every run
 # because default arguments are evaluated eagerly.
@@ -148,6 +174,7 @@ def get_playlist_info(url):
             "ignoreerrors": True,  # Continue even if some videos have errors
             "playlistend": MAX_PLAYLIST_SIZE,  # Limit based on config
             "remote_components": REMOTE_COMPONENTS,
+            "extractor_args": EXTRACTOR_ARGS,
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -303,54 +330,86 @@ async def join_voice_channel(ctx):
         return False
 
 
-def download_audio(url):
-    try:
-        # Ensure temp directory exists
-        os.makedirs(temp_dir, exist_ok=True)
+def _download_once(url):
+    """Single download attempt. Raises on any failure."""
+    # Ensure temp directory exists
+    os.makedirs(temp_dir, exist_ok=True)
 
-        # Simplified but robust configuration
-        ydl_opts = {
-            "format": AUDIO_FORMAT,
-            "noplaylist": True,
-            "outtmpl": os.path.join(temp_dir, "%(id)s.%(ext)s"),
-            "quiet": False,
-            "remote_components": REMOTE_COMPONENTS,
-        }
+    # Simplified but robust configuration
+    ydl_opts = {
+        "format": AUDIO_FORMAT,
+        "noplaylist": True,
+        "outtmpl": os.path.join(temp_dir, "%(id)s.%(ext)s"),
+        "quiet": False,
+        "remote_components": REMOTE_COMPONENTS,
+        "extractor_args": EXTRACTOR_ARGS,
+    }
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            print(f"Downloading: {url}")
-            info = ydl.extract_info(url, download=True)
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        print(f"Downloading: {url}")
+        info = ydl.extract_info(url, download=True)
 
-            video_id = info.get("id", "")
-            title = info.get("title", "Unknown")
+        video_id = info.get("id", "")
+        title = info.get("title", "Unknown")
 
-            # Find the downloaded file
-            temp_files = os.listdir(temp_dir)
+        # Find the downloaded file
+        temp_files = os.listdir(temp_dir)
 
-            for f in temp_files:
-                if video_id in f:
-                    filepath = os.path.join(temp_dir, f)
-                    # Verify file exists and has content
-                    if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
-                        return filepath, title
-
-            # If not found by ID, take the most recent
-            if temp_files:
-                import time
-
-                latest_file = max(
-                    temp_files,
-                    key=lambda f: os.path.getctime(os.path.join(temp_dir, f)),
-                )
-                filepath = os.path.join(temp_dir, latest_file)
+        for f in temp_files:
+            if video_id in f:
+                filepath = os.path.join(temp_dir, f)
+                # Verify file exists and has content
                 if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
                     return filepath, title
 
-            raise RuntimeError(f"File not found after download")
+        # If not found by ID, take the most recent
+        if temp_files:
+            latest_file = max(
+                temp_files,
+                key=lambda f: os.path.getctime(os.path.join(temp_dir, f)),
+            )
+            filepath = os.path.join(temp_dir, latest_file)
+            if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
+                return filepath, title
 
-    except Exception as e:
-        print(f"Download error: {str(e)}")
-        raise RuntimeError(f"Error during download: {str(e)}")
+        raise RuntimeError("File not found after download")
+
+
+def _is_permanent_failure(message):
+    """True when retrying cannot help (deleted, private, blocked...)."""
+    lowered = message.lower()
+    return any(marker in lowered for marker in PERMANENT_ERROR_MARKERS)
+
+
+def download_audio(url):
+    """Download one track, retrying transient YouTube refusals.
+
+    Runs in an executor thread (see download_and_queue_song), so the blocking
+    sleep between attempts does not stall the bot's event loop.
+    """
+    last_error = None
+
+    for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
+        try:
+            return _download_once(url)
+        except Exception as e:
+            last_error = str(e)
+            print(
+                f"Download error (attempt {attempt}/{DOWNLOAD_ATTEMPTS}): "
+                f"{last_error}"
+            )
+
+            if _is_permanent_failure(last_error):
+                print("Permanent failure, not retrying.")
+                break
+            if attempt == DOWNLOAD_ATTEMPTS:
+                break
+
+            delay = RETRY_BACKOFF_SECONDS[attempt - 1]
+            print(f"Retrying in {delay}s...")
+            time.sleep(delay)
+
+    raise RuntimeError(f"Error during download: {last_error}")
 
 
 async def download_and_queue_song(ctx, player, url, skip_voice_check=False):

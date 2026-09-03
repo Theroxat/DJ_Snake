@@ -8,7 +8,10 @@
 # code is not a reliable signal here -- offline it still exits 0 -- so the
 # result is reported by comparing the version before and after.
 #
-# Set YTDLP_AUTO_UPDATE=0 to skip this (offline runs, CI smoke tests).
+# Only yt-dlp is updated. bgutil-ytdlp-pot-provider stays pinned because it has
+# to match the pot-provider server image (see requirements.txt).
+#
+# Set YTDLP_AUTO_UPDATE=0 to skip the update (offline runs, CI smoke tests).
 
 set -e
 
@@ -31,6 +34,23 @@ if [ "${YTDLP_AUTO_UPDATE:-1}" = "1" ]; then
     else
         echo "[entrypoint] yt-dlp unchanged at ${after} (already current, or PyPI unreachable)"
     fi
+fi
+
+# Report the PO token provider link. A silent failure here is expensive: the bot
+# starts fine and then hits "Sign in to confirm you're not a bot" under load, so
+# make the state visible in the logs at boot.
+pot_url="${POT_BASE_URL:-http://pot-provider:4416}"
+if python -c "
+import sys, urllib.request
+try:
+    urllib.request.urlopen('${pot_url}/ping', timeout=5)
+except Exception as e:
+    sys.exit(1)
+" 2>/dev/null; then
+    echo "[entrypoint] PO token provider reachable at ${pot_url}"
+else
+    echo "[entrypoint] WARNING: PO token provider unreachable at ${pot_url}." >&2
+    echo "[entrypoint] Downloads may fail with \"Sign in to confirm you're not a bot\"." >&2
 fi
 
 exec "$@"

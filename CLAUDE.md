@@ -111,6 +111,27 @@ has two defenses:
 challenge solver. Without it, signature and `n` challenge solving fail and some
 formats become unavailable. It needs the `deno` runtime, installed in the image.
 
+### "Sign in to confirm you're not a bot"
+
+A different failure from the 403, and intermittent: YouTube challenges traffic
+from datacenter IPs and demands a Proof-of-Origin token. `yt-dlp -v` shows
+`PO Token Providers: none` when nothing can answer that challenge.
+
+The `pot-provider` service in `docker-compose.yml` mints those tokens, and
+`bgutil-ytdlp-pot-provider` (pinned in `requirements.txt`) is the yt-dlp side.
+**The plugin version must match the server image tag** -- bump them together.
+
+`EXTRACTOR_ARGS` in `bot.py` points the plugin at the service. The key name is
+load-bearing: `youtube:getpot_bgutil_baseurl` is deprecated and *rejected*, and
+the plugin then silently falls back to its default, so the setting looks applied
+but is not. The current key is `youtubepot-bgutilhttp:base_url`. To check that a
+config change is actually read, point it at a dead port and confirm yt-dlp warns
+about that port.
+
+Because the challenge is intermittent, `download_audio()` also retries
+transient failures with backoff, while `PERMANENT_ERROR_MARKERS` keeps it from
+wasting retries on deleted or private videos.
+
 To diagnose a download failure, reproduce it directly:
 
 ```bash
@@ -133,6 +154,7 @@ docker exec dj-snake python -m yt_dlp --remote-components ejs:github \
 - `Dockerfile` / `docker-compose.yml`: Container build and deployment
 - `docker-entrypoint.sh`: Refreshes yt-dlp at container start (see below)
 - `scripts/refresh-dj-snake.sh`: Host-side weekly restart, run from cron
+- `pot-provider` service: PO token minting sidecar (no host port; internal only)
 - `token`: Bot token file (not in git)
 - `README.md`: English documentation for users
 - `.env.example`: Environment configuration template
