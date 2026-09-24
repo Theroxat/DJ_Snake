@@ -732,15 +732,6 @@ async def on_command_error(ctx, error):
         pass
 
 
-@bot.event
-async def on_disconnect():
-    for file in os.listdir(temp_dir):
-        try:
-            os.remove(os.path.join(temp_dir, file))
-        except:
-            pass
-
-
 def get_discord_token():
     """Get Discord token from environment variables or token file (fallback)"""
     TOKEN = os.getenv("DISCORD_TOKEN")
