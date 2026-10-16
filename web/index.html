@@ -58,7 +58,7 @@ header {
 
 /* Layout */
 main {
-  display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 32px;
+  display: grid; grid-template-columns: minmax(0, 1fr) clamp(380px, 32vw, 480px); gap: 32px;
   padding: 28px 24px 40px; max-width: 1500px; margin: 0 auto;
 }
 .stage { min-width: 0; }
@@ -80,7 +80,20 @@ video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: con
 .trackinfo { flex: 1 1 260px; min-width: 0; }
 .title { font-size: clamp(18px, 2.4vw, 28px); margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .progline { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
-.progline .prog { flex: 1; height: 8px; border: 2px solid var(--cream); margin: 0; }
+.seek {
+  position: relative; flex: 1; min-width: 0; height: 28px; display: flex; align-items: center;
+  cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.seek .prog { width: 100%; height: 8px; border: 2px solid var(--cream); margin: 0; transition: border-color .08s; }
+.seek:hover .prog, .seek.active .prog { border-color: var(--yellow); }
+.seek:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.seek.disabled { cursor: default; pointer-events: none; opacity: .5; }
+.seek .ghost { position: absolute; top: 4px; bottom: 4px; width: 2px; margin-left: -1px; background: var(--yellow); pointer-events: none; }
+.seek .tip {
+  position: absolute; bottom: 100%; transform: translateX(-50%); margin-bottom: 2px; pointer-events: none; z-index: 5;
+  background: var(--ink); color: var(--yellow); border: 2px solid var(--yellow); padding: 0 8px; line-height: 1.2; white-space: nowrap;
+}
+@media (pointer: coarse) { .seek { height: 44px; } .seek .ghost { top: 10px; bottom: 10px; } }
 .prog i { display: block; height: 100%; width: 0; background: var(--red); }
 .times { font-family: "VT323", monospace; font-size: 20px; line-height: 1; color: var(--muted); white-space: nowrap; }
 .tools { display: flex; align-items: center; gap: 12px; }
@@ -121,14 +134,19 @@ aside { min-width: 0; display: flex; flex-direction: column; gap: 28px; }
 h2 { margin: 0 0 10px; font-size: 18px; display: flex; align-items: baseline; gap: 10px; }
 h2 .hud { color: var(--red); font-size: 20px; }
 .empty { color: var(--muted); border: 2px dashed var(--hair); padding: 14px; }
-ol { list-style: none; margin: 0; padding: 0; border: 2px solid var(--cream); max-height: 52vh; overflow-y: auto; }
-li { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--hair); }
+ol { list-style: none; margin: 0; padding: 0; border: 2px solid var(--cream); max-height: 68vh; overflow-y: auto; }
+li { display: flex; align-items: center; gap: 12px; padding: 10px 14px; min-height: 76px; border-bottom: 1px solid var(--hair); cursor: pointer; }
 li:last-child { border-bottom: 0; }
 li:hover { background: var(--cream); color: var(--ink); }
+li:active:not(.dragging) { background: var(--yellow); color: var(--ink); }
+li.busy { opacity: .6; cursor: progress; }
 li:hover .idx { color: var(--red-deep); }
-.idx { font-family: "VT323", monospace; font-size: 22px; color: var(--red); min-width: 2ch; }
-li img { width: 56px; aspect-ratio: 16 / 9; object-fit: cover; border: 1px solid var(--hair); flex: none; background: #111; }
-li .n { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.idx { font-family: "VT323", monospace; font-size: 24px; color: var(--red); min-width: 2ch; text-align: center; }
+.idx .pl { display: none; }
+li:hover .idx .num { display: none; }
+li:hover .idx .pl { display: inline; }
+li img { width: 96px; aspect-ratio: 16 / 9; object-fit: cover; border: 1px solid var(--hair); flex: none; background: #111; }
+li .n { flex: 1; min-width: 0; font-size: 14px; line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 li .d { font-family: "VT323", monospace; font-size: 20px; color: var(--muted); }
 li:hover .d { color: var(--ink); }
 
@@ -152,9 +170,18 @@ button[aria-busy="true"] { opacity: .6; cursor: progress; }
 /* Queue interaction */
 ol { position: relative; }
 li { position: relative; }
-li .n a, .title a { color: inherit; text-decoration: none; }
-li .n a:hover, .title a:hover { text-decoration: underline; }
-li .n a:focus-visible, .title a:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+li .n:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+a.yt {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+  color: var(--muted); transition: color .08s;
+}
+a.yt svg { width: 22px; height: 15.5px; fill: currentColor; display: block; }
+a.yt:hover, a.yt:focus-visible { color: var(--red); }
+a.yt:focus-visible { outline: 2px solid var(--cyan); outline-offset: 1px; }
+li:hover a.yt { color: var(--ink); }
+li:hover a.yt:hover { color: var(--red); }
+.title a.yt { width: 36px; height: 24px; vertical-align: middle; margin-left: 6px; }
+.title a.yt svg { width: 26px; height: 18px; }
 li button.grip, li button.rm {
   flex: none; width: 40px; height: 40px; min-width: 40px; padding: 0; box-shadow: none; display: inline-flex;
   align-items: center; justify-content: center; border-width: 2px; font-size: 20px; line-height: 1;
@@ -164,6 +191,9 @@ li button.grip svg { width: 18px; height: 18px; fill: currentColor; }
 li button.rm { border-color: var(--hair); color: var(--red); font-family: "VT323", monospace; font-size: 28px; }
 li button.grip:hover, li button.rm:hover { transform: none; box-shadow: none; border-color: var(--red); }
 li:hover button.grip, li:hover button.rm { background: var(--cream); }
+li:hover button.grip, li:hover button.rm { border-color: var(--ink); }
+li:hover button.grip { color: var(--ink); }
+li:hover button.rm { color: var(--red-deep); }
 li.dragging { z-index: 5; background: var(--cream); color: var(--ink); box-shadow: 4px 4px 0 var(--red); border: 2px solid var(--ink); cursor: grabbing; }
 li.dragging .idx { color: var(--red-deep); }
 li.dragging .d { color: var(--ink); }
@@ -204,7 +234,11 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
   .where b { max-width: 60vw; }
 }
 @media (max-width: 480px) {
-  li { gap: 8px; padding: 6px 8px; }
+  li { gap: 8px; padding: 6px 8px; min-height: 64px; }
+  .seek { height: 44px; }
+  .seek .ghost { top: 10px; bottom: 10px; }
+  a.yt { width: 40px; height: 40px; }
+  .title a.yt { width: 40px; height: 40px; margin: -8px 0 -8px 2px; }
   li img { display: none; }
   .transport { gap: 12px; }
   .addform { flex-basis: 100%; }
@@ -249,7 +283,11 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
       <div class="trackinfo">
         <h2 class="title display" id="title" style="display:block">&nbsp;</h2>
         <div class="progline" id="progline" hidden>
-          <div class="prog" role="progressbar" aria-label="Progression du morceau"><i id="progfill"></i></div>
+          <div class="seek disabled" id="seek" role="slider" tabindex="-1" aria-label="Position dans le morceau" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="00:00" aria-disabled="true">
+            <div class="prog"><i id="progfill"></i></div>
+            <span class="ghost" id="seekghost" hidden></span>
+            <span class="tip hud" id="seektip" hidden>00:00</span>
+          </div>
           <span class="times"><span id="tcur">00:00</span> / <span id="tdur">--:--</span></span>
         </div>
       </div>
@@ -383,13 +421,17 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { t.hidden = true; }, kind === "err" ? 5000 : 3000);
   }
-  function link(url, text) {
+  const YT = '<svg viewBox="0 0 24 17" aria-hidden="true"><path d="M23.5 2.7A3 3 0 0 0 21.4.5C19.5 0 12 0 12 0S4.5 0 2.6.5A3 3 0 0 0 .5 2.7C0 4.6 0 8.5 0 8.5s0 3.9.5 5.8a3 3 0 0 0 2.1 2.2C4.5 17 12 17 12 17s7.500 0 9.400-.5a3 3 0 0 0 2.100-2.200c.5-1.900.5-5.800.5-5.800s0-3.900-.5-5.800zM9.600 12.100V4.900l6.200 3.600z"/></svg>';
+  function ytLink(url) {
     // url is a server string: only http(s) targets become links
-    if (!/^https?:\/\//i.test(url || "")) return mk("span", null, text);
-    const a = mk("a", null, text);
+    if (!/^https?:\/\//i.test(url || "")) return null;
+    const a = mk("a", "yt");
     a.href = url;
     a.target = "_blank";
     a.rel = "noopener noreferrer";
+    a.title = "Ouvrir sur YouTube";
+    a.setAttribute("aria-label", "Ouvrir sur YouTube");
+    a.innerHTML = YT; // static markup, no server data
     return a;
   }
   function mk(tag, cls, text) {
@@ -426,11 +468,20 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
       grip.setAttribute("aria-label", "Déplacer « " + t.title + " » (glisser, ou flèches haut et bas)");
       grip.dataset.id = t.id;
       li.appendChild(grip);
-      li.appendChild(mk("span", "idx", String(i + 1).padStart(2, "0")));
+      const idx = mk("span", "idx");
+      idx.appendChild(mk("span", "num", String(i + 1).padStart(2, "0")));
+      idx.appendChild(mk("span", "pl", "▶"));
+      li.appendChild(idx);
+      li.title = "Lire maintenant";
       if (t.thumbnail) li.appendChild(safeImg(t.thumbnail));
       const n = mk("span", "n");
-      n.appendChild(link(t.url, t.title));
+      n.textContent = t.title;
+      n.tabIndex = 0;
+      n.setAttribute("role", "button");
+      n.setAttribute("aria-label", "Lire maintenant « " + t.title + " »");
       li.appendChild(n);
+      const yt = ytLink(t.url);
+      if (yt) li.appendChild(yt);
       li.appendChild(mk("span", "d", fmt(t.duration)));
       const rm = mk("button", "rm", "×");
       rm.type = "button";
@@ -463,12 +514,29 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
     send("move", { id, index: to });
   }
   $("queue").addEventListener("click", (e) => {
+    if (e.target.closest("a.yt, button.grip")) return;
     const rm = e.target.closest("button.rm");
-    if (!rm || !inVoice) return;
-    const id = rm.closest("li").dataset.id;
-    rm.disabled = true;
-    renderQueue(queue.filter((t) => t.id !== id));
-    send("remove", { id });
+    if (rm) {
+      if (!inVoice) return;
+      const id = rm.closest("li").dataset.id;
+      rm.disabled = true;
+      renderQueue(queue.filter((t) => t.id !== id));
+      send("remove", { id });
+      return;
+    }
+    const li = e.target.closest("li");
+    if (li) jumpTo(li);
+  });
+  function jumpTo(li) {
+    if (!inVoice || dragging || pending.has("jump")) return;
+    li.classList.add("busy");
+    send("jump", { id: li.dataset.id });
+  }
+  $("queue").addEventListener("keydown", (e) => {
+    const n = e.target.closest && e.target.closest("span.n");
+    if (!n || (e.key !== "Enter" && e.key !== " ")) return;
+    e.preventDefault();
+    jumpTo(n.closest("li"));
   });
   $("queue").addEventListener("keydown", (e) => {
     const g = e.target.closest && e.target.closest("button.grip");
@@ -606,13 +674,86 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
   function tick() {
     correct();
     if (state) {
-      const e = Math.min(state.duration || Infinity, baseElapsed + (paused ? 0 : (performance.now() - anchor) / 1000));
-      const pct = state.duration ? Math.min(100, (e / state.duration) * 100) : 0;
-      $("tcur").textContent = fmt(e);
-      $("progfill").style.width = pct + "%";
-      $("progfill").parentNode.setAttribute("aria-valuenow", String(Math.round(pct)));
+      const e = curElapsed();
+      const dur = state.duration || 0;
+      const pct = dur ? Math.min(100, (e / dur) * 100) : 0;
+      const sk = $("seek"), on = !!dur && inVoice;
+      sk.classList.toggle("disabled", !on);
+      sk.tabIndex = on ? 0 : -1;
+      sk.setAttribute("aria-disabled", String(!on));
+      sk.setAttribute("aria-valuemax", String(Math.floor(dur)));
+      if (!seeking) {
+        $("tcur").textContent = fmt(e);
+        $("progfill").style.width = pct + "%";
+        sk.setAttribute("aria-valuenow", String(Math.floor(e)));
+        sk.setAttribute("aria-valuetext", fmt(e));
+      }
     }
   }
+  function curElapsed() {
+    return Math.min(state.duration || Infinity, baseElapsed + (paused ? 0 : (performance.now() - anchor) / 1000));
+  }
+
+  // ---- seek bar (click, drag, touch, keyboard)
+  const seekEl = $("seek");
+  let seeking = false, seekFrac = 0;
+  const seekOn = () => !!(state && state.duration && inVoice);
+  function fracAt(x) {
+    const r = seekEl.getBoundingClientRect();
+    return r.width ? Math.max(0, Math.min(1, (x - r.left) / r.width)) : 0;
+  }
+  function showPreview(f) {
+    seekFrac = f;
+    const t = f * state.duration;
+    $("seekghost").hidden = false;
+    $("seektip").hidden = false;
+    $("seekghost").style.left = f * 100 + "%";
+    $("seektip").style.left = f * 100 + "%";
+    $("seektip").textContent = fmt(t);
+    if (seeking) {
+      $("progfill").style.width = f * 100 + "%";
+      $("tcur").textContent = fmt(t);
+      seekEl.setAttribute("aria-valuenow", String(Math.floor(t)));
+      seekEl.setAttribute("aria-valuetext", fmt(t));
+    }
+  }
+  function hidePreview() { $("seekghost").hidden = true; $("seektip").hidden = true; }
+  function seekTo(pos) {
+    if (!seekOn()) return;
+    pos = Math.max(0, Math.min(pos, Math.max(0, state.duration - 1)));
+    baseElapsed = pos;
+    anchor = performance.now();
+    if (!pendingSeek && video.readyState >= 1) { try { video.currentTime = targetPos(); } catch (e) {} }
+    tick();
+    send("seek", { position: Math.round(pos * 10) / 10 });
+  }
+  seekEl.addEventListener("pointerdown", (e) => {
+    if (!seekOn() || seeking || (e.pointerType === "mouse" && e.button !== 0)) return;
+    seeking = true;
+    seekEl.classList.add("active");
+    try { seekEl.setPointerCapture(e.pointerId); } catch (x) {}
+    e.preventDefault();
+    showPreview(fracAt(e.clientX));
+  });
+  seekEl.addEventListener("pointermove", (e) => {
+    if (!state || !state.duration) return;
+    if (seeking || e.pointerType === "mouse") showPreview(fracAt(e.clientX));
+  });
+  const seekEnd = (commit) => {
+    if (!seeking) return;
+    seeking = false;
+    seekEl.classList.remove("active");
+    hidePreview();
+    if (commit) seekTo(seekFrac * state.duration);
+  };
+  seekEl.addEventListener("pointerup", (e) => { if (seeking) { showPreview(fracAt(e.clientX)); seekEnd(true); } });
+  seekEl.addEventListener("pointercancel", () => seekEnd(false));
+  seekEl.addEventListener("pointerleave", () => { if (!seeking) hidePreview(); });
+  seekEl.addEventListener("keydown", (e) => {
+    if (!seekOn() || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+    e.preventDefault();
+    seekTo(curElapsed() + (e.key === "ArrowLeft" ? -5 : 5));
+  });
   setInterval(tick, 200);
 
   // ---- polling
@@ -650,7 +791,9 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
     if (tl.dataset.sig !== tsig) {
       tl.dataset.sig = tsig;
       tl.textContent = "";
-      tl.appendChild(link(np.url, np.title));
+      tl.appendChild(document.createTextNode(np.title));
+      const yt = ytLink(np.url);
+      if (yt) tl.appendChild(yt);
     }
     document.title = np.title + " — DJ Snake";
     state = { duration: np.duration };

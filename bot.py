@@ -1,6 +1,7 @@
 import os
 import asyncio
 import json
+import math
 import re
 import secrets
 import time
@@ -117,8 +118,11 @@ class MusicPlayer:
         # Serializes every change to the playback state (play_next, controls).
         self.lock = asyncio.Lock()
         # What play_next does when the current track stops: None (go on),
-        # "next", "previous" or "restart". Set by controls before stop().
+        # "next", "previous", "restart" or "seek". Set by controls before stop().
         self.pending_action = None
+        # For "seek": where to restart (seconds) and whether to stay paused.
+        self.seek_position = 0.0
+        self.seek_paused = False
         # Bumped on each track start; a stale `after` callback is ignored.
         self.play_gen = 0
 
@@ -707,9 +711,10 @@ def _cancelled(player, epoch):
 
 
 async def download_and_queue_song(
-    ctx, player, url, skip_voice_check=False, from_web=False
+    ctx, player, url, skip_voice_check=False, from_web=False, quiet=False
 ):
-    """Download one track and queue it. Returns the track, or None."""
+    """Download one track and queue it. Returns the track, or None.
+    `quiet` (playlist items) posts no message, not even on failure."""
     epoch = player.epoch
     try:
         if _cancelled(player, epoch):
@@ -721,7 +726,9 @@ async def download_and_queue_song(
                     await ctx.send("❌ Unable to join voice channel!")
                     return None
 
-        status_message = await ctx.send("⏳ Downloading...")
+        status_message = (
+            _NullMessage() if quiet else await ctx.send("⏳ Downloading...")
+        )
         loop = asyncio.get_running_loop()
         track = await loop.run_in_executor(None, download_media, url)
 
@@ -742,6 +749,9 @@ async def download_and_queue_song(
         return track
 
     except Exception as e:
+        if quiet:
+            print(f"Playlist item failed: {e}")
+            return None
         await ctx.send(f"❌ Download error: {str(e)}")
         if "status_message" in locals():
             try:
@@ -751,14 +761,28 @@ async def download_and_queue_song(
         return None
 
 
+async def _edit_quietly(message, content):
+    """Edit a status message; a deleted one is not worth an error."""
+    try:
+        await message.edit(content=content)
+    except Exception as e:
+        print(f"Could not edit message: {e}")
+
+
 async def queue_playlist(ctx, player, entries, from_web=False):
     """Download playlist entries one by one into the queue while earlier
     ones play. `loading` keeps play_next from leaving voice meanwhile."""
     epoch = player.epoch
-    player.loading_jobs += 1
     stopped = False
+    loaded = 0
+    total = len(entries)
+    # One message for the whole playlist, edited at the end: a line per
+    # track would flood the channel and bury the session link.
+    source = " from the web page" if from_web else ""
+    status_message = await ctx.send(f"📥 Loading {total} tracks{source}…")
+    player.loading_jobs += 1
     try:
-        for i, entry in enumerate(entries, 1):
+        for entry in entries:
             if _cancelled(player, epoch):
                 stopped = True
                 break
@@ -773,19 +797,23 @@ async def queue_playlist(ctx, player, entries, from_web=False):
             else:
                 video_url = f"https://www.youtube.com/watch?v={video_id}"
 
-            title = entry.get("title", "Unknown title")
-            await ctx.send(f"⏳ [{i}/{len(entries)}] Adding **{title}**...")
-
-            await download_and_queue_song(
-                ctx, player, video_url, skip_voice_check=True, from_web=from_web
+            track = await download_and_queue_song(
+                ctx, player, video_url, skip_voice_check=True, quiet=True
             )
+            if track is not None and not _cancelled(player, epoch):
+                loaded += 1
     finally:
         player.loading_jobs = max(0, player.loading_jobs - 1)
 
     if stopped or _cancelled(player, epoch):
-        await ctx.send("⏹️ Download stopped.")
+        await _edit_quietly(
+            status_message, f"⏹️ Loading stopped ({loaded}/{total} tracks loaded)"
+        )
         return
-    await ctx.send("✅ All playlist tracks have been added!")
+    text = f"✅ {loaded}/{total} tracks loaded{source}"
+    if loaded < total:
+        text += f" ({total - loaded} unavailable)"
+    await _edit_quietly(status_message, text)
     # The last track may have finished while the queue was empty during
     # loading: start the queue again, or leave if there is nothing left.
     if not player.is_playing:
@@ -823,8 +851,12 @@ async def _advance(ctx, player):
     player.paused_at = None
     player.paused_total = 0.0
 
-    if action == "restart" and finished:
+    offset = 0.0
+    keep_paused = False
+    if action in ("restart", "seek") and finished:
         next_track = finished
+        if action == "seek":
+            offset, keep_paused = player.seek_position, player.seek_paused
     elif action == "previous" and finished and player.history:
         player.queue.insert(0, finished)
         next_track = player.history.pop()
@@ -836,6 +868,7 @@ async def _advance(ctx, player):
     while next_track is not None and not os.path.exists(next_track["filepath"]):
         await ctx.send(f"❌ File not found for {next_track['title']}")
         next_track = player.next_in_queue()
+        offset, keep_paused = 0.0, False  # The seek was for the lost track
 
     if next_track is None:
         player.is_playing = False
@@ -874,7 +907,10 @@ async def _advance(ctx, player):
     player.now_playing = next_track
     player.is_playing = True
     # The file carries video for the web page; Discord only needs audio.
-    audio_source = discord.FFmpegPCMAudio(next_track["filepath"], options="-vn")
+    ffmpeg_kwargs = {"options": "-vn"}
+    if offset > 0:
+        ffmpeg_kwargs["before_options"] = f"-ss {offset:.3f}"
+    audio_source = discord.FFmpegPCMAudio(next_track["filepath"], **ffmpeg_kwargs)
     try:
         player.voice_client.play(audio_source, after=after_playing)
     except Exception:
@@ -882,8 +918,14 @@ async def _advance(ctx, player):
         player.is_playing = False
         discard_tracks([next_track])
         raise
-    player.started_at = time.monotonic()
+    now = time.monotonic()
+    player.started_at = now - offset
+    if keep_paused:
+        player.voice_client.pause()
+        player.paused_at = now
     player.last_active = _clock()
+    if action == "seek" and next_track is finished:
+        return  # Too noisy to announce
     # The track already plays: a failed announcement must not mark the
     # player idle (play_next would then try to start a second track).
     try:
@@ -963,6 +1005,48 @@ async def control_previous(player):
         action = "previous"
     await _stop_with(player, action)
     return action
+
+
+async def control_seek(player, position):
+    """Restart the current track at `position` seconds (clamped to the
+    track), keeping it paused if it was. Returns the applied position."""
+    async with player.lock:
+        _require_playing(player)
+        position = max(0.0, float(position))
+        duration = player.now_playing.get("duration")
+        if duration:
+            position = max(0.0, min(position, duration - 1))
+        if player.pending_action == "seek":
+            player.seek_position = position  # Not applied yet: retarget it
+            return position
+        if player.pending_action is not None:
+            return position  # Another transition is already under way
+        player.seek_position = position
+        player.seek_paused = player.paused_at is not None
+        player.pending_action = "seek"
+        player.voice_client.stop()
+        return position
+
+
+async def control_jump(player, guild_id, track_id):
+    """Play a queued track now; the current one goes to history like a skip
+    and the tracks queued before it keep their order. Returns the track."""
+    async with player.lock:
+        if not player.in_voice():
+            raise ControlError("not_in_voice")
+        track = player.queue.pop(_find_queued(player, track_id))
+        player.queue.insert(0, track)
+        idle = not player.is_playing or not player.now_playing
+        if not idle:
+            # A pending action is only applied by play_next, after this
+            # stop(): overriding it is safe and makes the jump win.
+            already_stopping = player.pending_action is not None
+            player.pending_action = "next"
+            if not already_stopping:
+                player.voice_client.stop()
+    if idle:
+        await play_next(WebContext(guild_id, player))
+    return track
 
 
 async def control_pause(player):
@@ -1058,7 +1142,6 @@ async def _add_from_web(player, guild_id, kind, url):
                 )
             else:
                 entries = entries[:MAX_PLAYLIST_SIZE]
-                await ctx.send(f"📋 Adding {len(entries)} tracks from the web page...")
                 await queue_playlist(ctx, player, entries, from_web=True)
     except Exception as e:
         print(f"Web add failed: {e}")
@@ -1165,7 +1248,6 @@ async def play(ctx, url: str = None):
 
             # Limit based on configuration
             playlist_entries = playlist_entries[:MAX_PLAYLIST_SIZE]
-            await ctx.send(f"📋 Adding {len(playlist_entries)} tracks to queue...")
             await queue_playlist(ctx, player, playlist_entries)
         else:
             # It's a single video
@@ -1269,6 +1351,31 @@ async def next_track(ctx):
     await _run_command_control(ctx, control_next)
 
 
+def parse_position(text):
+    """Seconds from "90", "1:30" or "1:02:03"; None if invalid."""
+    try:
+        parts = [float(p) for p in text.split(":")]
+    except ValueError:
+        return None
+    if not 1 <= len(parts) <= 3 or any(not math.isfinite(p) or p < 0 for p in parts):
+        return None
+    seconds = 0.0
+    for p in parts:
+        seconds = seconds * 60 + p
+    return seconds
+
+
+@bot.command(name="seek")
+async def seek(ctx, position: str):
+    seconds = parse_position(position)
+    if seconds is None:
+        await ctx.send("❌ Invalid position. Use seconds or mm:ss.")
+        return
+    applied = await _run_command_control(ctx, lambda p: control_seek(p, seconds))
+    if applied is not None:
+        await ctx.send(f"⏩ Seeking to {int(applied) // 60}:{int(applied) % 60:02d}")
+
+
 @bot.command(name="pause")
 async def pause(ctx):
     changed = await _run_command_control(ctx, control_pause)
@@ -1304,7 +1411,9 @@ async def on_command_error(ctx, error):
 #   GET /                      landing text
 #   GET /{sid}                 the page (it handles unknown/ended sessions)
 #   GET /api/{sid}/state       session state JSON, 404 {"active": false} if none
-#   POST /api/{sid}/control    {"action", "id"?, "index"?, "url"?} -> {"ok": ...}
+#   POST /api/{sid}/control    {"action", "id"?, "index"?, "url"?, "position"?}
+#                              -> {"ok": ...}; actions: next, previous, pause,
+#                              resume, remove, move, add, seek, jump
 #   GET /media/{sid}/{id}      the mp4 of a playing, queued or history track
 # Paths are never built from the request: tracks are looked up by id.
 
@@ -1414,16 +1523,34 @@ async def web_control(request):
     if not isinstance(data, dict):
         return _control_error(400, "Requête invalide.")
     action = data.get("action")
-    if action not in ("next", "previous", "pause", "resume", "remove", "move", "add"):
+    if action not in (
+        "next",
+        "previous",
+        "pause",
+        "resume",
+        "remove",
+        "move",
+        "add",
+        "seek",
+        "jump",
+    ):
         return _control_error(400, "Action inconnue.")
 
     track_id = data.get("id")
     index = data.get("index")
-    if action in ("remove", "move") and not (
+    if action in ("remove", "move", "jump") and not (
         isinstance(track_id, str) and 0 < len(track_id) <= 64
     ):
         return _control_error(400, "Morceau invalide.")
     if action == "move" and (type(index) is not int):
+        return _control_error(400, "Position invalide.")
+    position = data.get("position")
+    if action == "seek" and not (
+        isinstance(position, (int, float))
+        and not isinstance(position, bool)
+        and math.isfinite(position)
+        and position >= 0
+    ):
         return _control_error(400, "Position invalide.")
     if action == "add" and not isinstance(data.get("url"), str):
         return _control_error(400, "Lien manquant.")
@@ -1458,6 +1585,13 @@ async def web_control(request):
                 player,
                 f"↕️ Moved from the web page: **{track['title']}** "
                 f"(now #{index + 1})",
+            )
+        elif action == "seek":
+            await control_seek(player, position)  # Not announced: too noisy
+        elif action == "jump":
+            track = await control_jump(player, guild_id, track_id)
+            await announce(
+                player, f"▶️ Jumped to **{track['title']}** from the web page"
             )
         elif action == "add":
             control_add(player, guild_id, data["url"])

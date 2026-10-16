@@ -88,7 +88,7 @@ and `YTDLP_AUTO_UPDATE`
   with no generation only starts an idle player. Controls never pick the next
   track themselves: they set `pending_action` under the lock and call
   `voice_client.stop()`.
-- **Controls** (`control_next/previous/pause/resume/remove/move/add`) are shared
+- **Controls** (`control_next/previous/pause/resume/remove/move/add/seek/jump`) are shared
   by Discord commands and the web page and raise `ControlError` (HTTP status,
   French web message, English Discord message). Previous restarts the track
   after 5 s of play or with empty history. Add accepts only YouTube hosts and
@@ -100,7 +100,10 @@ and `YTDLP_AUTO_UPDATE`
   with no download. If the URL contains both `v=` and a playlist (a radio or
   mix link), `PlaylistChoiceView` asks with buttons whether to play one track
   or the whole list; on timeout it plays the single track. Playlist tracks
-  download one at a time while earlier ones play. `player.loading` stops
+  download one at a time while earlier ones play. Loading posts one message
+  (`📥 Loading N tracks…`) and edits it at the end (`✅ k/N tracks loaded (m
+  unavailable)` or `⏹️ Loading stopped`); items download with `quiet=True`, so
+  there is no per-track message, not even for a failure. `player.loading` stops
   `play_next()` from disconnecting when the queue briefly runs empty during
   that loading. `!stop` sets `should_stop` and bumps `epoch`, which every
   download step checks, and deletes queue, current and history files.
@@ -127,7 +130,9 @@ and `YTDLP_AUTO_UPDATE`
   thumbnail, url}]}` (404 `{"active": false}` when the sid is unknown or
   expired; out of voice, `now_playing` is null and `queue` empty; `elapsed`
   freezes while paused). `POST /api/{sid}/control` takes `{action:
-  next|previous|pause|resume|remove|move|add, id?, index?, url?}` (body <= 4 KB)
+  next|previous|pause|resume|remove|move|add|seek|jump, id?, index?, url?,
+  position?}` (body <= 4 KB; seek restarts the track at `position` seconds,
+  clamped, staying paused if it was, unannounced; jump plays a queued `id` now)
   and returns 200 `{"ok": true}` (202 for add, which downloads in the
   background) or `{"ok": false, "error": "<French>"}` with 400 (bad input,
   non-YouTube URL), 404 (unknown sid or track id) or 409 (not in voice, nothing
@@ -137,7 +142,7 @@ and `YTDLP_AUTO_UPDATE`
 - **Voice**: `safe_voice_connect()` cleans up any stale voice client, adds
   delays, and retries. It exists to avoid Discord close code 4006 (invalid
   session). `join_voice_channel()` wraps it. `!reset` forces a reconnect.
-- **Commands**: `!play`, `!list`, `!next`, `!pause`, `!resume`, `!stop`,
+- **Commands**: `!play`, `!list`, `!next`, `!pause`, `!resume`, `!seek`, `!stop`,
   `!reset`.
 - Voice needs `PyNaCl`, `davey` (DAVE encryption, required by discord.py 2.7+)
   and, on Python 3.13+, `audioop-lts`. The Docker image uses Python 3.12. CI
