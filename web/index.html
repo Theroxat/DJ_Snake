@@ -124,6 +124,62 @@ li .n { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; display: -webk
 li .d { font-family: "VT323", monospace; font-size: 20px; color: var(--muted); }
 li:hover .d { color: var(--ink); }
 
+/* Transport */
+.transport { display: flex; align-items: center; gap: 16px; margin-top: 22px; flex-wrap: wrap; }
+.transport button { min-width: 56px; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; padding: 6px 16px; }
+.transport button svg { width: 22px; height: 22px; fill: currentColor; display: block; }
+.transport #pp { background: var(--red); border-color: var(--cream); color: var(--ink); box-shadow: 6px 6px 0 var(--cream); min-width: 72px; }
+.transport #pp:hover { box-shadow: 3px 3px 0 var(--cream); }
+.transport #pp:active { box-shadow: 0 0 0 var(--cream); }
+button:disabled { opacity: .35; cursor: not-allowed; box-shadow: 3px 3px 0 var(--hair); transform: none; }
+button[aria-busy="true"] { opacity: .6; cursor: progress; }
+.pausebadge {
+  position: absolute; top: 10px; right: 10px; z-index: 2; background: var(--ink); color: var(--yellow);
+  border: 2px solid var(--yellow); padding: 0 10px; box-shadow: 3px 3px 0 var(--red);
+}
+.pausebadge i { font-style: normal; animation: blink 1s steps(2, start) infinite; }
+.overlay .sub { color: var(--cream); max-width: 46ch; margin: 0; font-size: 14px; }
+.idle-overlay .big { color: var(--cyan); }
+
+/* Queue interaction */
+ol { position: relative; }
+li { position: relative; }
+li .n a, .now .t a, .title a { color: inherit; text-decoration: none; }
+li .n a:hover, .now .t a:hover, .title a:hover { text-decoration: underline; }
+li .n a:focus-visible, .now .t a:focus-visible, .title a:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+li button.grip, li button.rm {
+  flex: none; width: 40px; height: 40px; min-width: 40px; padding: 0; box-shadow: none; display: inline-flex;
+  align-items: center; justify-content: center; border-width: 2px; font-size: 20px; line-height: 1;
+}
+li button.grip { touch-action: none; cursor: grab; border-color: var(--hair); color: var(--muted); }
+li button.grip svg { width: 18px; height: 18px; fill: currentColor; }
+li button.rm { border-color: var(--hair); color: var(--red); font-family: "VT323", monospace; font-size: 28px; }
+li button.grip:hover, li button.rm:hover { transform: none; box-shadow: none; border-color: var(--red); }
+li:hover button.grip, li:hover button.rm { background: var(--cream); }
+li.dragging { z-index: 5; background: var(--cream); color: var(--ink); box-shadow: 4px 4px 0 var(--red); border: 2px solid var(--ink); cursor: grabbing; }
+li.dragging .idx { color: var(--red-deep); }
+li.dragging .d { color: var(--ink); }
+ol.sorting li:not(.dragging) { transition: transform .12s; }
+ol.sorting { user-select: none; -webkit-user-select: none; }
+
+.addform { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.addform input {
+  flex: 1 1 180px; min-width: 0; min-height: 44px; background: var(--ink); color: var(--cream);
+  border: 2px solid var(--cream); padding: 8px 12px; font: 400 14px "Space Mono", monospace;
+  box-shadow: 4px 4px 0 var(--cyan);
+}
+.addform input::placeholder { color: var(--muted); }
+.addform input:disabled { opacity: .4; }
+.addform button { min-height: 44px; box-shadow: 4px 4px 0 var(--yellow); }
+
+#toast {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 120; max-width: min(92vw, 560px);
+  background: var(--ink); color: var(--cream); border: 2px solid var(--cyan); box-shadow: 4px 4px 0 var(--cyan);
+  padding: 4px 14px; font-family: "VT323", monospace; font-size: 22px; letter-spacing: .04em; text-align: center;
+}
+#toast.err { border-color: var(--red); box-shadow: 4px 4px 0 var(--red); color: var(--yellow); }
+#toast.ok { border-color: var(--lime); box-shadow: 4px 4px 0 var(--lime); color: var(--lime); }
+
 /* Ended screen */
 #ended {
   position: fixed; inset: 0; z-index: 50; background: var(--ink);
@@ -139,7 +195,14 @@ li:hover .d { color: var(--ink); }
   ol { max-height: none; }
   .where b { max-width: 60vw; }
 }
-@media (prefers-reduced-motion: reduce) { .live i, .blink { animation: none !important; } }
+@media (max-width: 480px) {
+  li { gap: 8px; padding: 6px 8px; }
+  li img { display: none; }
+  .transport { gap: 12px; }
+  .bar button, .offset button { min-height: 44px; min-width: 44px; }
+  .offset input[type=range] { min-height: 40px; }
+}
+@media (prefers-reduced-motion: reduce) { .live i, .blink, .pausebadge i { animation: none !important; } }
 </style>
 </head>
 <body>
@@ -156,10 +219,17 @@ li:hover .d { color: var(--ink); }
   <section class="stage">
     <div class="frame" id="frame">
       <video id="video" muted playsinline preload="auto"></video>
+      <div class="pausebadge hud" id="pausebadge" hidden><i>❚❚</i> PAUSE</div>
       <div class="overlay" id="overlay">
-        <div class="hud blink" style="color:var(--cyan)">PLAYER 1 — READY</div>
+        <div class="hud blink" id="overlayhud" style="color:var(--cyan)">PLAYER 1 — READY</div>
         <div class="big display" id="overlaytxt">Connexion…</div>
+        <p class="sub" id="overlaysub" hidden></p>
       </div>
+    </div>
+    <div class="transport" role="group" aria-label="Contrôles de lecture">
+      <button id="prev" type="button" aria-label="Morceau précédent" title="Précédent" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h3v14H5zM20 5v14L9 12z"/></svg></button>
+      <button id="pp" type="button" aria-label="Pause" title="Pause" disabled><svg id="ppicon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg></button>
+      <button id="next" type="button" aria-label="Morceau suivant" title="Suivant" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h3v14h-3zM4 5v14l11-7z"/></svg></button>
     </div>
     <div class="bar">
       <h2 class="title display" id="title" style="display:block">&nbsp;</h2>
@@ -181,11 +251,17 @@ li:hover .d { color: var(--ink); }
     </div>
     <div>
       <h2 class="display"><span class="hud" id="qcount">00</span> À suivre</h2>
-      <ol id="queue"></ol>
+      <ol id="queue" aria-label="File d'attente"></ol>
       <div id="queueempty" class="empty">La file est vide.</div>
+      <form id="addform" class="addform" autocomplete="off">
+        <input id="addurl" type="text" inputmode="url" placeholder="Colle un lien YouTube…" aria-label="Lien YouTube à ajouter" disabled>
+        <button id="addbtn" type="submit" aria-label="Ajouter à la file" disabled>Ajouter</button>
+      </form>
     </div>
   </aside>
 </main>
+
+<div id="toast" role="status" aria-live="polite" hidden></div>
 
 <div id="ended" hidden>
   <div class="card">
@@ -221,6 +297,12 @@ li:hover .d { color: var(--ink); }
   let timer = null;
   let polling = false;
   let lastQueueSig = "", lastNowSig = "";
+  let inVoice = true, paused = false, canPrev = false;
+  let queue = [];          // current (possibly optimistic) queue
+  let dragging = false, deferredQueue = null;
+  let focusAfterRender = null;
+  let again = false;
+  const pending = new Set();
 
   const fmt = (s) => {
     if (s == null || !isFinite(s)) return "--:--";
@@ -250,13 +332,35 @@ li:hover .d { color: var(--ink); }
   });
 
   // ---- UI helpers
-  function setLive(on) {
+  function setLive(on, label) {
     $("live").classList.toggle("off", !on);
-    $("livetxt").textContent = on ? "LIVE" : "HORS SYNC";
+    $("livetxt").textContent = on ? "LIVE" : (label || "HORS SYNC");
   }
-  function overlay(text) {
+  function overlay(text, sub, idle) {
     $("overlay").hidden = !text;
+    $("overlay").classList.toggle("idle-overlay", !!idle);
+    $("overlayhud").hidden = !!idle;
+    $("overlaysub").hidden = !sub;
+    $("overlaysub").textContent = sub || "";
     if (text) $("overlaytxt").textContent = text;
+  }
+  let toastTimer = null;
+  function toast(msg, kind) {
+    const t = $("toast");
+    t.textContent = msg;
+    t.className = kind || "";
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.hidden = true; }, kind === "err" ? 5000 : 3000);
+  }
+  function link(url, text) {
+    // url is a server string: only http(s) targets become links
+    if (!/^https?:\/\//i.test(url || "")) return mk("span", null, text);
+    const a = mk("a", null, text);
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    return a;
   }
   function mk(tag, cls, text) {
     const e = document.createElement(tag);
@@ -275,7 +379,7 @@ li:hover .d { color: var(--ink); }
 
   function renderNow(np) {
     const box = $("now");
-    const sig = np ? np.id + "|" + np.title + "|" + np.duration : "";
+    const sig = np ? np.id + "|" + np.title + "|" + np.duration + "|" + np.url : "";
     if (sig === lastNowSig) return;
     lastNowSig = sig;
     box.textContent = "";
@@ -283,7 +387,9 @@ li:hover .d { color: var(--ink); }
     box.className = "now";
     if (np.thumbnail) box.appendChild(safeImg(np.thumbnail, "thumb"));
     const meta = mk("div", "meta");
-    meta.appendChild(mk("div", "t", np.title));
+    const tt = mk("div", "t");
+    tt.appendChild(link(np.url, np.title));
+    meta.appendChild(tt);
     const prog = mk("div", "prog"); const fill = mk("i"); fill.id = "progfill"; prog.appendChild(fill);
     meta.appendChild(prog);
     const times = mk("div", "times");
@@ -294,24 +400,142 @@ li:hover .d { color: var(--ink); }
     box.appendChild(meta);
   }
 
+  const GRIP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h3v3H8zM13 5h3v3h-3zM8 10.5h3v3H8zM13 10.5h3v3h-3zM8 16h3v3H8zM13 16h3v3h-3z"/></svg>';
+
   function renderQueue(q) {
-    const sig = JSON.stringify(q.map((t) => [t.id, t.title, t.duration]));
+    queue = q;
+    if (dragging) { deferredQueue = q; return; }
+    const sig = JSON.stringify(q.map((t) => [t.id, t.title, t.duration, t.url, t.thumbnail]));
     if (sig === lastQueueSig) return;
     lastQueueSig = sig;
     const ol = $("queue");
     ol.textContent = "";
     q.forEach((t, i) => {
       const li = mk("li");
+      li.dataset.id = t.id;
+      const grip = mk("button", "grip");
+      grip.type = "button";
+      grip.innerHTML = GRIP; // static markup, no server data
+      grip.setAttribute("aria-label", "Déplacer « " + t.title + " » (glisser, ou flèches haut et bas)");
+      grip.dataset.id = t.id;
+      li.appendChild(grip);
       li.appendChild(mk("span", "idx", String(i + 1).padStart(2, "0")));
       if (t.thumbnail) li.appendChild(safeImg(t.thumbnail));
-      li.appendChild(mk("span", "n", t.title));
+      const n = mk("span", "n");
+      n.appendChild(link(t.url, t.title));
+      li.appendChild(n);
       li.appendChild(mk("span", "d", fmt(t.duration)));
+      const rm = mk("button", "rm", "×");
+      rm.type = "button";
+      rm.setAttribute("aria-label", "Retirer « " + t.title + " » de la file");
+      li.appendChild(rm);
       ol.appendChild(li);
     });
     $("qcount").textContent = String(q.length).padStart(2, "0");
     $("queueempty").hidden = q.length > 0;
     ol.hidden = q.length === 0;
+    if (focusAfterRender != null) {
+      const g = [...ol.querySelectorAll("button.grip")].find((b) => b.dataset.id === focusAfterRender);
+      focusAfterRender = null;
+      if (g) g.focus();
+    }
   }
+
+  // ---- queue actions (optimistic)
+  function moveLocal(from, to) {
+    const q = queue.slice();
+    const [it] = q.splice(from, 1);
+    q.splice(to, 0, it);
+    renderQueue(q);
+  }
+  function doMove(from, to, focusId) {
+    if (from === to || from < 0 || to < 0 || to >= queue.length) return;
+    const id = queue[from].id;
+    if (focusId) focusAfterRender = id;
+    moveLocal(from, to);
+    send("move", { id, index: to });
+  }
+  $("queue").addEventListener("click", (e) => {
+    const rm = e.target.closest("button.rm");
+    if (!rm || !inVoice) return;
+    const id = rm.closest("li").dataset.id;
+    rm.disabled = true;
+    renderQueue(queue.filter((t) => t.id !== id));
+    send("remove", { id });
+  });
+  $("queue").addEventListener("keydown", (e) => {
+    const g = e.target.closest && e.target.closest("button.grip");
+    if (!g || !inVoice || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+    e.preventDefault();
+    const from = queue.findIndex((t) => t.id === g.dataset.id);
+    doMove(from, from + (e.key === "ArrowUp" ? -1 : 1), true);
+  });
+
+  // pointer drag-and-drop (mouse + touch), started from the grip only
+  $("queue").addEventListener("pointerdown", (e) => {
+    const g = e.target.closest("button.grip");
+    if (!g || !inVoice || dragging || (e.pointerType === "mouse" && e.button !== 0)) return;
+    const ol = $("queue");
+    const li = g.closest("li");
+    const items = [...ol.children];
+    const from = items.indexOf(li);
+    const geo = items.map((x) => ({ top: x.offsetTop, h: x.offsetHeight }));
+    const h = geo[from].h;
+    const startY = e.clientY, startScroll = ol.scrollTop;
+    let to = from, lastY = startY;
+    dragging = true;
+    deferredQueue = null;
+    g.setPointerCapture(e.pointerId);
+    li.classList.add("dragging");
+    ol.classList.add("sorting");
+    e.preventDefault();
+
+    const layout = () => {
+      const dy = lastY - startY + (ol.scrollTop - startScroll);
+      li.style.transform = "translateY(" + dy + "px)";
+      const center = geo[from].top + h / 2 + dy;
+      to = 0;
+      items.forEach((_, j) => { if (j !== from && geo[j].top + geo[j].h / 2 < center) to++; });
+      items.forEach((x, j) => {
+        if (j === from) return;
+        let sh = 0;
+        if (j > from && j <= to) sh = -h;
+        else if (j < from && j >= to) sh = h;
+        x.style.transform = sh ? "translateY(" + sh + "px)" : "";
+      });
+    };
+    const move = (ev) => {
+      lastY = ev.clientY;
+      layout();
+      const r = ol.getBoundingClientRect();
+      if (ev.clientY < r.top + 24) { ol.scrollTop -= 8; layout(); }
+      else if (ev.clientY > r.bottom - 24) { ol.scrollTop += 8; layout(); }
+    };
+    const end = (cancel) => {
+      g.removeEventListener("pointermove", move);
+      g.removeEventListener("pointerup", up);
+      g.removeEventListener("pointercancel", cancelFn);
+      try { g.releasePointerCapture(e.pointerId); } catch (x) {}
+      dragging = false;
+      ol.classList.remove("sorting");
+      items.forEach((x) => { x.style.transform = ""; x.classList.remove("dragging"); });
+      const deferred = deferredQueue;
+      deferredQueue = null;
+      if (!cancel && to !== from) {
+        const id = queue[from].id;
+        lastQueueSig = ""; // force a rebuild of the rows in their new order
+        moveLocal(from, to);
+        send("move", { id, index: to });
+      } else if (deferred) {
+        renderQueue(deferred);
+      }
+    };
+    const up = () => end(false);
+    const cancelFn = () => end(true);
+    g.addEventListener("pointermove", move);
+    g.addEventListener("pointerup", up);
+    g.addEventListener("pointercancel", cancelFn);
+  });
 
   function showEnded() {
     $("ended").hidden = false;
@@ -323,7 +547,7 @@ li:hover .d { color: var(--ink); }
   // ---- sync
   function targetPos() {
     if (!state) return 0;
-    let t = baseElapsed + (performance.now() - anchor) / 1000 + offset;
+    let t = baseElapsed + (paused ? 0 : (performance.now() - anchor) / 1000 + offset);
     if (state.duration) t = Math.min(t, state.duration);
     return Math.max(0, t);
   }
@@ -342,8 +566,7 @@ li:hover .d { color: var(--ink); }
     if (!pendingSeek) return;
     pendingSeek = false;
     try { video.currentTime = targetPos(); } catch (e) {}
-    const p = video.play();
-    if (p && p.catch) p.catch(() => {});
+    if (!paused) { const p = video.play(); if (p && p.catch) p.catch(() => {}); }
     overlay(null);
   }
   video.addEventListener("loadedmetadata", onMeta);
@@ -351,6 +574,13 @@ li:hover .d { color: var(--ink); }
 
   function correct() {
     if (!state || !curId || pendingSeek || video.readyState < 1) return;
+    if (paused) {
+      if (!video.paused) video.pause();
+      video.playbackRate = 1;
+      if (Math.abs(video.currentTime - targetPos()) > 0.3) { try { video.currentTime = targetPos(); } catch (e) {} }
+      setLive(false, "PAUSE");
+      return;
+    }
     if (video.paused && !video.ended) { const p = video.play(); if (p && p.catch) p.catch(() => {}); }
     const target = targetPos();
     const drift = video.currentTime - target; // >0: video ahead
@@ -369,7 +599,7 @@ li:hover .d { color: var(--ink); }
   function tick() {
     correct();
     if (state) {
-      const e = Math.min(state.duration || Infinity, baseElapsed + (performance.now() - anchor) / 1000);
+      const e = Math.min(state.duration || Infinity, baseElapsed + (paused ? 0 : (performance.now() - anchor) / 1000));
       const tc = $("tcur"), pf = $("progfill");
       if (tc) tc.textContent = fmt(e);
       if (pf) pf.style.width = (state.duration ? Math.min(100, (e / state.duration) * 100) : 0) + "%";
@@ -380,30 +610,104 @@ li:hover .d { color: var(--ink); }
   // ---- polling
   function apply(d, latency) {
     $("ended").hidden = true;
+    inVoice = d.in_voice !== false;
+    paused = !!d.paused && inVoice;
+    canPrev = !!d.can_previous;
+    $("pausebadge").hidden = !(paused && d.now_playing);
     $("guild").textContent = d.guild || "—";
     $("channel").textContent = d.channel ? " # " + d.channel : "";
     renderQueue(d.queue || []);
     const np = d.now_playing;
     renderNow(np);
+    if (!inVoice) {
+      state = null; curId = null;
+      if (video.getAttribute("src")) { video.pause(); video.removeAttribute("src"); video.load(); }
+      $("title").textContent = ""; $("title").dataset.sig = "";
+      overlay("En pause", "DJ Snake n'est dans aucune room. Lance !play dans Discord pour reprendre, ce lien reste valable.", true);
+      setLive(false, "EN PAUSE");
+      updateControls();
+      return;
+    }
     if (!np) {
       state = null; curId = null;
       if (video.getAttribute("src")) { video.pause(); video.removeAttribute("src"); video.load(); }
       $("title").textContent = "";
       overlay(d.loading ? "Le bot prépare le morceau…" : "En attente d'un morceau…");
       setLive(false);
+      updateControls();
       return;
     }
-    $("title").textContent = np.title;
+    const tl = $("title"), tsig = np.id + "|" + np.title + "|" + np.url;
+    if (tl.dataset.sig !== tsig) {
+      tl.dataset.sig = tsig;
+      tl.textContent = "";
+      tl.appendChild(link(np.url, np.title));
+    }
     document.title = np.title + " — DJ Snake";
     state = { duration: np.duration };
-    baseElapsed = (np.elapsed || 0) + latency;
+    baseElapsed = (np.elapsed || 0) + (paused ? 0 : latency);
     anchor = performance.now();
     if (np.id !== curId) loadTrack(np);
+    updateControls();
   }
 
+  // ---- controls
+  function updateControls() {
+    const dis = (id, v) => { $(id).disabled = !!v; };
+    dis("prev", !inVoice || !canPrev || pending.has("previous"));
+    dis("next", !inVoice || pending.has("next"));
+    dis("pp", !inVoice || !state || pending.has("pause") || pending.has("resume"));
+    dis("addurl", !inVoice);
+    dis("addbtn", !inVoice || pending.has("add"));
+    const pp = $("pp");
+    pp.setAttribute("aria-label", paused ? "Reprendre" : "Pause");
+    pp.title = paused ? "Reprendre" : "Pause";
+    $("ppicon").innerHTML = paused ? '<path d="M7 4.5v15l12-7.5z"/>' : '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>';
+  }
+
+  // POST a control action; returns true on success. Always refreshes the state afterwards.
+  async function send(action, extra) {
+    pending.add(action);
+    updateControls();
+    let ok = false;
+    try {
+      const r = await fetch("/api/" + encodeURIComponent(sid) + "/control", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.assign({ action }, extra || {})),
+      });
+      let j = null;
+      try { j = await r.json(); } catch (e) {}
+      if (r.ok && j && j.ok) {
+        ok = true;
+        if (action === "add") toast("Ajouté — téléchargement en cours…", "ok");
+      } else {
+        toast((j && j.error) || "Action impossible (erreur " + r.status + ").", "err");
+      }
+    } catch (e) {
+      toast("Réseau indisponible, réessaie.", "err");
+    } finally {
+      pending.delete(action);
+      updateControls();
+      pollNow();
+    }
+    return ok;
+  }
+  $("prev").addEventListener("click", () => send("previous"));
+  $("next").addEventListener("click", () => send("next"));
+  $("pp").addEventListener("click", () => send(paused ? "resume" : "pause"));
+  $("addform").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const inp = $("addurl");
+    const url = inp.value.trim();
+    if (!url || !inVoice || pending.has("add")) return;
+    if (await send("add", { url })) inp.value = "";
+  });
+
   async function poll() {
-    if (polling) return;
+    if (polling) { again = true; return; }
     polling = true;
+    again = false;
     let next = POLL_MS;
     const t0 = performance.now();
     try {
@@ -422,9 +726,10 @@ li:hover .d { color: var(--ink); }
     } finally {
       polling = false;
       clearTimeout(timer);
-      timer = setTimeout(poll, next);
+      timer = setTimeout(poll, again ? 0 : next);
     }
   }
+  function pollNow() { clearTimeout(timer); poll(); }
 
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {

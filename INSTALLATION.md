@@ -102,6 +102,7 @@ cp .env.example .env
 DISCORD_TOKEN=your_bot_token_here
 COMMAND_PREFIX=!
 MAX_PLAYLIST_SIZE=30
+SESSION_IDLE_HOURS=6
 ```
 
 ### Method 2: Token File (Less Secure)
@@ -138,6 +139,8 @@ Connected to 1 guilds
 - `!play <URL>` - Play music from YouTube
 - `!list` - Show current queue
 - `!next` - Skip to next track
+- `!pause` - Pause playback
+- `!resume` - Resume playback
 - `!stop` - Stop playback and clear queue
 - `!reset` - Reset voice connection
 

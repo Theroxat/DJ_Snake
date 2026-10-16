@@ -60,55 +60,85 @@ container by `env_file`): `DISCORD_TOKEN` (required; a `token` file is the
 fallback), `COMMAND_PREFIX` (`!`), `MAX_PLAYLIST_SIZE` (30), `MEDIA_FORMAT`
 (max 720p H.264 + m4a, see `DEFAULT_MEDIA_FORMAT`; it replaces `AUDIO_FORMAT`,
 which is no longer read), `TEMP_DIR`, `POT_BASE_URL`, `WEB_PORT` (47823),
-`PUBLIC_BASE_URL` (`https://dj.example.com`), and `YTDLP_AUTO_UPDATE`
+`PUBLIC_BASE_URL` (`https://dj.example.com`), `SESSION_IDLE_HOURS` (6),
+and `YTDLP_AUTO_UPDATE`
 (entrypoint only). `config.json.example` is not read by the code.
 
 ## Architecture (`bot.py`)
 
 - **Per-guild state**: `music_players` maps guild ID to a `MusicPlayer` holding
-  the voice client, the queue of `{id, filepath, title, duration, thumbnail}` items, the
-  flags `is_playing`, `should_stop` and `loading`, the web session `sid` and
-  `started_at` (`time.monotonic()` at playback start).
+  the voice client, the queue of `{id, filepath, title, duration, thumbnail,
+  url}` items, `history` (last 5 played tracks), the flags `is_playing`,
+  `should_stop` and `loading` (`loading_jobs > 0`), `epoch` (bumped by `!stop`
+  / `!reset` so older download jobs give up), the web session `sid`, and
+  `started_at` / `paused_at` / `paused_total` for `elapsed()`.
 - **Download before play**: tracks are fully downloaded to `TEMP_DIR` as one
   video+audio mp4 (`merge_output_format`, `+faststart`) before they enter the
-  queue. The downloaded file is deleted once the next track starts. yt-dlp is
+  queue. Files are removed by `discard_tracks()`, which skips any path still
+  referenced by a player (the same video shares one path). yt-dlp is
   blocking, so `download_media()` and `get_playlist_info()` always run through
   `loop.run_in_executor`.
-- **Playback chain**: `play_next()` pops the queue and starts `FFmpegPCMAudio`
-  (with `-vn`: Discord gets the audio only).
-  The `after` callback runs on a non-asyncio thread and schedules the next
-  `play_next()` with `asyncio.run_coroutine_threadsafe(..., bot.loop)`.
+- **Playback chain**: `play_next()` takes `player.lock` and `_advance()` retires
+  the current track per `player.pending_action` (None/"next": to history, pop
+  the queue; "previous": current back to the queue front, play the last history
+  track; "restart": replay it), then starts `FFmpegPCMAudio` (`-vn`). The
+  `after` callback runs on the audio thread and only schedules
+  `play_next(ctx, gen, player)` on the loop; a callback whose generation
+  (`play_gen`) or player (replaced by `!reset`) is stale is ignored, and a call
+  with no generation only starts an idle player. Controls never pick the next
+  track themselves: they set `pending_action` under the lock and call
+  `voice_client.stop()`.
+- **Controls** (`control_next/previous/pause/resume/remove/move/add`) are shared
+  by Discord commands and the web page and raise `ControlError` (HTTP status,
+  French web message, English Discord message). Previous restarts the track
+  after 5 s of play or with empty history. Add accepts only YouTube hosts and
+  rebuilds a canonical URL (`parse_youtube_url()`, no SSRF via yt-dlp); `v=`
+  means one track, otherwise `list=` loads up to `MAX_PLAYLIST_SIZE` in the
+  background with a `WebContext` (no author, so it can never join voice).
+  Web actions are announced in the session's text channel.
 - **Playlists**: `!play` first tries `get_playlist_info()`, a flat extraction
   with no download. If the URL contains both `v=` and a playlist (a radio or
   mix link), `PlaylistChoiceView` asks with buttons whether to play one track
   or the whole list; on timeout it plays the single track. Playlist tracks
   download one at a time while earlier ones play. `player.loading` stops
   `play_next()` from disconnecting when the queue briefly runs empty during
-  that loading. `!stop` sets `should_stop`, which every download step checks.
+  that loading. `!stop` sets `should_stop` and bumps `epoch`, which every
+  download step checks, and deletes queue, current and history files.
 - **Gateway reconnects are routine**: discord.py drops and resumes the gateway
   session roughly every couple of hours. Don't do cleanup in `on_disconnect`.
   An earlier handler deleted `TEMP_DIR` there and broke long playlists in the
   middle of playback. Per-track cleanup in `play_next()` and `!stop` is the only
   place files are removed. `on_voice_state_update` resets the player's voice
   state when the bot is kicked from a channel.
-- **Clip live sessions**: joining voice (`join_voice_channel()`) opens a session
-  (`secrets.token_urlsafe(16)`, `sessions` maps sid to guild) and posts
-  `{PUBLIC_BASE_URL}/{sid}` in the channel. Leaving voice ends it (queue end,
-  `!stop`, a kick seen by `on_voice_state_update`); `player.reconnecting` keeps
-  it across `!reset` and channel switches.
+- **Clip live sessions**: a session (`secrets.token_urlsafe(16)`, `sessions`
+  maps sid to guild) belongs to the guild and survives leaving voice (queue
+  end, `!stop`, kick, `!reset`). A fresh join reuses the unexpired sid, or
+  makes one, and posts `{PUBLIC_BASE_URL}/{sid}`; that channel becomes
+  `player.text_channel` for notices. It expires after `SESSION_IDLE_HOURS`
+  without activity (playback or being in voice, a command via
+  `bot.before_invoke`, a web control): lazily in `_session_player()` plus
+  `session_cleanup_loop()` every 10 min. Expiry deletes the player's files.
 - **Web server**: aiohttp, started in `setup_hook` on the bot's loop, bound to
   `0.0.0.0:WEB_PORT`. Routes, the contract `web/index.html` relies on:
   `GET /` landing text; `GET /{sid}` serves `web/index.html`;
-  `GET /api/{sid}/state` returns `{active, guild, channel, loading, server_time,
-  now_playing: {id, title, duration, thumbnail, video_url, elapsed} | null,
-  queue: [{id, title, duration, thumbnail}]}` (404 `{"active": false}` when the
-  sid is unknown); `GET /media/{sid}/{id}` streams the playing or a queued
+  `GET /api/{sid}/state` returns `{active, in_voice, guild, channel, loading,
+  paused, can_previous, server_time, now_playing: {id, title, duration,
+  thumbnail, url, video_url, elapsed} | null, queue: [{id, title, duration,
+  thumbnail, url}]}` (404 `{"active": false}` when the sid is unknown or
+  expired; out of voice, `now_playing` is null and `queue` empty; `elapsed`
+  freezes while paused). `POST /api/{sid}/control` takes `{action:
+  next|previous|pause|resume|remove|move|add, id?, index?, url?}` (body <= 4 KB)
+  and returns 200 `{"ok": true}` (202 for add, which downloads in the
+  background) or `{"ok": false, "error": "<French>"}` with 400 (bad input,
+  non-YouTube URL), 404 (unknown sid or track id) or 409 (not in voice, nothing
+  playing). `GET /media/{sid}/{id}` streams the playing, a queued or a history
   track's mp4 with Range support. Files are found by track id, never by a path
   from the request.
 - **Voice**: `safe_voice_connect()` cleans up any stale voice client, adds
   delays, and retries. It exists to avoid Discord close code 4006 (invalid
   session). `join_voice_channel()` wraps it. `!reset` forces a reconnect.
-- **Commands**: `!play`, `!list`, `!next`, `!stop`, `!reset`.
+- **Commands**: `!play`, `!list`, `!next`, `!pause`, `!resume`, `!stop`,
+  `!reset`.
 - Voice needs `PyNaCl`, `davey` (DAVE encryption, required by discord.py 2.7+)
   and, on Python 3.13+, `audioop-lts`. The Docker image uses Python 3.12. CI
   tests on 3.10 to 3.12.

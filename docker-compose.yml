@@ -5,8 +5,8 @@ services:
     container_name: dj-snake
     restart: unless-stopped
     # Reads DISCORD_TOKEN and the optional COMMAND_PREFIX / MAX_PLAYLIST_SIZE /
-    # MEDIA_FORMAT / WEB_PORT / PUBLIC_BASE_URL variables from your local .env
-    # file (never committed).
+    # MEDIA_FORMAT / WEB_PORT / PUBLIC_BASE_URL / SESSION_IDLE_HOURS variables
+    # from your local .env file (never committed).
     env_file:
       - .env
     # Synced clip web page. Bound to the LAN address only; the Cloudflare

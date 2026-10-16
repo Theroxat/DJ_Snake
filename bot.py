@@ -1,7 +1,10 @@
 import os
 import asyncio
+import json
+import re
 import secrets
 import time
+import types
 import yt_dlp
 import discord
 from discord.ext import commands
@@ -40,6 +43,15 @@ PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://dj.example.com").rstrip(
 WEB_INDEX = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "web", "index.html"
 )
+# A web session outlives the bot's stay in voice; it expires after this many
+# hours without activity (playback, a command or a web control).
+SESSION_IDLE_HOURS = float(os.getenv("SESSION_IDLE_HOURS", "6"))
+SESSION_CLEANUP_SECONDS = 600
+# Played tracks kept (files on disk) so "previous" can go back.
+HISTORY_SIZE = 5
+# "Previous" restarts the current track once it has played this long.
+PREVIOUS_RESTART_SECONDS = 5
+MAX_CONTROL_BODY = 4096
 # YouTube signs stream URLs with a JS challenge. yt-dlp needs both a JS
 # runtime (deno, installed in the image) and the EJS solver script, which it
 # fetches on first use. Without it, signature/n solving fails and some
@@ -79,28 +91,49 @@ bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
 temp_dir = TEMP_DIR
 
 
+def _clock():
+    """Wall clock for session expiry (a function so tests can fake it)."""
+    return time.time()
+
+
 class MusicPlayer:
     def __init__(self):
         self.voice_client = None
         self.queue = []
-        self.current_file = None
-        self.is_playing = False
+        self.history = []  # Last played tracks, oldest first (files kept)
+        self.is_playing = False  # A track is loaded in the voice client
         self.should_stop = False
+        # Bumped by !stop / !reset: download jobs started before it give up,
+        # even if a later !play clears should_stop again.
+        self.epoch = 0
         self.now_playing = None
-        self.loading = False  # True while a playlist is still being downloaded
-        self.sid = None  # Web session id, set while the bot is in voice
+        self.loading_jobs = 0  # Playlist / web downloads still running
+        self.sid = None  # Web session id (outlives the stay in voice)
+        self.last_active = _clock()
+        self.text_channel = None  # Where the session was last announced
         self.started_at = None  # time.monotonic() when now_playing started
-        # True while the bot leaves voice on purpose but comes back (!reset,
-        # channel switch), so on_voice_state_update keeps the session.
-        self.reconnecting = False
+        self.paused_at = None  # time.monotonic() when paused, else None
+        self.paused_total = 0.0  # Paused seconds since started_at
+        # Serializes every change to the playback state (play_next, controls).
+        self.lock = asyncio.Lock()
+        # What play_next does when the current track stops: None (go on),
+        # "next", "previous" or "restart". Set by controls before stop().
+        self.pending_action = None
+        # Bumped on each track start; a stale `after` callback is ignored.
+        self.play_gen = 0
 
-    def cleanup(self):
-        if self.current_file and os.path.exists(self.current_file):
-            try:
-                os.remove(self.current_file)
-            except:
-                pass
-            self.current_file = None
+    @property
+    def loading(self):
+        return self.loading_jobs > 0
+
+    def in_voice(self):
+        return bool(self.voice_client and self.voice_client.is_connected())
+
+    def elapsed(self):
+        if self.started_at is None:
+            return None
+        end = self.paused_at if self.paused_at is not None else time.monotonic()
+        return max(0.0, end - self.started_at - self.paused_total)
 
     def add_to_queue(self, track):
         if not self.should_stop:
@@ -113,13 +146,23 @@ class MusicPlayer:
 
     def stop_and_clear(self):
         self.should_stop = True
-        self.loading = False
+        self.epoch += 1
+        self.play_gen += 1  # The stopped track's callback must not advance
+        self.pending_action = None
+        tracks = list(self.queue) + list(self.history)
+        if self.now_playing:
+            tracks.append(self.now_playing)
         self.queue.clear()
-        if self.voice_client and self.voice_client.is_playing():
-            self.voice_client.stop()
-        self.cleanup()
+        self.history.clear()
         self.now_playing = None
+        if self.voice_client and (
+            self.voice_client.is_playing() or self.voice_client.is_paused()
+        ):
+            self.voice_client.stop()
+        discard_tracks(tracks)
         self.started_at = None
+        self.paused_at = None
+        self.paused_total = 0.0
         self.is_playing = False
 
     async def disconnect_voice_client(self):
@@ -141,13 +184,110 @@ music_players = {}
 sessions = {}
 
 
-async def open_session(ctx, player):
-    """Start a web session for this guild if none is active, and post its link."""
+def _file_in_use(filepath):
+    """True if any player still references this file (the same video
+    downloaded twice, or in two guilds, shares one path)."""
+    for player in music_players.values():
+        tracks = list(player.queue) + list(player.history)
+        if player.now_playing:
+            tracks.append(player.now_playing)
+        if any(t.get("filepath") == filepath for t in tracks):
+            return True
+    return False
+
+
+def discard_tracks(tracks):
+    """Delete the files of tracks no player references any more."""
+    for track in tracks:
+        filepath = track.get("filepath") if track else None
+        if not filepath or _file_in_use(filepath):
+            continue
+        try:
+            if os.path.exists(filepath):
+                os.remove(filepath)
+        except OSError as e:
+            print(f"Could not delete {filepath}: {e}")
+
+
+def push_history(player, track):
+    player.history.append(track)
+    evicted = []
+    while len(player.history) > HISTORY_SIZE:
+        evicted.append(player.history.pop(0))
+    discard_tracks(evicted)
+
+
+# --- Sessions ---------------------------------------------------------------
+
+
+def _session_expired(player):
+    if player.in_voice():
+        return False  # Being in voice counts as activity
+    return _clock() - player.last_active > SESSION_IDLE_HOURS * 3600
+
+
+def expire_session(player):
+    """End the session for good: its links stop working and its files go."""
     if player.sid:
+        sessions.pop(player.sid, None)
+        print(f"Web session expired: {player.sid}")
+        player.sid = None
+    if not player.in_voice():
+        tracks = list(player.queue) + list(player.history)
+        if player.now_playing:
+            tracks.append(player.now_playing)
+        player.queue.clear()
+        player.history.clear()
+        player.now_playing = None
+        discard_tracks(tracks)
+
+
+def touch(player):
+    """Record activity. An already expired session is ended, not revived."""
+    if player.sid and _session_expired(player):
+        expire_session(player)
+    player.last_active = _clock()
+
+
+def _session_player(sid):
+    """The player behind a live session id, or None (expires lazily)."""
+    guild_id = sessions.get(sid)
+    if guild_id is None:
+        return None
+    player = music_players.get(guild_id)
+    if not player or player.sid != sid:
+        sessions.pop(sid, None)
+        return None
+    if player.in_voice():
+        player.last_active = _clock()
+    elif _session_expired(player):
+        expire_session(player)
+        return None
+    return player
+
+
+async def session_cleanup_loop():
+    while True:
+        await asyncio.sleep(SESSION_CLEANUP_SECONDS)
+        try:
+            for sid in list(sessions):
+                _session_player(sid)
+        except Exception as e:
+            print(f"Session cleanup error: {e}")
+
+
+async def open_session(ctx, player, announce=True):
+    """Reuse the guild's live session or start one, and post its link."""
+    touch(player)
+    created = False
+    if not player.sid:
+        player.sid = secrets.token_urlsafe(16)
+        sessions[player.sid] = ctx.guild.id
+        created = True
+        print(f"Web session opened for {ctx.guild.name}: {player.sid}")
+    if not (created or announce):
         return
-    player.sid = secrets.token_urlsafe(16)
-    sessions[player.sid] = ctx.guild.id
-    print(f"Web session opened for {ctx.guild.name}: {player.sid}")
+    player.text_channel = ctx.channel
     try:
         await ctx.channel.send(
             f"📺 Watch the clip live: {PUBLIC_BASE_URL}/{player.sid}"
@@ -156,12 +296,44 @@ async def open_session(ctx, player):
         print(f"Could not post session link: {e}")
 
 
-def end_session(player):
-    """End the player's web session; its links stop working."""
-    if player.sid:
-        sessions.pop(player.sid, None)
-        print(f"Web session ended: {player.sid}")
-        player.sid = None
+async def announce(player, text):
+    """Post a short notice in the session's text channel."""
+    if player.text_channel is None:
+        return
+    try:
+        await player.text_channel.send(text)
+    except Exception as e:
+        print(f"Could not announce: {e}")
+
+
+class _NullMessage:
+    async def edit(self, **kwargs):
+        pass
+
+    async def delete(self):
+        pass
+
+
+class WebContext:
+    """Stands in for a command context when the web page triggers work.
+    It has no author, so it can never make the bot join voice."""
+
+    author = None
+
+    def __init__(self, guild_id, player):
+        self.guild = bot.get_guild(guild_id) or types.SimpleNamespace(
+            id=guild_id, name=""
+        )
+        self.channel = player.text_channel
+
+    async def send(self, content=None, **kwargs):
+        if self.channel is None:
+            return _NullMessage()
+        try:
+            return await self.channel.send(content, **kwargs)
+        except Exception as e:
+            print(f"Could not send: {e}")
+            return _NullMessage()
 
 
 def get_video_id_from_url(url):
@@ -174,6 +346,47 @@ def get_video_id_from_url(url):
         return video_id or None
     except Exception:
         return None
+
+
+YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com"}
+_VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
+_LIST_ID_RE = re.compile(r"^[A-Za-z0-9_-]{2,64}$")
+
+
+def parse_youtube_url(url):
+    """Validate a URL from the web page and rebuild it canonically.
+
+    Returns ("single", url) or ("playlist", url), or None for anything that is
+    not a YouTube video or playlist link. Only the rebuilt URL reaches yt-dlp,
+    so the request cannot point it at another host.
+    """
+    if not isinstance(url, str) or len(url) > 2048:
+        return None
+    try:
+        parsed = urlparse(url.strip())
+        host = (parsed.hostname or "").lower()
+        parsed.port  # Raises on a malformed port
+    except ValueError:
+        return None
+    if parsed.scheme not in ("http", "https") or parsed.username or parsed.port:
+        return None
+    query = parse_qs(parsed.query)
+    if host == "youtu.be":
+        video_id = parsed.path.strip("/")
+    elif host in YOUTUBE_HOSTS:
+        video_id = query.get("v", [""])[0]
+        if not video_id and parsed.path.startswith("/shorts/"):
+            video_id = parsed.path[len("/shorts/") :].strip("/")
+        if not video_id:
+            list_id = query.get("list", [""])[0]
+            if _LIST_ID_RE.match(list_id):
+                return ("playlist", f"https://www.youtube.com/playlist?list={list_id}")
+            return None
+    else:
+        return None
+    if _VIDEO_ID_RE.match(video_id):
+        return ("single", f"https://www.youtube.com/watch?v={video_id}")
+    return None
 
 
 class PlaylistChoiceView(discord.ui.View):
@@ -357,29 +570,31 @@ async def safe_voice_connect(voice_channel, max_attempts=3):
 
 async def join_voice_channel(ctx):
     """Simplified voice connection function"""
-    if not ctx.author.voice:
+    author = getattr(ctx, "author", None)
+    if not author or not author.voice:
         await ctx.send("❌ You must be in a voice channel!")
         return False
 
-    voice_channel = ctx.author.voice.channel
+    voice_channel = author.voice.channel
 
     # Initialize player if necessary
     if ctx.guild.id not in music_players:
         music_players[ctx.guild.id] = MusicPlayer()
 
     player = music_players[ctx.guild.id]
+    # Expire a stale session now: once in voice it would count as active.
+    touch(player)
 
-    # Use our secure connection function. A channel switch disconnects first,
-    # which must not end the web session.
-    player.reconnecting = True
-    try:
-        voice_client = await safe_voice_connect(voice_channel)
-    finally:
-        player.reconnecting = False
+    current = ctx.guild.voice_client
+    already_here = bool(
+        current and current.is_connected() and current.channel == voice_channel
+    )
+    voice_client = await safe_voice_connect(voice_channel)
 
     if voice_client:
         player.voice_client = voice_client
-        await open_session(ctx, player)
+        # A fresh join (re)posts the session link; a later !play does not.
+        await open_session(ctx, player, announce=not already_here)
         return True
     else:
         await ctx.send("❌ Unable to connect to voice channel.")
@@ -418,6 +633,7 @@ def _download_once(url):
                 "title": info.get("title", "Unknown"),
                 "duration": float(duration) if duration else None,
                 "thumbnail": info.get("thumbnail"),
+                "url": info.get("webpage_url") or url,
             }
 
         # yt-dlp reports the final (merged) path
@@ -486,32 +702,44 @@ def download_media(url):
     raise RuntimeError(f"Error during download: {last_error}")
 
 
-async def download_and_queue_song(ctx, player, url, skip_voice_check=False):
+def _cancelled(player, epoch):
+    return player.should_stop or player.epoch != epoch
+
+
+async def download_and_queue_song(
+    ctx, player, url, skip_voice_check=False, from_web=False
+):
+    """Download one track and queue it. Returns the track, or None."""
+    epoch = player.epoch
     try:
-        if player.should_stop:
-            return
+        if _cancelled(player, epoch):
+            return None
 
         if not skip_voice_check:
             if not player.voice_client or not player.voice_client.is_connected():
                 if not await join_voice_channel(ctx):
                     await ctx.send("❌ Unable to join voice channel!")
-                    return
+                    return None
 
         status_message = await ctx.send("⏳ Downloading...")
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         track = await loop.run_in_executor(None, download_media, url)
 
-        if player.should_stop:
-            if os.path.exists(track["filepath"]):
-                os.remove(track["filepath"])
+        if _cancelled(player, epoch):
+            discard_tracks([track])
             await status_message.delete()
-            return
+            return None
 
         player.add_to_queue(track)
-        await status_message.edit(content=f"✅ **{track['title']}** added to queue.")
+        if from_web:
+            text = f"➕ Added from the web page: **{track['title']}**"
+        else:
+            text = f"✅ **{track['title']}** added to queue."
+        await status_message.edit(content=text)
 
         if not player.is_playing:
             await play_next(ctx)
+        return track
 
     except Exception as e:
         await ctx.send(f"❌ Download error: {str(e)}")
@@ -520,80 +748,324 @@ async def download_and_queue_song(ctx, player, url, skip_voice_check=False):
                 await status_message.delete()
             except:
                 pass
+        return None
 
 
-async def play_next(ctx):
+async def queue_playlist(ctx, player, entries, from_web=False):
+    """Download playlist entries one by one into the queue while earlier
+    ones play. `loading` keeps play_next from leaving voice meanwhile."""
+    epoch = player.epoch
+    player.loading_jobs += 1
+    stopped = False
     try:
-        player = music_players.get(ctx.guild.id)
-        if not player or player.should_stop:
-            return
+        for i, entry in enumerate(entries, 1):
+            if _cancelled(player, epoch):
+                stopped = True
+                break
 
-        # Clean up previous file
-        if player.now_playing and os.path.exists(player.now_playing["filepath"]):
-            try:
-                os.remove(player.now_playing["filepath"])
-            except:
-                pass
-        player.now_playing = None
-        player.started_at = None
+            # Build video URL
+            video_id = entry.get("id") or entry.get("url") or entry.get("webpage_url")
+            if not video_id:
+                continue
 
-        next_track = player.next_in_queue()
-        if next_track is None:
-            player.is_playing = False
-            # A playlist may still be downloading its next tracks. Stay connected
-            # and idle instead of disconnecting; the next queued track will
-            # trigger play_next() again once it finishes downloading.
-            if player.loading:
+            if isinstance(video_id, str) and video_id.startswith("http"):
+                video_url = video_id
+            else:
+                video_url = f"https://www.youtube.com/watch?v={video_id}"
+
+            title = entry.get("title", "Unknown title")
+            await ctx.send(f"⏳ [{i}/{len(entries)}] Adding **{title}**...")
+
+            await download_and_queue_song(
+                ctx, player, video_url, skip_voice_check=True, from_web=from_web
+            )
+    finally:
+        player.loading_jobs = max(0, player.loading_jobs - 1)
+
+    if stopped or _cancelled(player, epoch):
+        await ctx.send("⏹️ Download stopped.")
+        return
+    await ctx.send("✅ All playlist tracks have been added!")
+    # The last track may have finished while the queue was empty during
+    # loading: start the queue again, or leave if there is nothing left.
+    if not player.is_playing:
+        await play_next(ctx)
+
+
+async def play_next(ctx, gen=None, origin=None):
+    """Advance playback. Called by the `after` callback (with the generation
+    of the track that ended) or to start an idle player (gen=None)."""
+    player = music_players.get(ctx.guild.id)
+    if not player or (origin is not None and origin is not player):
+        return  # Player replaced by !reset
+    try:
+        async with player.lock:
+            if player.should_stop:
                 return
-            if player.voice_client and player.voice_client.is_connected():
-                await player.voice_client.disconnect()
-            if not player.reconnecting:  # !reset keeps the session
-                end_session(player)
-            await ctx.send("🎵 Queue is empty!")
-            return
-
-        player.now_playing = next_track
-        player.current_file = next_track["filepath"]
-
-        # Check voice connection
-        if not player.voice_client or not player.voice_client.is_connected():
-            if not await join_voice_channel(ctx):
-                await ctx.send("❌ Unable to join voice channel!")
-                return
-
-        title = next_track["title"]
-        filepath = next_track["filepath"]
-
-        # Check that file exists
-        if not os.path.exists(filepath):
-            await ctx.send(f"❌ File not found for {title}")
-            await play_next(ctx)  # Try next song
-            return
-
-        player.is_playing = True
-
-        def after_playing(error):
-            if error:
-                print(f"Playback error: {error}")
-            player.is_playing = False
-            # Schedule next song
-            try:
-                asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop)
-            except Exception as e:
-                print(f"Error scheduling next song: {e}")
-
-        # The file carries video for the web page; Discord only needs audio.
-        audio_source = discord.FFmpegPCMAudio(filepath, options="-vn")
-        player.voice_client.play(audio_source, after=after_playing)
-        player.started_at = time.monotonic()
-        await ctx.send(f"🎵 Now playing: **{title}**")
-
+            if gen is not None and gen != player.play_gen:
+                return  # Stale callback
+            if gen is None and player.is_playing:
+                return  # Already playing; its callback will continue
+            await _advance(ctx, player)
     except Exception as e:
         print(f"Error in play_next: {e}")
-        player = music_players.get(ctx.guild.id)
-        if player:
-            player.is_playing = False
+        player.is_playing = False
         await ctx.send(f"❌ Playback error: {str(e)}")
+
+
+async def _advance(ctx, player):
+    """Retire the current track according to pending_action and start the
+    next one. Must run under player.lock."""
+    action, player.pending_action = player.pending_action, None
+    finished = player.now_playing
+    player.now_playing = None
+    player.started_at = None
+    player.paused_at = None
+    player.paused_total = 0.0
+
+    if action == "restart" and finished:
+        next_track = finished
+    elif action == "previous" and finished and player.history:
+        player.queue.insert(0, finished)
+        next_track = player.history.pop()
+    else:
+        if finished:
+            push_history(player, finished)
+        next_track = player.next_in_queue()
+
+    while next_track is not None and not os.path.exists(next_track["filepath"]):
+        await ctx.send(f"❌ File not found for {next_track['title']}")
+        next_track = player.next_in_queue()
+
+    if next_track is None:
+        player.is_playing = False
+        # A playlist may still be downloading its next tracks. Stay connected
+        # and idle instead of disconnecting; the next queued track will
+        # trigger play_next() again once it finishes downloading.
+        if player.loading:
+            return
+        if player.voice_client and player.voice_client.is_connected():
+            await player.voice_client.disconnect()
+        # The web session survives: it expires after SESSION_IDLE_HOURS.
+        await ctx.send("🎵 Queue is empty!")
+        return
+
+    # Check voice connection
+    if not player.voice_client or not player.voice_client.is_connected():
+        if not await join_voice_channel(ctx):
+            player.queue.insert(0, next_track)
+            player.is_playing = False
+            await ctx.send("❌ Unable to join voice channel!")
+            return
+
+    player.play_gen += 1
+    gen = player.play_gen
+    loop = asyncio.get_running_loop()
+
+    def after_playing(error):
+        # Runs on the audio thread: only hand over to the event loop.
+        if error:
+            print(f"Playback error: {error}")
+        try:
+            asyncio.run_coroutine_threadsafe(play_next(ctx, gen, player), loop)
+        except Exception as e:
+            print(f"Error scheduling next song: {e}")
+
+    player.now_playing = next_track
+    player.is_playing = True
+    # The file carries video for the web page; Discord only needs audio.
+    audio_source = discord.FFmpegPCMAudio(next_track["filepath"], options="-vn")
+    try:
+        player.voice_client.play(audio_source, after=after_playing)
+    except Exception:
+        player.now_playing = None
+        player.is_playing = False
+        discard_tracks([next_track])
+        raise
+    player.started_at = time.monotonic()
+    player.last_active = _clock()
+    # The track already plays: a failed announcement must not mark the
+    # player idle (play_next would then try to start a second track).
+    try:
+        if next_track is finished:
+            await ctx.send(f"🔁 Restarting: **{next_track['title']}**")
+        else:
+            await ctx.send(f"🎵 Now playing: **{next_track['title']}**")
+    except Exception as e:
+        print(f"Could not announce track: {e}")
+
+
+# --- Controls shared by Discord commands and the web page -------------------
+
+
+class ControlError(Exception):
+    """A control that cannot be applied. `code` picks the message."""
+
+    # code -> (HTTP status, French message for the web page, English message)
+    MESSAGES = {
+        "not_in_voice": (
+            409,
+            "Le bot n'est pas dans un salon vocal.",
+            "I'm not in a voice channel.",
+        ),
+        "nothing_playing": (
+            409,
+            "Rien n'est en cours de lecture.",
+            "No music is currently playing.",
+        ),
+        "track_not_found": (
+            404,
+            "Ce morceau n'est plus dans la file.",
+            "That track is not in the queue.",
+        ),
+        "bad_index": (400, "Position invalide.", "Invalid position."),
+        "bad_url": (
+            400,
+            "Seuls les liens YouTube (vidéo ou playlist) sont acceptés.",
+            "Only YouTube video or playlist links are accepted.",
+        ),
+    }
+
+    def __init__(self, code):
+        super().__init__(code)
+        self.code = code
+        self.status, self.french, self.english = self.MESSAGES[code]
+
+
+def _require_playing(player):
+    if not player.in_voice():
+        raise ControlError("not_in_voice")
+    if not player.is_playing or not player.now_playing:
+        raise ControlError("nothing_playing")
+
+
+async def _stop_with(player, action):
+    """Stop the current track; play_next then applies `action`."""
+    async with player.lock:
+        _require_playing(player)
+        if player.pending_action is not None:
+            return  # A transition is already under way
+        player.pending_action = action
+        player.voice_client.stop()
+
+
+async def control_next(player):
+    await _stop_with(player, "next")
+
+
+async def control_previous(player):
+    """Restart the current track, or go back to the last played one.
+    Returns "restart" or "previous"."""
+    elapsed = player.elapsed() or 0.0
+    if elapsed > PREVIOUS_RESTART_SECONDS or not player.history:
+        action = "restart"
+    else:
+        action = "previous"
+    await _stop_with(player, action)
+    return action
+
+
+async def control_pause(player):
+    """Returns False if it was already paused."""
+    async with player.lock:
+        _require_playing(player)
+        if player.paused_at is not None:
+            return False
+        player.voice_client.pause()
+        player.paused_at = time.monotonic()
+        return True
+
+
+async def control_resume(player):
+    """Returns False if it was not paused."""
+    async with player.lock:
+        _require_playing(player)
+        if player.paused_at is None:
+            return False
+        player.voice_client.resume()
+        player.paused_total += time.monotonic() - player.paused_at
+        player.paused_at = None
+        return True
+
+
+def _find_queued(player, track_id):
+    for i, track in enumerate(player.queue):
+        if track["id"] == track_id:
+            return i
+    raise ControlError("track_not_found")
+
+
+async def control_remove(player, track_id):
+    """Returns the removed track."""
+    async with player.lock:
+        if not player.in_voice():
+            raise ControlError("not_in_voice")
+        track = player.queue.pop(_find_queued(player, track_id))
+    discard_tracks([track])
+    return track
+
+
+async def control_move(player, track_id, index):
+    """Move a queued track to a 0-based queue index. Returns the track."""
+    async with player.lock:
+        if not player.in_voice():
+            raise ControlError("not_in_voice")
+        i = _find_queued(player, track_id)
+        if not 0 <= index < len(player.queue):
+            raise ControlError("bad_index")
+        track = player.queue.pop(i)
+        player.queue.insert(index, track)
+    return track
+
+
+_background_tasks = set()
+
+
+def control_add(player, guild_id, url):
+    """Validate a link and download it in the background."""
+    parsed = parse_youtube_url(url)
+    if parsed is None:
+        raise ControlError("bad_url")
+    if not player.in_voice():
+        raise ControlError("not_in_voice")
+    kind, clean_url = parsed
+    task = asyncio.get_running_loop().create_task(
+        _add_from_web(player, guild_id, kind, clean_url)
+    )
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+
+
+async def _add_from_web(player, guild_id, kind, url):
+    ctx = WebContext(guild_id, player)
+    epoch = player.epoch
+    # Counts as loading, so the queue running out meanwhile keeps the bot in
+    # voice (the web page cannot make it join again).
+    player.loading_jobs += 1
+    try:
+        if kind == "single":
+            await download_and_queue_song(
+                ctx, player, url, skip_voice_check=True, from_web=True
+            )
+        else:
+            loop = asyncio.get_running_loop()
+            entries = await loop.run_in_executor(None, get_playlist_info, url)
+            if _cancelled(player, epoch):
+                pass
+            elif not entries:
+                await ctx.send(
+                    "❌ Could not read the playlist added from the web page."
+                )
+            else:
+                entries = entries[:MAX_PLAYLIST_SIZE]
+                await ctx.send(f"📋 Adding {len(entries)} tracks from the web page...")
+                await queue_playlist(ctx, player, entries, from_web=True)
+    except Exception as e:
+        print(f"Web add failed: {e}")
+    finally:
+        player.loading_jobs = max(0, player.loading_jobs - 1)
+    if not player.is_playing and not _cancelled(player, epoch):
+        await play_next(ctx)
 
 
 @bot.event
@@ -626,8 +1098,13 @@ async def on_voice_state_update(member, before, after):
             player = music_players[guild.id]
             player.voice_client = None
             player.is_playing = False
-            if not player.reconnecting:
-                end_session(player)
+            # The web session stays; it expires after SESSION_IDLE_HOURS.
+
+
+@bot.before_invoke
+async def record_command_activity(ctx):
+    if ctx.guild and ctx.guild.id in music_players:
+        touch(music_players[ctx.guild.id])
 
 
 @bot.command(name="play")
@@ -649,7 +1126,7 @@ async def play(ctx, url: str = None):
         wait_msg = await ctx.send("⏳ Analyzing source...")
 
         # Try to extract as playlist
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         playlist_entries = await loop.run_in_executor(None, get_playlist_info, url)
 
         if playlist_entries:
@@ -689,44 +1166,7 @@ async def play(ctx, url: str = None):
             # Limit based on configuration
             playlist_entries = playlist_entries[:MAX_PLAYLIST_SIZE]
             await ctx.send(f"📋 Adding {len(playlist_entries)} tracks to queue...")
-
-            # Mark the player as loading so play_next() doesn't disconnect while
-            # tracks are still being downloaded one by one.
-            player.loading = True
-            for i, entry in enumerate(playlist_entries, 1):
-                if player.should_stop:
-                    await ctx.send("⏹️ Download stopped.")
-                    player.loading = False
-                    return
-
-                # Build video URL
-                video_id = (
-                    entry.get("id") or entry.get("url") or entry.get("webpage_url")
-                )
-                if not video_id:
-                    continue
-
-                if isinstance(video_id, str) and video_id.startswith("http"):
-                    video_url = video_id
-                else:
-                    video_url = f"https://www.youtube.com/watch?v={video_id}"
-
-                title = entry.get("title", "Unknown title")
-                await ctx.send(
-                    f"⏳ [{i}/{len(playlist_entries)}] Adding **{title}**..."
-                )
-
-                await download_and_queue_song(
-                    ctx, player, video_url, skip_voice_check=True
-                )
-
-            player.loading = False
-            if not player.should_stop:
-                await ctx.send("✅ All playlist tracks have been added!")
-                # The last track may have finished playing while the queue was
-                # empty during loading; kick playback off again if idle.
-                if not player.is_playing and player.queue:
-                    await play_next(ctx)
+            await queue_playlist(ctx, player, playlist_entries)
         else:
             # It's a single video
             await wait_msg.delete()
@@ -734,7 +1174,6 @@ async def play(ctx, url: str = None):
                 await download_and_queue_song(ctx, player, url)
 
     except Exception as e:
-        player.loading = False
         await ctx.send(f"❌ An error occurred: {str(e)}")
         if "wait_msg" in locals():
             try:
@@ -750,9 +1189,10 @@ async def stop(ctx):
         await ctx.send("❌ No music is currently playing.")
         return
 
-    player.stop_and_clear()
+    async with player.lock:
+        player.stop_and_clear()
     await player.disconnect_voice_client()
-    end_session(player)
+    # The web session stays (same link on the next !play) until it expires.
     await ctx.send("⏹️ Music stopped and queue cleared.")
 
 
@@ -761,30 +1201,33 @@ async def reset_voice(ctx):
     """Force reset the voice connection"""
     await ctx.send("🔧 Resetting voice connection...")
 
-    # The web session survives a reset: keep the same link working.
     player = music_players.get(ctx.guild.id)
+
+    # Disconnect completely
+    if ctx.guild.voice_client:
+        await ctx.guild.voice_client.disconnect(force=True)
+
+    # Clean the player. The web session survives a reset: same link.
     if player:
-        player.reconnecting = True
+        player.should_stop = True
+        player.epoch += 1
+        await player.disconnect_voice_client()
+        fresh = MusicPlayer()
+        fresh.sid = player.sid
+        fresh.text_channel = player.text_channel
+        fresh.last_active = player.last_active
+        fresh.history = player.history
+        music_players[ctx.guild.id] = fresh
+        leftovers = list(player.queue)
+        if player.now_playing:
+            leftovers.append(player.now_playing)
+        player.queue = []
+        player.history = []
+        player.now_playing = None
+        discard_tracks(leftovers)
 
-    try:
-        # Disconnect completely
-        if ctx.guild.voice_client:
-            await ctx.guild.voice_client.disconnect(force=True)
-
-        # Clean the player
-        if player:
-            await player.disconnect_voice_client()
-            fresh = MusicPlayer()
-            fresh.sid = player.sid
-            fresh.reconnecting = True
-            music_players[ctx.guild.id] = fresh
-
-        # Wait a bit (the voice state update arrives in the meantime)
-        await asyncio.sleep(2)
-    finally:
-        if player:
-            player.reconnecting = False
-            music_players[ctx.guild.id].reconnecting = False
+    # Wait a bit (the voice state update arrives in the meantime)
+    await asyncio.sleep(2)
     await ctx.send("✅ Voice connection reset!")
 
 
@@ -804,16 +1247,40 @@ async def list_queue(ctx):
     await ctx.send(message)
 
 
+async def _run_command_control(ctx, control):
+    """Run a control for a Discord command; returns its result or None."""
+    player = music_players.get(ctx.guild.id)
+    if not player:
+        await ctx.send("❌ No music is currently playing.")
+        return None
+    try:
+        return await control(player)
+    except ControlError as e:
+        await ctx.send(f"❌ {e.english}")
+        return None
+
+
 @bot.command(name="next")
 async def next_track(ctx):
     player = music_players.get(ctx.guild.id)
-    if not player or not player.voice_client or not player.voice_client.is_playing():
-        await ctx.send("❌ No music is currently playing.")
-        return
-
+    if player and player.in_voice() and player.is_playing:
+        await ctx.send("⏭️ Skipping...")
     # Stopping triggers the after_playing callback, which plays the next track.
-    await ctx.send("⏭️ Skipping...")
-    player.voice_client.stop()
+    await _run_command_control(ctx, control_next)
+
+
+@bot.command(name="pause")
+async def pause(ctx):
+    changed = await _run_command_control(ctx, control_pause)
+    if changed is not None:
+        await ctx.send("⏸️ Paused." if changed else "⏸️ Already paused.")
+
+
+@bot.command(name="resume")
+async def resume(ctx):
+    changed = await _run_command_control(ctx, control_resume)
+    if changed is not None:
+        await ctx.send("▶️ Resumed." if changed else "▶️ Not paused.")
 
 
 @bot.event
@@ -837,18 +1304,9 @@ async def on_command_error(ctx, error):
 #   GET /                      landing text
 #   GET /{sid}                 the page (it handles unknown/ended sessions)
 #   GET /api/{sid}/state       session state JSON, 404 {"active": false} if none
-#   GET /media/{sid}/{id}      the mp4 of the playing or a queued track (Range ok)
+#   POST /api/{sid}/control    {"action", "id"?, "index"?, "url"?} -> {"ok": ...}
+#   GET /media/{sid}/{id}      the mp4 of a playing, queued or history track
 # Paths are never built from the request: tracks are looked up by id.
-
-
-def _active_player(sid):
-    guild_id = sessions.get(sid)
-    if guild_id is None:
-        return None
-    player = music_players.get(guild_id)
-    if not player or player.sid != sid:
-        return None
-    return player
 
 
 def _track_summary(track):
@@ -857,6 +1315,7 @@ def _track_summary(track):
         "title": track["title"],
         "duration": track.get("duration"),
         "thumbnail": track.get("thumbnail"),
+        "url": track.get("url"),
     }
 
 
@@ -873,31 +1332,37 @@ async def web_page(request):
 async def web_state(request):
     sid = request.match_info["sid"]
     headers = {"Cache-Control": "no-store"}
-    player = _active_player(sid)
+    player = _session_player(sid)
     if player is None:
         return web.json_response({"active": False}, status=404, headers=headers)
 
     guild = bot.get_guild(sessions[sid])
+    in_voice = player.in_voice()
     channel = None
-    if player.voice_client and player.voice_client.channel:
-        channel = player.voice_client.channel.name
-
     now_playing = None
-    if player.now_playing and player.started_at is not None:
-        track = player.now_playing
-        now_playing = _track_summary(track)
-        now_playing["video_url"] = f"/media/{sid}/{track['id']}"
-        now_playing["elapsed"] = time.monotonic() - player.started_at
+    queue = []
+    if in_voice:
+        if player.voice_client.channel:
+            channel = player.voice_client.channel.name
+        if player.now_playing and player.started_at is not None:
+            track = player.now_playing
+            now_playing = _track_summary(track)
+            now_playing["video_url"] = f"/media/{sid}/{track['id']}"
+            now_playing["elapsed"] = player.elapsed()
+        queue = [_track_summary(t) for t in player.queue]
 
     return web.json_response(
         {
             "active": True,
+            "in_voice": in_voice,
             "guild": guild.name if guild else "",
             "channel": channel,
             "loading": player.loading,
+            "paused": now_playing is not None and player.paused_at is not None,
+            "can_previous": now_playing is not None and player.pending_action is None,
             "server_time": time.time(),
             "now_playing": now_playing,
-            "queue": [_track_summary(t) for t in player.queue],
+            "queue": queue,
         },
         headers=headers,
     )
@@ -906,10 +1371,11 @@ async def web_state(request):
 async def web_media(request):
     sid = request.match_info["sid"]
     track_id = request.match_info["track_id"]
-    player = _active_player(sid)
+    player = _session_player(sid)
     if player is None:
         raise web.HTTPNotFound()
     tracks = ([player.now_playing] if player.now_playing else []) + list(player.queue)
+    tracks += list(player.history)
     for track in tracks:
         if track.get("id") == track_id:
             filepath = track["filepath"]
@@ -919,10 +1385,93 @@ async def web_media(request):
     raise web.HTTPNotFound()
 
 
+def _control_error(status, message):
+    return web.json_response({"ok": False, "error": message}, status=status)
+
+
+async def web_control(request):
+    sid = request.match_info["sid"]
+    player = _session_player(sid)
+    if player is None:
+        return _control_error(404, "Session inconnue ou expirée.")
+    guild_id = sessions[sid]
+
+    if (request.content_length or 0) > MAX_CONTROL_BODY:
+        return _control_error(400, "Requête trop volumineuse.")
+    # StreamReader.read() may return a partial chunk: read until EOF.
+    body = b""
+    while len(body) <= MAX_CONTROL_BODY:
+        chunk = await request.content.read(MAX_CONTROL_BODY + 1 - len(body))
+        if not chunk:
+            break
+        body += chunk
+    if len(body) > MAX_CONTROL_BODY:
+        return _control_error(400, "Requête trop volumineuse.")
+    try:
+        data = json.loads(body)
+    except (ValueError, RecursionError):
+        return _control_error(400, "Requête invalide.")
+    if not isinstance(data, dict):
+        return _control_error(400, "Requête invalide.")
+    action = data.get("action")
+    if action not in ("next", "previous", "pause", "resume", "remove", "move", "add"):
+        return _control_error(400, "Action inconnue.")
+
+    track_id = data.get("id")
+    index = data.get("index")
+    if action in ("remove", "move") and not (
+        isinstance(track_id, str) and 0 < len(track_id) <= 64
+    ):
+        return _control_error(400, "Morceau invalide.")
+    if action == "move" and (type(index) is not int):
+        return _control_error(400, "Position invalide.")
+    if action == "add" and not isinstance(data.get("url"), str):
+        return _control_error(400, "Lien manquant.")
+
+    touch(player)
+    if player.sid != sid:  # Expired just now
+        return _control_error(404, "Session inconnue ou expirée.")
+
+    try:
+        if action == "next":
+            await control_next(player)
+            await announce(player, "⏭️ Skipped from the web page")
+        elif action == "previous":
+            if await control_previous(player) == "restart":
+                await announce(player, "⏮️ Restarted from the web page")
+            else:
+                await announce(player, "⏮️ Previous track from the web page")
+        elif action == "pause":
+            if await control_pause(player):
+                await announce(player, "⏸️ Paused from the web page")
+        elif action == "resume":
+            if await control_resume(player):
+                await announce(player, "▶️ Resumed from the web page")
+        elif action == "remove":
+            track = await control_remove(player, track_id)
+            await announce(
+                player, f"🗑️ Removed from the web page: **{track['title']}**"
+            )
+        elif action == "move":
+            track = await control_move(player, track_id, index)
+            await announce(
+                player,
+                f"↕️ Moved from the web page: **{track['title']}** "
+                f"(now #{index + 1})",
+            )
+        elif action == "add":
+            control_add(player, guild_id, data["url"])
+            return web.json_response({"ok": True}, status=202)
+    except ControlError as e:
+        return _control_error(e.status, e.french)
+    return web.json_response({"ok": True})
+
+
 def build_web_app():
     app = web.Application()
     app.router.add_get("/", web_landing)
     app.router.add_get("/api/{sid}/state", web_state)
+    app.router.add_post("/api/{sid}/control", web_control)
     app.router.add_get("/media/{sid}/{track_id}", web_media)
     app.router.add_get("/{sid}", web_page)
     return app
@@ -951,6 +1500,8 @@ async def start_web_server():
 
 async def setup_hook():
     await start_web_server()
+    task = asyncio.get_running_loop().create_task(session_cleanup_loop())
+    _background_tasks.add(task)
 
 
 bot.setup_hook = setup_hook

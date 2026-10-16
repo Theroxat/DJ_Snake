@@ -61,6 +61,8 @@ python bot.py
 | `!play <URL>` | Play music from YouTube URL or search | `!play https://youtu.be/dQw4w9WgXcQ` |
 | `!list` | Show current queue | `!list` |
 | `!next` | Skip to next track | `!next` |
+| `!pause` | Pause playback | `!pause` |
+| `!resume` | Resume playback | `!resume` |
 | `!stop` | Stop playback and clear queue | `!stop` |
 | `!reset` | Reset voice connection | `!reset` |
 
@@ -82,6 +84,8 @@ MAX_PLAYLIST_SIZE=30
 MEDIA_FORMAT=bestvideo[height<=720][vcodec^=avc1]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]/best
 WEB_PORT=47823
 PUBLIC_BASE_URL=https://dj.example.com
+# Hours without activity before a web session link expires
+SESSION_IDLE_HOURS=6
 ```
 
 ### Discord Bot Setup
