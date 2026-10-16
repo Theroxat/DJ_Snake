@@ -77,7 +77,11 @@ DISCORD_TOKEN=your_bot_token_here
 # Optional
 COMMAND_PREFIX=!
 MAX_PLAYLIST_SIZE=30
-AUDIO_FORMAT=bestaudio/best
+# yt-dlp format; tracks are downloaded as one mp4 (video for the web page,
+# audio for Discord). Default: max 720p H.264 + m4a audio.
+MEDIA_FORMAT=bestvideo[height<=720][vcodec^=avc1]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]/best
+WEB_PORT=47823
+PUBLIC_BASE_URL=https://dj.example.com
 ```
 
 ### Discord Bot Setup

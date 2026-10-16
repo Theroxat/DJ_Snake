@@ -8,6 +8,8 @@ discord.py>=2.5.2
 # HTTP 403 on the media download. Keep this floor recent and rebuild often.
 yt-dlp>=2026.8.19
 python-dotenv==1.0.0
+# Web server for the synced clip page (already pulled in by discord.py).
+aiohttp>=3.9
 
 # Supplies the Proof-of-Origin tokens YouTube demands from datacenter IPs.
 # Without it yt-dlp reports `PO Token Providers: none` and downloads get

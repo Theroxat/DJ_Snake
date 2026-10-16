@@ -1,10 +1,12 @@
 import os
 import asyncio
+import secrets
 import time
 import yt_dlp
 import discord
 from discord.ext import commands
 import tempfile
+from aiohttp import web
 from urllib.parse import urlparse, parse_qs
 from dotenv import load_dotenv
 
@@ -21,7 +23,23 @@ intents.guild_messages = True
 # Configuration from environment variables
 COMMAND_PREFIX = os.getenv("COMMAND_PREFIX", "!")
 MAX_PLAYLIST_SIZE = int(os.getenv("MAX_PLAYLIST_SIZE", "30"))
-AUDIO_FORMAT = os.getenv("AUDIO_FORMAT", "bestaudio/best")
+# Tracks are downloaded as one video+audio mp4 (max 720p, H.264 so every
+# browser can play it): Discord gets the audio, the web page shows the clip.
+DEFAULT_MEDIA_FORMAT = (
+    "bestvideo[height<=720][vcodec^=avc1]+bestaudio[ext=m4a]"
+    "/best[height<=720][ext=mp4]/best[height<=720]/best"
+)
+MEDIA_FORMAT = os.getenv("MEDIA_FORMAT") or DEFAULT_MEDIA_FORMAT
+if os.getenv("AUDIO_FORMAT") and not os.getenv("MEDIA_FORMAT"):
+    print("⚠️  AUDIO_FORMAT is no longer read; set MEDIA_FORMAT instead.")
+
+# Web server for the synced clip page. The public URL is what gets posted in
+# Discord; the tunnel in front of it forwards to WEB_PORT.
+WEB_PORT = int(os.getenv("WEB_PORT", "47823"))
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://dj.example.com").rstrip("/")
+WEB_INDEX = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "web", "index.html"
+)
 # YouTube signs stream URLs with a JS challenge. yt-dlp needs both a JS
 # runtime (deno, installed in the image) and the EJS solver script, which it
 # fetches on first use. Without it, signature/n solving fails and some
@@ -70,6 +88,11 @@ class MusicPlayer:
         self.should_stop = False
         self.now_playing = None
         self.loading = False  # True while a playlist is still being downloaded
+        self.sid = None  # Web session id, set while the bot is in voice
+        self.started_at = None  # time.monotonic() when now_playing started
+        # True while the bot leaves voice on purpose but comes back (!reset,
+        # channel switch), so on_voice_state_update keeps the session.
+        self.reconnecting = False
 
     def cleanup(self):
         if self.current_file and os.path.exists(self.current_file):
@@ -79,9 +102,9 @@ class MusicPlayer:
                 pass
             self.current_file = None
 
-    def add_to_queue(self, filepath, title):
+    def add_to_queue(self, track):
         if not self.should_stop:
-            self.queue.append({"filepath": filepath, "title": title})
+            self.queue.append(track)
 
     def next_in_queue(self):
         if self.queue:
@@ -95,6 +118,8 @@ class MusicPlayer:
         if self.voice_client and self.voice_client.is_playing():
             self.voice_client.stop()
         self.cleanup()
+        self.now_playing = None
+        self.started_at = None
         self.is_playing = False
 
     async def disconnect_voice_client(self):
@@ -112,6 +137,31 @@ class MusicPlayer:
 
 
 music_players = {}
+# Web session id -> guild id. The only way a request reaches a player.
+sessions = {}
+
+
+async def open_session(ctx, player):
+    """Start a web session for this guild if none is active, and post its link."""
+    if player.sid:
+        return
+    player.sid = secrets.token_urlsafe(16)
+    sessions[player.sid] = ctx.guild.id
+    print(f"Web session opened for {ctx.guild.name}: {player.sid}")
+    try:
+        await ctx.channel.send(
+            f"📺 Watch the clip live: {PUBLIC_BASE_URL}/{player.sid}"
+        )
+    except Exception as e:
+        print(f"Could not post session link: {e}")
+
+
+def end_session(player):
+    """End the player's web session; its links stop working."""
+    if player.sid:
+        sessions.pop(player.sid, None)
+        print(f"Web session ended: {player.sid}")
+        player.sid = None
 
 
 def get_video_id_from_url(url):
@@ -319,11 +369,17 @@ async def join_voice_channel(ctx):
 
     player = music_players[ctx.guild.id]
 
-    # Use our secure connection function
-    voice_client = await safe_voice_connect(voice_channel)
+    # Use our secure connection function. A channel switch disconnects first,
+    # which must not end the web session.
+    player.reconnecting = True
+    try:
+        voice_client = await safe_voice_connect(voice_channel)
+    finally:
+        player.reconnecting = False
 
     if voice_client:
         player.voice_client = voice_client
+        await open_session(ctx, player)
         return True
     else:
         await ctx.send("❌ Unable to connect to voice channel.")
@@ -337,7 +393,10 @@ def _download_once(url):
 
     # Simplified but robust configuration
     ydl_opts = {
-        "format": AUDIO_FORMAT,
+        "format": MEDIA_FORMAT,
+        "merge_output_format": "mp4",
+        # Moov atom first, so browsers can start and seek before the end.
+        "postprocessor_args": {"merger": ["-movflags", "+faststart"]},
         "noplaylist": True,
         "outtmpl": os.path.join(temp_dir, "%(id)s.%(ext)s"),
         "quiet": False,
@@ -350,9 +409,24 @@ def _download_once(url):
         info = ydl.extract_info(url, download=True)
 
         video_id = info.get("id", "")
-        title = info.get("title", "Unknown")
+        duration = info.get("duration")
 
-        # Find the downloaded file
+        def track(filepath):
+            return {
+                "id": secrets.token_hex(4),
+                "filepath": filepath,
+                "title": info.get("title", "Unknown"),
+                "duration": float(duration) if duration else None,
+                "thumbnail": info.get("thumbnail"),
+            }
+
+        # yt-dlp reports the final (merged) path
+        for download in info.get("requested_downloads") or []:
+            filepath = download.get("filepath")
+            if filepath and os.path.exists(filepath) and os.path.getsize(filepath) > 0:
+                return track(filepath)
+
+        # Fallback: find the downloaded file
         temp_files = os.listdir(temp_dir)
 
         for f in temp_files:
@@ -360,7 +434,7 @@ def _download_once(url):
                 filepath = os.path.join(temp_dir, f)
                 # Verify file exists and has content
                 if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
-                    return filepath, title
+                    return track(filepath)
 
         # If not found by ID, take the most recent
         if temp_files:
@@ -370,7 +444,7 @@ def _download_once(url):
             )
             filepath = os.path.join(temp_dir, latest_file)
             if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
-                return filepath, title
+                return track(filepath)
 
         raise RuntimeError("File not found after download")
 
@@ -381,8 +455,8 @@ def _is_permanent_failure(message):
     return any(marker in lowered for marker in PERMANENT_ERROR_MARKERS)
 
 
-def download_audio(url):
-    """Download one track, retrying transient YouTube refusals.
+def download_media(url):
+    """Download one track (video+audio mp4), retrying transient YouTube refusals.
 
     Runs in an executor thread (see download_and_queue_song), so the blocking
     sleep between attempts does not stall the bot's event loop.
@@ -425,17 +499,16 @@ async def download_and_queue_song(ctx, player, url, skip_voice_check=False):
 
         status_message = await ctx.send("⏳ Downloading...")
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, download_audio, url)
+        track = await loop.run_in_executor(None, download_media, url)
 
         if player.should_stop:
-            if os.path.exists(result[0]):
-                os.remove(result[0])
+            if os.path.exists(track["filepath"]):
+                os.remove(track["filepath"])
             await status_message.delete()
             return
 
-        filepath, title = result
-        player.add_to_queue(filepath, title)
-        await status_message.edit(content=f"✅ **{title}** added to queue.")
+        player.add_to_queue(track)
+        await status_message.edit(content=f"✅ **{track['title']}** added to queue.")
 
         if not player.is_playing:
             await play_next(ctx)
@@ -462,6 +535,7 @@ async def play_next(ctx):
             except:
                 pass
         player.now_playing = None
+        player.started_at = None
 
         next_track = player.next_in_queue()
         if next_track is None:
@@ -473,6 +547,8 @@ async def play_next(ctx):
                 return
             if player.voice_client and player.voice_client.is_connected():
                 await player.voice_client.disconnect()
+            if not player.reconnecting:  # !reset keeps the session
+                end_session(player)
             await ctx.send("🎵 Queue is empty!")
             return
 
@@ -506,8 +582,10 @@ async def play_next(ctx):
             except Exception as e:
                 print(f"Error scheduling next song: {e}")
 
-        audio_source = discord.FFmpegPCMAudio(filepath)
+        # The file carries video for the web page; Discord only needs audio.
+        audio_source = discord.FFmpegPCMAudio(filepath, options="-vn")
         player.voice_client.play(audio_source, after=after_playing)
+        player.started_at = time.monotonic()
         await ctx.send(f"🎵 Now playing: **{title}**")
 
     except Exception as e:
@@ -538,10 +616,18 @@ async def on_voice_state_update(member, before, after):
         print(f"Bot was disconnected from voice channel: {before.channel.name}")
 
         guild = before.channel.guild
+        # The client's own handler runs in a separate task, so give it time to
+        # settle. A stale event from an old disconnect (!stop then !play) then
+        # sees a live client and is ignored; a real kick sees it disconnected.
+        await asyncio.sleep(1.5)
+        if guild.voice_client and guild.voice_client.is_connected():
+            return
         if guild.id in music_players:
             player = music_players[guild.id]
             player.voice_client = None
             player.is_playing = False
+            if not player.reconnecting:
+                end_session(player)
 
 
 @bot.command(name="play")
@@ -666,6 +752,7 @@ async def stop(ctx):
 
     player.stop_and_clear()
     await player.disconnect_voice_client()
+    end_session(player)
     await ctx.send("⏹️ Music stopped and queue cleared.")
 
 
@@ -674,18 +761,30 @@ async def reset_voice(ctx):
     """Force reset the voice connection"""
     await ctx.send("🔧 Resetting voice connection...")
 
-    # Disconnect completely
-    if ctx.guild.voice_client:
-        await ctx.guild.voice_client.disconnect(force=True)
+    # The web session survives a reset: keep the same link working.
+    player = music_players.get(ctx.guild.id)
+    if player:
+        player.reconnecting = True
 
-    # Clean the player
-    if ctx.guild.id in music_players:
-        player = music_players[ctx.guild.id]
-        await player.disconnect_voice_client()
-        music_players[ctx.guild.id] = MusicPlayer()
+    try:
+        # Disconnect completely
+        if ctx.guild.voice_client:
+            await ctx.guild.voice_client.disconnect(force=True)
 
-    # Wait a bit
-    await asyncio.sleep(2)
+        # Clean the player
+        if player:
+            await player.disconnect_voice_client()
+            fresh = MusicPlayer()
+            fresh.sid = player.sid
+            fresh.reconnecting = True
+            music_players[ctx.guild.id] = fresh
+
+        # Wait a bit (the voice state update arrives in the meantime)
+        await asyncio.sleep(2)
+    finally:
+        if player:
+            player.reconnecting = False
+            music_players[ctx.guild.id].reconnecting = False
     await ctx.send("✅ Voice connection reset!")
 
 
@@ -730,6 +829,131 @@ async def on_command_error(ctx, error):
         await ctx.send(f"❌ Error: {error}")
     except Exception:
         pass
+
+
+# --- Web server: synced clip page -------------------------------------------
+#
+# Contract relied on by web/index.html:
+#   GET /                      landing text
+#   GET /{sid}                 the page (it handles unknown/ended sessions)
+#   GET /api/{sid}/state       session state JSON, 404 {"active": false} if none
+#   GET /media/{sid}/{id}      the mp4 of the playing or a queued track (Range ok)
+# Paths are never built from the request: tracks are looked up by id.
+
+
+def _active_player(sid):
+    guild_id = sessions.get(sid)
+    if guild_id is None:
+        return None
+    player = music_players.get(guild_id)
+    if not player or player.sid != sid:
+        return None
+    return player
+
+
+def _track_summary(track):
+    return {
+        "id": track["id"],
+        "title": track["title"],
+        "duration": track.get("duration"),
+        "thumbnail": track.get("thumbnail"),
+    }
+
+
+async def web_landing(request):
+    return web.Response(text="DJ Snake")
+
+
+async def web_page(request):
+    if not os.path.isfile(WEB_INDEX):
+        return web.Response(status=404, text="Page not found")
+    return web.FileResponse(WEB_INDEX, headers={"Cache-Control": "no-cache"})
+
+
+async def web_state(request):
+    sid = request.match_info["sid"]
+    headers = {"Cache-Control": "no-store"}
+    player = _active_player(sid)
+    if player is None:
+        return web.json_response({"active": False}, status=404, headers=headers)
+
+    guild = bot.get_guild(sessions[sid])
+    channel = None
+    if player.voice_client and player.voice_client.channel:
+        channel = player.voice_client.channel.name
+
+    now_playing = None
+    if player.now_playing and player.started_at is not None:
+        track = player.now_playing
+        now_playing = _track_summary(track)
+        now_playing["video_url"] = f"/media/{sid}/{track['id']}"
+        now_playing["elapsed"] = time.monotonic() - player.started_at
+
+    return web.json_response(
+        {
+            "active": True,
+            "guild": guild.name if guild else "",
+            "channel": channel,
+            "loading": player.loading,
+            "server_time": time.time(),
+            "now_playing": now_playing,
+            "queue": [_track_summary(t) for t in player.queue],
+        },
+        headers=headers,
+    )
+
+
+async def web_media(request):
+    sid = request.match_info["sid"]
+    track_id = request.match_info["track_id"]
+    player = _active_player(sid)
+    if player is None:
+        raise web.HTTPNotFound()
+    tracks = ([player.now_playing] if player.now_playing else []) + list(player.queue)
+    for track in tracks:
+        if track.get("id") == track_id:
+            filepath = track["filepath"]
+            if os.path.isfile(filepath):
+                return web.FileResponse(filepath)
+            break
+    raise web.HTTPNotFound()
+
+
+def build_web_app():
+    app = web.Application()
+    app.router.add_get("/", web_landing)
+    app.router.add_get("/api/{sid}/state", web_state)
+    app.router.add_get("/media/{sid}/{track_id}", web_media)
+    app.router.add_get("/{sid}", web_page)
+    return app
+
+
+web_runner = None
+
+
+async def start_web_server():
+    """Start the web server in the bot's event loop (once)."""
+    global web_runner
+    if web_runner is not None:
+        return
+    runner = web.AppRunner(build_web_app(), access_log=None)
+    await runner.setup()
+    try:
+        await web.TCPSite(runner, "0.0.0.0", WEB_PORT).start()
+    except OSError as e:
+        # A busy port must not keep the music bot from starting.
+        print(f"❌ Web server could not listen on port {WEB_PORT}: {e}")
+        await runner.cleanup()
+        return
+    web_runner = runner
+    print(f"Web server listening on port {WEB_PORT} ({PUBLIC_BASE_URL})")
+
+
+async def setup_hook():
+    await start_web_server()
+
+
+bot.setup_hook = setup_hook
 
 
 def get_discord_token():

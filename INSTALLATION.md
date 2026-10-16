@@ -194,8 +194,10 @@ Adjust `MAX_PLAYLIST_SIZE` to control how many tracks can be added from playlist
 MAX_PLAYLIST_SIZE=50
 ```
 
-### Audio Quality
-Modify `AUDIO_FORMAT` for different quality settings:
+### Media Quality
+Tracks are downloaded as one mp4 (video for the web page, audio for Discord).
+`MEDIA_FORMAT` (it replaces the old `AUDIO_FORMAT`, which is no longer read)
+picks the yt-dlp format; keep it browser-playable, for example:
 ```env
-AUDIO_FORMAT=best[height<=720]
+MEDIA_FORMAT=best[height<=480][ext=mp4]/best
 ```
