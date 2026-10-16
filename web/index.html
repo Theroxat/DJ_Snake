@@ -75,9 +75,15 @@ video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: con
 .overlay .big { font-size: clamp(22px, 4vw, 40px); color: var(--yellow); }
 .overlay .blink { animation: blink 1.2s steps(2, start) infinite; }
 .bar {
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 22px;
+  position: relative; display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; margin-top: 22px;
 }
-.title { font-size: clamp(18px, 2.4vw, 28px); margin: 0; flex: 1 1 260px; min-width: 0; overflow-wrap: anywhere; }
+.trackinfo { flex: 1 1 260px; min-width: 0; }
+.title { font-size: clamp(18px, 2.4vw, 28px); margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.progline { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.progline .prog { flex: 1; height: 8px; border: 2px solid var(--cream); margin: 0; }
+.prog i { display: block; height: 100%; width: 0; background: var(--red); }
+.times { font-family: "VT323", monospace; font-size: 20px; line-height: 1; color: var(--muted); white-space: nowrap; }
+.tools { display: flex; align-items: center; gap: 12px; }
 
 button, .btn {
   font: 400 15px "Archivo Black", Impact, sans-serif; text-transform: uppercase; letter-spacing: -0.025em;
@@ -89,29 +95,31 @@ button:hover { box-shadow: 3px 3px 0 var(--yellow); transform: translate(2px, 2p
 button:active { box-shadow: 0 0 0 var(--yellow); transform: translate(6px, 6px); }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 
+button.synctoggle {
+  box-shadow: none; border-color: var(--hair); color: var(--muted); background: transparent;
+  font: 400 20px "VT323", monospace; letter-spacing: .04em; padding: 4px 10px; min-height: 40px;
+}
+button.synctoggle:hover { box-shadow: none; transform: none; color: var(--cyan); border-color: var(--cyan); }
+button.synctoggle:active { box-shadow: none; transform: none; }
+button.synctoggle[aria-expanded="true"] { color: var(--cyan); border-color: var(--cyan); }
+button.synctoggle b { color: var(--yellow); font-weight: 400; }
 .offset {
-  margin-top: 22px; border: 2px solid var(--cream); box-shadow: 6px 6px 0 var(--cyan);
-  padding: 10px 14px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  position: absolute; right: 0; top: 100%; margin-top: 10px; z-index: 30; width: min(460px, 100%);
+  background: var(--ink); border: 2px solid var(--cream); box-shadow: 6px 6px 0 var(--cyan);
+  padding: 10px 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
 }
 .offset .hud { color: var(--cyan); }
-.offset input[type=range] { flex: 1 1 160px; min-width: 120px; accent-color: var(--red); }
-.offset output { min-width: 5.5ch; text-align: right; font-weight: 700; }
+.offset input[type=range] { flex: 1 1 80px; min-width: 60px; accent-color: var(--red); }
+.offset output { min-width: 5.5ch; white-space: nowrap; text-align: right; font-weight: 700; }
 .offset button { padding: 4px 10px; box-shadow: 3px 3px 0 var(--cyan); }
 .offset button:hover { box-shadow: 1px 1px 0 var(--cyan); transform: translate(2px, 2px); }
 .offset button:active { box-shadow: 0 0 0 var(--cyan); transform: translate(3px, 3px); }
-.hint { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+.hint { color: var(--muted); font-size: 12px; margin: 0; flex: 1 1 100%; }
 
 /* Sidebar */
 aside { min-width: 0; display: flex; flex-direction: column; gap: 28px; }
 h2 { margin: 0 0 10px; font-size: 18px; display: flex; align-items: baseline; gap: 10px; }
 h2 .hud { color: var(--red); font-size: 20px; }
-.now { border: 2px solid var(--cream); box-shadow: 6px 6px 0 var(--red); }
-.now .thumb { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-bottom: 2px solid var(--cream); background: #111; }
-.now .meta { padding: 12px; }
-.now .t { font-weight: 700; overflow-wrap: anywhere; }
-.prog { height: 10px; border: 2px solid var(--cream); margin: 10px 0 6px; }
-.prog i { display: block; height: 100%; width: 0; background: var(--red); }
-.times { display: flex; justify-content: space-between; font-family: "VT323", monospace; font-size: 20px; color: var(--muted); }
 .empty { color: var(--muted); border: 2px dashed var(--hair); padding: 14px; }
 ol { list-style: none; margin: 0; padding: 0; border: 2px solid var(--cream); max-height: 52vh; overflow-y: auto; }
 li { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--hair); }
@@ -125,7 +133,7 @@ li .d { font-family: "VT323", monospace; font-size: 20px; color: var(--muted); }
 li:hover .d { color: var(--ink); }
 
 /* Transport */
-.transport { display: flex; align-items: center; gap: 16px; margin-top: 22px; flex-wrap: wrap; }
+.transport { display: flex; align-items: stretch; gap: 16px; margin-top: 22px; flex-wrap: wrap; }
 .transport button { min-width: 56px; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; padding: 6px 16px; }
 .transport button svg { width: 22px; height: 22px; fill: currentColor; display: block; }
 .transport #pp { background: var(--red); border-color: var(--cream); color: var(--ink); box-shadow: 6px 6px 0 var(--cream); min-width: 72px; }
@@ -144,9 +152,9 @@ button[aria-busy="true"] { opacity: .6; cursor: progress; }
 /* Queue interaction */
 ol { position: relative; }
 li { position: relative; }
-li .n a, .now .t a, .title a { color: inherit; text-decoration: none; }
-li .n a:hover, .now .t a:hover, .title a:hover { text-decoration: underline; }
-li .n a:focus-visible, .now .t a:focus-visible, .title a:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+li .n a, .title a { color: inherit; text-decoration: none; }
+li .n a:hover, .title a:hover { text-decoration: underline; }
+li .n a:focus-visible, .title a:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 li button.grip, li button.rm {
   flex: none; width: 40px; height: 40px; min-width: 40px; padding: 0; box-shadow: none; display: inline-flex;
   align-items: center; justify-content: center; border-width: 2px; font-size: 20px; line-height: 1;
@@ -162,15 +170,15 @@ li.dragging .d { color: var(--ink); }
 ol.sorting li:not(.dragging) { transition: transform .12s; }
 ol.sorting { user-select: none; -webkit-user-select: none; }
 
-.addform { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.addform { display: flex; gap: 12px; flex: 1 1 260px; min-width: 0; }
 .addform input {
-  flex: 1 1 180px; min-width: 0; min-height: 44px; background: var(--ink); color: var(--cream);
+  flex: 1 1 auto; min-width: 0; min-height: 48px; background: var(--ink); color: var(--cream);
   border: 2px solid var(--cream); padding: 8px 12px; font: 400 14px "Space Mono", monospace;
   box-shadow: 4px 4px 0 var(--cyan);
 }
 .addform input::placeholder { color: var(--muted); }
 .addform input:disabled { opacity: .4; }
-.addform button { min-height: 44px; box-shadow: 4px 4px 0 var(--yellow); }
+.addform button { min-height: 48px; box-shadow: 4px 4px 0 var(--yellow); flex: none; }
 
 #toast {
   position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 120; max-width: min(92vw, 560px);
@@ -199,7 +207,9 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
   li { gap: 8px; padding: 6px 8px; }
   li img { display: none; }
   .transport { gap: 12px; }
+  .addform { flex-basis: 100%; }
   .bar button, .offset button { min-height: 44px; min-width: 44px; }
+  button.synctoggle { min-height: 44px; }
   .offset input[type=range] { min-height: 40px; }
 }
 @media (prefers-reduced-motion: reduce) { .live i, .blink, .pausebadge i { animation: none !important; } }
@@ -230,33 +240,38 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
       <button id="prev" type="button" aria-label="Morceau précédent" title="Précédent" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h3v14H5zM20 5v14L9 12z"/></svg></button>
       <button id="pp" type="button" aria-label="Pause" title="Pause" disabled><svg id="ppicon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg></button>
       <button id="next" type="button" aria-label="Morceau suivant" title="Suivant" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h3v14h-3zM4 5v14l11-7z"/></svg></button>
-    </div>
-    <div class="bar">
-      <h2 class="title display" id="title" style="display:block">&nbsp;</h2>
-      <button id="fs" type="button">Plein écran</button>
-    </div>
-    <div class="offset">
-      <span class="hud">Décalage</span>
-      <input id="offset" type="range" min="-2" max="2" step="0.05" value="0" aria-label="Décalage en secondes">
-      <output id="offsetval">0.00 s</output>
-      <button id="offsetreset" type="button">0</button>
-    </div>
-    <p class="hint">Le son vient de Discord, la vidéo est muette. Si l'image est en avance ou en retard sur le son, ajuste le décalage.</p>
-  </section>
-
-  <aside>
-    <div>
-      <h2 class="display"><span class="hud">NOW PLAYING</span> En cours</h2>
-      <div id="now" class="empty">Rien pour le moment.</div>
-    </div>
-    <div>
-      <h2 class="display"><span class="hud" id="qcount">00</span> À suivre</h2>
-      <ol id="queue" aria-label="File d'attente"></ol>
-      <div id="queueempty" class="empty">La file est vide.</div>
       <form id="addform" class="addform" autocomplete="off">
         <input id="addurl" type="text" inputmode="url" placeholder="Colle un lien YouTube…" aria-label="Lien YouTube à ajouter" disabled>
         <button id="addbtn" type="submit" aria-label="Ajouter à la file" disabled>Ajouter</button>
       </form>
+    </div>
+    <div class="bar">
+      <div class="trackinfo">
+        <h2 class="title display" id="title" style="display:block">&nbsp;</h2>
+        <div class="progline" id="progline" hidden>
+          <div class="prog" role="progressbar" aria-label="Progression du morceau"><i id="progfill"></i></div>
+          <span class="times"><span id="tcur">00:00</span> / <span id="tdur">--:--</span></span>
+        </div>
+      </div>
+      <div class="tools">
+        <button id="synctoggle" class="synctoggle" type="button" aria-expanded="false" aria-controls="syncpanel" title="Décalage image / son">⚙ Sync<b id="syncbadge" hidden></b></button>
+        <button id="fs" type="button">Plein écran</button>
+      </div>
+      <div class="offset" id="syncpanel" role="group" aria-label="Décalage de synchronisation" hidden>
+        <span class="hud" style="color:var(--cyan)">Décalage</span>
+        <input id="offset" type="range" min="-2" max="2" step="0.05" value="0" aria-label="Décalage en secondes">
+        <output id="offsetval">0.00 s</output>
+        <button id="offsetreset" type="button" aria-label="Remettre le décalage à zéro">0</button>
+        <p class="hint">Le son vient de Discord, la vidéo est muette. Si l'image est en avance ou en retard sur le son, ajuste le décalage.</p>
+      </div>
+    </div>
+  </section>
+
+  <aside>
+    <div>
+      <h2 class="display"><span class="hud" id="qcount">00</span> À suivre</h2>
+      <ol id="queue" aria-label="File d'attente"></ol>
+      <div id="queueempty" class="empty">La file est vide.</div>
     </div>
   </aside>
 </main>
@@ -296,7 +311,7 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
   let failures = 0;
   let timer = null;
   let polling = false;
-  let lastQueueSig = "", lastNowSig = "";
+  let lastQueueSig = "";
   let inVoice = true, paused = false, canPrev = false;
   let queue = [];          // current (possibly optimistic) queue
   let dragging = false, deferredQueue = null;
@@ -316,12 +331,27 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
   function setOffset(v, save) {
     offset = Math.round(v * 100) / 100;
     $("offset").value = offset;
-    $("offsetval").textContent = (offset > 0 ? "+" : "") + offset.toFixed(2) + " s";
+    const txt = (offset > 0 ? "+" : "") + offset.toFixed(2) + " s";
+    $("offsetval").textContent = txt;
+    $("syncbadge").textContent = " " + txt;
+    $("syncbadge").hidden = offset === 0;
     if (save) { try { localStorage.setItem(OFFSET_KEY, String(offset)); } catch (e) {} }
   }
   setOffset(offset, false);
   $("offset").addEventListener("input", (e) => setOffset(parseFloat(e.target.value), true));
   $("offsetreset").addEventListener("click", () => setOffset(0, true));
+
+  function setPanel(open) {
+    $("syncpanel").hidden = !open;
+    $("synctoggle").setAttribute("aria-expanded", String(open));
+  }
+  $("synctoggle").addEventListener("click", () => setPanel($("syncpanel").hidden));
+  document.addEventListener("click", (e) => {
+    if (!$("syncpanel").hidden && !e.target.closest("#syncpanel, #synctoggle")) setPanel(false);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("syncpanel").hidden) { setPanel(false); $("synctoggle").focus(); }
+  });
 
   // ---- fullscreen
   $("fs").addEventListener("click", () => {
@@ -375,29 +405,6 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
     img.referrerPolicy = "no-referrer";
     if (url) img.src = url;
     return img;
-  }
-
-  function renderNow(np) {
-    const box = $("now");
-    const sig = np ? np.id + "|" + np.title + "|" + np.duration + "|" + np.url : "";
-    if (sig === lastNowSig) return;
-    lastNowSig = sig;
-    box.textContent = "";
-    if (!np) { box.className = "empty"; box.textContent = "Rien pour le moment."; return; }
-    box.className = "now";
-    if (np.thumbnail) box.appendChild(safeImg(np.thumbnail, "thumb"));
-    const meta = mk("div", "meta");
-    const tt = mk("div", "t");
-    tt.appendChild(link(np.url, np.title));
-    meta.appendChild(tt);
-    const prog = mk("div", "prog"); const fill = mk("i"); fill.id = "progfill"; prog.appendChild(fill);
-    meta.appendChild(prog);
-    const times = mk("div", "times");
-    const cur = mk("span", null, "00:00"); cur.id = "tcur";
-    times.appendChild(cur);
-    times.appendChild(mk("span", null, fmt(np.duration)));
-    meta.appendChild(times);
-    box.appendChild(meta);
   }
 
   const GRIP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h3v3H8zM13 5h3v3h-3zM8 10.5h3v3H8zM13 10.5h3v3h-3zM8 16h3v3H8zM13 16h3v3h-3z"/></svg>';
@@ -600,9 +607,10 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
     correct();
     if (state) {
       const e = Math.min(state.duration || Infinity, baseElapsed + (paused ? 0 : (performance.now() - anchor) / 1000));
-      const tc = $("tcur"), pf = $("progfill");
-      if (tc) tc.textContent = fmt(e);
-      if (pf) pf.style.width = (state.duration ? Math.min(100, (e / state.duration) * 100) : 0) + "%";
+      const pct = state.duration ? Math.min(100, (e / state.duration) * 100) : 0;
+      $("tcur").textContent = fmt(e);
+      $("progfill").style.width = pct + "%";
+      $("progfill").parentNode.setAttribute("aria-valuenow", String(Math.round(pct)));
     }
   }
   setInterval(tick, 200);
@@ -618,11 +626,11 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
     $("channel").textContent = d.channel ? " # " + d.channel : "";
     renderQueue(d.queue || []);
     const np = d.now_playing;
-    renderNow(np);
     if (!inVoice) {
       state = null; curId = null;
       if (video.getAttribute("src")) { video.pause(); video.removeAttribute("src"); video.load(); }
       $("title").textContent = ""; $("title").dataset.sig = "";
+      $("progline").hidden = true;
       overlay("En pause", "DJ Snake n'est dans aucune room. Lance !play dans Discord pour reprendre, ce lien reste valable.", true);
       setLive(false, "EN PAUSE");
       updateControls();
@@ -632,6 +640,7 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
       state = null; curId = null;
       if (video.getAttribute("src")) { video.pause(); video.removeAttribute("src"); video.load(); }
       $("title").textContent = "";
+      $("progline").hidden = true;
       overlay(d.loading ? "Le bot prépare le morceau…" : "En attente d'un morceau…");
       setLive(false);
       updateControls();
@@ -645,6 +654,8 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
     }
     document.title = np.title + " — DJ Snake";
     state = { duration: np.duration };
+    $("tdur").textContent = fmt(np.duration);
+    $("progline").hidden = false;
     baseElapsed = (np.elapsed || 0) + (paused ? 0 : latency);
     anchor = performance.now();
     if (np.id !== curId) loadTrack(np);
