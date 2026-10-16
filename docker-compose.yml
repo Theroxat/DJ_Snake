@@ -5,14 +5,14 @@ services:
     container_name: dj-snake
     restart: unless-stopped
     # Reads DISCORD_TOKEN and the optional COMMAND_PREFIX / MAX_PLAYLIST_SIZE /
-    # MEDIA_FORMAT / WEB_PORT / PUBLIC_BASE_URL / SESSION_IDLE_HOURS variables
+    # MEDIA_FORMAT / WEB_PORT / WEB_BIND / PUBLIC_BASE_URL / SESSION_IDLE_HOURS variables
     # from your local .env file (never committed).
     env_file:
       - .env
-    # Synced clip web page. Bound to the LAN address only; the Cloudflare
-    # tunnel reaches it at http://127.0.0.1:47823.
+    # Synced clip web page. WEB_BIND is the host IP the port is published on
+    # (default 127.0.0.1; set a LAN IP or 0.0.0.0 for a reverse proxy/tunnel).
     ports:
-      - "127.0.0.1:47823:47823"
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-47823}:${WEB_PORT:-47823}"
     depends_on:
       pot-provider:
         condition: service_healthy

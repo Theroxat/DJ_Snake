@@ -60,8 +60,10 @@ container by `env_file`): `DISCORD_TOKEN` (required; a `token` file is the
 fallback), `COMMAND_PREFIX` (`!`), `MAX_PLAYLIST_SIZE` (30), `MEDIA_FORMAT`
 (max 720p H.264 + m4a, see `DEFAULT_MEDIA_FORMAT`; it replaces `AUDIO_FORMAT`,
 which is no longer read), `TEMP_DIR`, `POT_BASE_URL`, `WEB_PORT` (47823),
-`PUBLIC_BASE_URL` (`https://dj.example.com`), `SESSION_IDLE_HOURS` (6),
-and `YTDLP_AUTO_UPDATE`
+`WEB_BIND` (host IP the web port is published on, compose only, default
+`127.0.0.1`; set a LAN IP or `0.0.0.0` for a reverse proxy or tunnel),
+`PUBLIC_BASE_URL` (e.g. `https://dj.example.com`; empty falls back to
+`http://localhost:WEB_PORT`), `SESSION_IDLE_HOURS` (6), and `YTDLP_AUTO_UPDATE`
 (entrypoint only). `config.json.example` is not read by the code.
 
 ## Architecture (`bot.py`)

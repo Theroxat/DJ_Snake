@@ -73,3 +73,4 @@ htmlcov/
 *.tmp
 *.temp
 temp/
+.claude/settings.local.json

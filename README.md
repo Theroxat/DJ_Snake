@@ -83,6 +83,10 @@ MAX_PLAYLIST_SIZE=30
 # audio for Discord). Default: max 720p H.264 + m4a audio.
 MEDIA_FORMAT=bestvideo[height<=720][vcodec^=avc1]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]/best
 WEB_PORT=47823
+# Host IP the web port is published on (docker-compose). Default 127.0.0.1;
+# set a LAN IP or 0.0.0.0 to reach it from a reverse proxy or tunnel.
+WEB_BIND=127.0.0.1
+# Public URL of the clip page, posted in Discord (default http://localhost:WEB_PORT)
 PUBLIC_BASE_URL=https://dj.example.com
 # Hours without activity before a web session link expires
 SESSION_IDLE_HOURS=6

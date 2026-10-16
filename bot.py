@@ -44,7 +44,10 @@ if os.getenv("AUDIO_FORMAT") and not os.getenv("MEDIA_FORMAT"):
 # Web server for the synced clip page. The public URL is what gets posted in
 # Discord; the tunnel in front of it forwards to WEB_PORT.
 WEB_PORT = int(os.getenv("WEB_PORT", "47823"))
-PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://dj.example.com").rstrip("/")
+# Empty PUBLIC_BASE_URL falls back to the local address.
+PUBLIC_BASE_URL = (
+    os.getenv("PUBLIC_BASE_URL") or f"http://localhost:{WEB_PORT}"
+).rstrip("/")
 WEB_INDEX = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "web", "index.html"
 )

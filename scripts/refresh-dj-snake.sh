@@ -6,12 +6,12 @@
 # Docker fige yt-dlp au build ; l'entrypoint le met à jour à chaque démarrage,
 # donc un simple restart suffit — inutile de reconstruire l'image.
 #
-# Appelé par cron. Voir la crontab de l'utilisateur.
+# Appelé par cron (crontab de l'utilisateur qui gère Docker).
 
 set -euo pipefail
 
-COMPOSE_DIR="/opt/dj-snake"
-LOG="/opt/dj-snake/logs/refresh.log"
+COMPOSE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+LOG="$COMPOSE_DIR/logs/refresh.log"
 
 mkdir -p "$(dirname "$LOG")"
 exec >>"$LOG" 2>&1
