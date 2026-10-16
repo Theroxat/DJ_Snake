@@ -3,7 +3,7 @@
 # Core Dependencies
 # discord.py 2.5+ is required for Python 3.13+ (older versions import the
 # `audioop` module, which was removed from the standard library in Python 3.13).
-discord.py>=2.5.2
+discord.py>=2.7.1
 # YouTube breaks older extractors regularly: an out-of-date yt-dlp returns
 # HTTP 403 on the media download. Keep this floor recent and rebuild often.
 yt-dlp>=2026.8.19
