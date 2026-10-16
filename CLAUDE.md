@@ -78,6 +78,18 @@ and `YTDLP_AUTO_UPDATE`
   referenced by a player (the same video shares one path). yt-dlp is
   blocking, so `download_media()` and `get_playlist_info()` always run through
   `loop.run_in_executor`.
+- **Automix** (always on, no settings): after the download,
+  `_remove_offtopic()` cuts SponsorBlock `music_offtopic` segments out of the
+  file (stream copy, best effort: no segments or API down keeps the file).
+  `analyse_media()` then runs one audio-only ffmpeg pass (~5 s per track):
+  `loudnorm` first pass plus `silencedetect`, stored on the track as
+  `loudnorm`, `start` (end of leading silence, max 20 s) and `end` (start of
+  trailing silence). `playback_options()` builds the FFmpeg args: input
+  `-ss`/`-t` keep playback inside `start`..`end` (file time), and `-af` applies
+  the `loudnorm` second pass (linear, I=-14, TP=-1.5), a fade-in and a 4 s
+  fade-out timed from the seek point. `elapsed`, seeks and the state's
+  `start`/`end` are all in file time, so the muted web video stays in sync; the
+  page's progress bar spans `start`..`end`. Tracks without `end` play untouched.
 - **Playback chain**: `play_next()` takes `player.lock` and `_advance()` retires
   the current track per `player.pending_action` (None/"next": to history, pop
   the queue; "previous": current back to the queue front, play the last history
@@ -87,8 +99,24 @@ and `YTDLP_AUTO_UPDATE`
   (`play_gen`) or player (replaced by `!reset`) is stale is ignored, and a call
   with no generation only starts an idle player. Controls never pick the next
   track themselves: they set `pending_action` under the lock and call
-  `voice_client.stop()`.
-- **Controls** (`control_next/previous/pause/resume/remove/move/add/seek/jump`) are shared
+  `voice_client.stop()`. The voice client always plays a `CrossfadeMixer`
+  wrapping the FFmpeg source (a pass-through unless a crossfade runs).
+- **Crossfade** (`player.crossfade`, per session, off by default; `!crossfade
+  on|off` or the web `crossfade` action): tracks then get a 6 s fade-out. When
+  the mixer reaches a track's fade-out it calls `on_tail` on the audio thread,
+  which schedules `_start_crossfade()`: under the lock, if the next queued
+  track exists, both tracks' automix windows are >= 15 s and nothing is
+  paused or pending, it opens the next track (fade-in = remaining overlap),
+  reads its first frame in an executor, `attach()`es it, and promotes it
+  exactly like a normal advance (history, queue, `play_gen`, `started_at`).
+  The old source drains underneath, summed with `audioop.add` (saturating)
+  only during the overlap. No `play()`/`stop()` happens, so the `after`
+  callback fires once at the end of the chain and reads `mixer.gen`. Any
+  control stops the whole mixer, which cancels the overlap. Off, the FFmpeg
+  options are exactly the usual ones (1 s in, 4 s out). The state's
+  `crossfading` is true while the old track drains; only then does the page
+  cross-dissolve its two stacked `<video>`s (skips stay an instant swap).
+- **Controls** (`control_next/previous/pause/resume/remove/move/add/seek/jump/crossfade`) are shared
   by Discord commands and the web page and raise `ControlError` (HTTP status,
   French web message, English Discord message). Previous restarts the track
   after 5 s of play or with empty history. Add accepts only YouTube hosts and
@@ -125,13 +153,14 @@ and `YTDLP_AUTO_UPDATE`
   `0.0.0.0:WEB_PORT`. Routes, the contract `web/index.html` relies on:
   `GET /` landing text; `GET /{sid}` serves `web/index.html`;
   `GET /api/{sid}/state` returns `{active, in_voice, guild, channel, loading,
-  paused, can_previous, server_time, now_playing: {id, title, duration,
-  thumbnail, url, video_url, elapsed} | null, queue: [{id, title, duration,
+  paused, can_previous, crossfade, crossfading, server_time, now_playing: {id,
+  title, duration, thumbnail, url, video_url, elapsed, start, end} | null, queue: [{id, title, duration,
   thumbnail, url}]}` (404 `{"active": false}` when the sid is unknown or
   expired; out of voice, `now_playing` is null and `queue` empty; `elapsed`
   freezes while paused). `POST /api/{sid}/control` takes `{action:
-  next|previous|pause|resume|remove|move|add|seek|jump, id?, index?, url?,
-  position?}` (body <= 4 KB; seek restarts the track at `position` seconds,
+  next|previous|pause|resume|remove|move|add|seek|jump|crossfade, id?, index?,
+  url?, position?, enabled?}` (body <= 4 KB; crossfade takes a boolean
+  `enabled`; seek restarts the track at `position` seconds (file time),
   clamped, staying paused if it was, unannounced; jump plays a queued `id` now)
   and returns 200 `{"ok": true}` (202 for add, which downloads in the
   background) or `{"ok": false, "error": "<French>"}` with 400 (bad input,
@@ -139,11 +168,21 @@ and `YTDLP_AUTO_UPDATE`
   playing). `GET /media/{sid}/{id}` streams the playing, a queued or a history
   track's mp4 with Range support. Files are found by track id, never by a path
   from the request.
+- **Status panel**: each web session has one message in its text channel
+  (`player.panel_message`), edited in place instead of announcing events:
+  clip link, now playing / paused / idle, up next, loading progress and the
+  last action. Every state change calls `refresh_panel(player)`, which is
+  coalesced to one edit per `PANEL_MIN_INTERVAL` (1.5 s, last state wins). A
+  deleted panel is re-posted; a rejoin posts a fresh one and deletes the old.
+  Use `set_action()` for the last-action line. Commands acknowledge success
+  with a reaction (`ack()`); only errors, `!list`, `!reset`, usage help and
+  the playlist prompt are text replies.
 - **Voice**: `safe_voice_connect()` cleans up any stale voice client, adds
   delays, and retries. It exists to avoid Discord close code 4006 (invalid
   session). `join_voice_channel()` wraps it. `!reset` forces a reconnect.
-- **Commands**: `!play`, `!list`, `!next`, `!pause`, `!resume`, `!seek`, `!stop`,
-  `!reset`.
+- **Commands**: `!play`, `!list`, `!next`, `!pause`, `!resume`, `!seek`
+  (position relative to the track's automix `start`, as the page shows it),
+  `!crossfade on|off`, `!stop`, `!reset`.
 - Voice needs `PyNaCl`, `davey` (DAVE encryption, required by discord.py 2.7+)
   and, on Python 3.13+, `audioop-lts`. The Docker image uses Python 3.12. CI
   tests on 3.10 to 3.12.

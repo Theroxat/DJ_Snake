@@ -67,9 +67,12 @@ main {
   box-shadow: 6px 6px 0 var(--red); aspect-ratio: 16 / 9;
 }
 .frame:fullscreen { box-shadow: none; border: 0; aspect-ratio: auto; width: 100%; height: 100%; }
-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
+video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; z-index: 0; }
+/* Two stacked players: the active one on top. A crossfade fades the new one in over the old. */
+video.front { z-index: 1; }
+video.dissolving { opacity: 0; }
 .overlay {
-  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 10px; text-align: center; padding: 16px; background: #0a0a0acc;
 }
 .overlay .big { font-size: clamp(22px, 4vw, 40px); color: var(--yellow); }
@@ -116,6 +119,11 @@ button.synctoggle:hover { box-shadow: none; transform: none; color: var(--cyan);
 button.synctoggle:active { box-shadow: none; transform: none; }
 button.synctoggle[aria-expanded="true"] { color: var(--cyan); border-color: var(--cyan); }
 button.synctoggle b { color: var(--yellow); font-weight: 400; }
+button.synctoggle:disabled { box-shadow: none; }
+.transport button.xfade { align-self: center; min-width: 0; min-height: 40px; padding: 4px 10px; gap: 8px; }
+.xfade .box { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; position: relative; top: -1px; }
+.xfade[aria-checked="true"] { color: var(--cyan); border-color: var(--cyan); }
+.xfade[aria-checked="true"] .box { background: var(--yellow); border-color: var(--yellow); box-shadow: 2px 2px 0 var(--red); }
 .offset {
   position: absolute; right: 0; top: 100%; margin-top: 10px; z-index: 30; width: min(460px, 100%);
   background: var(--ink); border: 2px solid var(--cream); box-shadow: 6px 6px 0 var(--cyan);
@@ -262,7 +270,8 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
 <main>
   <section class="stage">
     <div class="frame" id="frame">
-      <video id="video" muted playsinline preload="auto"></video>
+      <video id="video" class="front" muted playsinline preload="auto"></video>
+      <video id="video2" muted playsinline preload="auto" aria-hidden="true"></video>
       <div class="pausebadge hud" id="pausebadge" hidden><i>❚❚</i> PAUSE</div>
       <div class="overlay" id="overlay">
         <div class="hud blink" id="overlayhud" style="color:var(--cyan)">PLAYER 1 — READY</div>
@@ -274,6 +283,7 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
       <button id="prev" type="button" aria-label="Morceau précédent" title="Précédent" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h3v14H5zM20 5v14L9 12z"/></svg></button>
       <button id="pp" type="button" aria-label="Pause" title="Pause" disabled><svg id="ppicon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg></button>
       <button id="next" type="button" aria-label="Morceau suivant" title="Suivant" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h3v14h-3zM4 5v14l11-7z"/></svg></button>
+      <button id="xfade" class="synctoggle xfade" type="button" role="switch" aria-checked="false" title="Fondu enchaîné entre les morceaux (pour tout le salon)" disabled><span class="box" aria-hidden="true"></span>Crossfade</button>
       <form id="addform" class="addform" autocomplete="off">
         <input id="addurl" type="text" inputmode="url" placeholder="Colle un lien YouTube…" aria-label="Lien YouTube à ajouter" disabled>
         <button id="addbtn" type="submit" aria-label="Ajouter à la file" disabled>Ajouter</button>
@@ -330,8 +340,11 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
   "use strict";
   const sid = location.pathname.split("/").filter(Boolean)[0] || "";
   const $ = (id) => document.getElementById(id);
-  const video = $("video");
-  video.muted = true; // always muted: sound comes from Discord
+  // Two stacked <video>s: `video` is the synced one; `back` holds the previous
+  // clip while a crossfade dissolves into the new one.
+  let video = $("video"), back = $("video2");
+  video.muted = back.muted = true; // always muted: sound comes from Discord
+  const XFADE_S = 6;
 
   const POLL_MS = 2000, ENDED_POLL_MS = 10000;
   const HARD_SEEK = 1.0, NUDGE_MIN = 0.15, NUDGE_STOP = 0.1;
@@ -350,7 +363,8 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
   let timer = null;
   let polling = false;
   let lastQueueSig = "";
-  let inVoice = true, paused = false, canPrev = false;
+  let inVoice = true, paused = false, canPrev = false, xfade = false;
+  let dissolveTimer = null;
   let queue = [];          // current (possibly optimistic) queue
   let dragging = false, deferredQueue = null;
   let focusAfterRender = null;
@@ -615,6 +629,7 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
   function showEnded() {
     $("ended").hidden = false;
     setLive(false);
+    endDissolve();
     video.pause();
     state = null; curId = null; // a revived session reloads the video from scratch
   }
@@ -623,33 +638,82 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
   function targetPos() {
     if (!state) return 0;
     let t = baseElapsed + (paused ? 0 : (performance.now() - anchor) / 1000 + offset);
-    if (state.duration) t = Math.min(t, state.duration);
+    if (state.end) t = Math.min(t, state.end);
     return Math.max(0, t);
   }
 
-  function loadTrack(np) {
+  function clearVideo(v) {
+    v.pause();
+    if (v.getAttribute("src")) { v.removeAttribute("src"); v.load(); }
+  }
+  // Finish (or cancel) a running dissolve: only the front video remains.
+  function endDissolve() {
+    clearTimeout(dissolveTimer);
+    dissolveTimer = null;
+    video.style.transition = "";
+    video.classList.remove("dissolving");
+    back.classList.remove("front");
+    back.style.transition = "";
+    clearVideo(back);
+  }
+
+  function loadTrack(np, crossfading) {
+    // Crossfade (the server says the audio overlaps): the clip on screen stays
+    // and keeps playing underneath while the new one loads in the other
+    // element, then fades in over it. A skip or a jump stays an instant swap.
+    const dissolve = crossfading && !!curId && !!video.getAttribute("src") && video.readyState >= 2 && !paused;
+    endDissolve();
     curId = np.id;
     pendingSeek = true;
-    video.pause();
+    if (dissolve) {
+      [video, back] = [back, video];
+      video.removeAttribute("aria-hidden");
+      back.setAttribute("aria-hidden", "true");
+      video.style.transition = "none";
+      video.classList.add("dissolving");
+      video.classList.add("front");
+      back.classList.remove("front");
+      video.dataset.dissolve = "1";
+    } else {
+      video.pause();
+      delete video.dataset.dissolve;
+      overlay("Chargement de la vidéo…");
+    }
     video.src = np.video_url;
     video.muted = true;
     video.load();
-    overlay("Chargement de la vidéo…");
   }
 
-  function onMeta() {
-    if (!pendingSeek) return;
+  function onMeta(e) {
+    if (e.target !== video || !pendingSeek) return;
     pendingSeek = false;
-    try { video.currentTime = targetPos(); } catch (e) {}
+    try { video.currentTime = targetPos(); } catch (x) {}
     if (!paused) { const p = video.play(); if (p && p.catch) p.catch(() => {}); }
     overlay(null);
+    if (video.dataset.dissolve) {
+      delete video.dataset.dissolve;
+      // What is left of the audio overlap (the page may learn of it late).
+      const left = Math.max(0.4, XFADE_S - Math.max(0, targetPos() - (state ? state.start : 0)));
+      void video.offsetWidth; // commit opacity 0 before animating
+      video.style.transition = "opacity " + left.toFixed(2) + "s linear";
+      video.classList.remove("dissolving");
+      dissolveTimer = setTimeout(endDissolve, left * 1000 + 100);
+    }
   }
-  video.addEventListener("loadedmetadata", onMeta);
-  video.addEventListener("error", () => { if (curId) overlay("Vidéo indisponible…"); setLive(false); });
+  function onErr(e) {
+    if (e.target !== video) return;
+    if (curId) overlay("Vidéo indisponible…");
+    setLive(false);
+  }
+  for (const v of [video, back]) {
+    v.addEventListener("loadedmetadata", onMeta);
+    v.addEventListener("error", onErr);
+  }
 
   function correct() {
     if (!state || !curId || pendingSeek || video.readyState < 1) return;
     if (paused) {
+      if (dissolveTimer) endDissolve(); // a pause cuts the crossfade short
       if (!video.paused) video.pause();
       video.playbackRate = 1;
       if (Math.abs(video.currentTime - targetPos()) > 0.3) { try { video.currentTime = targetPos(); } catch (e) {} }
@@ -674,9 +738,9 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
   function tick() {
     correct();
     if (state) {
-      const e = curElapsed();
-      const dur = state.duration || 0;
-      const pct = dur ? Math.min(100, (e / dur) * 100) : 0;
+      const e = curElapsed() - state.start; // bar spans start..end (file time)
+      const dur = state.end - state.start;
+      const pct = dur > 0 ? Math.max(0, Math.min(100, (e / dur) * 100)) : 0;
       const sk = $("seek"), on = !!dur && inVoice;
       sk.classList.toggle("disabled", !on);
       sk.tabIndex = on ? 0 : -1;
@@ -691,20 +755,20 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
     }
   }
   function curElapsed() {
-    return Math.min(state.duration || Infinity, baseElapsed + (paused ? 0 : (performance.now() - anchor) / 1000));
+    return Math.min(state.end || Infinity, baseElapsed + (paused ? 0 : (performance.now() - anchor) / 1000));
   }
 
   // ---- seek bar (click, drag, touch, keyboard)
   const seekEl = $("seek");
   let seeking = false, seekFrac = 0;
-  const seekOn = () => !!(state && state.duration && inVoice);
+  const seekOn = () => !!(state && state.end > state.start && inVoice);
   function fracAt(x) {
     const r = seekEl.getBoundingClientRect();
     return r.width ? Math.max(0, Math.min(1, (x - r.left) / r.width)) : 0;
   }
   function showPreview(f) {
     seekFrac = f;
-    const t = f * state.duration;
+    const t = f * (state.end - state.start); // shown relative to start
     $("seekghost").hidden = false;
     $("seektip").hidden = false;
     $("seekghost").style.left = f * 100 + "%";
@@ -720,9 +784,10 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
   function hidePreview() { $("seekghost").hidden = true; $("seektip").hidden = true; }
   function seekTo(pos) {
     if (!seekOn()) return;
-    pos = Math.max(0, Math.min(pos, Math.max(0, state.duration - 1)));
+    pos = Math.max(state.start, Math.min(pos, Math.max(state.start, state.end - 1)));
     baseElapsed = pos;
     anchor = performance.now();
+    if (dissolveTimer) endDissolve(); // the server cancels the overlap too
     if (!pendingSeek && video.readyState >= 1) { try { video.currentTime = targetPos(); } catch (e) {} }
     tick();
     send("seek", { position: Math.round(pos * 10) / 10 });
@@ -736,7 +801,7 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
     showPreview(fracAt(e.clientX));
   });
   seekEl.addEventListener("pointermove", (e) => {
-    if (!state || !state.duration) return;
+    if (!seekOn()) return;
     if (seeking || e.pointerType === "mouse") showPreview(fracAt(e.clientX));
   });
   const seekEnd = (commit) => {
@@ -744,7 +809,7 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
     seeking = false;
     seekEl.classList.remove("active");
     hidePreview();
-    if (commit) seekTo(seekFrac * state.duration);
+    if (commit) seekTo(state.start + seekFrac * (state.end - state.start));
   };
   seekEl.addEventListener("pointerup", (e) => { if (seeking) { showPreview(fracAt(e.clientX)); seekEnd(true); } });
   seekEl.addEventListener("pointercancel", () => seekEnd(false));
@@ -762,6 +827,7 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
     inVoice = d.in_voice !== false;
     paused = !!d.paused && inVoice;
     canPrev = !!d.can_previous;
+    if (!pending.has("crossfade")) xfade = !!d.crossfade;
     $("pausebadge").hidden = !(paused && d.now_playing);
     $("guild").textContent = d.guild || "—";
     $("channel").textContent = d.channel ? " # " + d.channel : "";
@@ -769,7 +835,8 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
     const np = d.now_playing;
     if (!inVoice) {
       state = null; curId = null;
-      if (video.getAttribute("src")) { video.pause(); video.removeAttribute("src"); video.load(); }
+      endDissolve();
+      clearVideo(video);
       $("title").textContent = ""; $("title").dataset.sig = "";
       $("progline").hidden = true;
       overlay("En pause", "DJ Snake n'est dans aucune room. Lance !play dans Discord pour reprendre, ce lien reste valable.", true);
@@ -779,7 +846,8 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
     }
     if (!np) {
       state = null; curId = null;
-      if (video.getAttribute("src")) { video.pause(); video.removeAttribute("src"); video.load(); }
+      endDissolve();
+      clearVideo(video);
       $("title").textContent = "";
       $("progline").hidden = true;
       overlay(d.loading ? "Le bot prépare le morceau…" : "En attente d'un morceau…");
@@ -796,12 +864,14 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
       if (yt) tl.appendChild(yt);
     }
     document.title = np.title + " — DJ Snake";
-    state = { duration: np.duration };
-    $("tdur").textContent = fmt(np.duration);
+    // Automix window in file time; older servers send neither field.
+    const start = np.start || 0, end = np.end || np.duration || 0;
+    state = { duration: np.duration, start: start, end: end };
+    $("tdur").textContent = fmt(end ? end - start : null);
     $("progline").hidden = false;
     baseElapsed = (np.elapsed || 0) + (paused ? 0 : latency);
     anchor = performance.now();
-    if (np.id !== curId) loadTrack(np);
+    if (np.id !== curId) loadTrack(np, !!d.crossfading);
     updateControls();
   }
 
@@ -813,6 +883,8 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
     dis("pp", !inVoice || !state || pending.has("pause") || pending.has("resume"));
     dis("addurl", !inVoice);
     dis("addbtn", !inVoice || pending.has("add"));
+    dis("xfade", !inVoice || pending.has("crossfade"));
+    $("xfade").setAttribute("aria-checked", String(xfade));
     const pp = $("pp");
     pp.setAttribute("aria-label", paused ? "Reprendre" : "Pause");
     pp.title = paused ? "Reprendre" : "Pause";
@@ -850,6 +922,12 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
   $("prev").addEventListener("click", () => send("previous"));
   $("next").addEventListener("click", () => send("next"));
   $("pp").addEventListener("click", () => send(paused ? "resume" : "pause"));
+  $("xfade").addEventListener("click", () => {
+    if (!inVoice || pending.has("crossfade")) return;
+    const want = !xfade;
+    xfade = want; // optimistic; the next poll confirms
+    send("crossfade", { enabled: want }).then((ok) => { if (!ok) xfade = !want; updateControls(); });
+  });
   $("addform").addEventListener("submit", async (e) => {
     e.preventDefault();
     const inp = $("addurl");

@@ -1,14 +1,18 @@
 import os
 import asyncio
+import audioop  # Standard library up to 3.12; audioop-lts on 3.13+
 import json
 import math
 import re
 import secrets
+import subprocess
+import threading
 import time
 import types
 import yt_dlp
 import discord
 from discord.ext import commands
+from yt_dlp.postprocessor import ModifyChaptersPP, SponsorBlockPP
 import tempfile
 from aiohttp import web
 from urllib.parse import urlparse, parse_qs
@@ -83,6 +87,30 @@ PERMANENT_ERROR_MARKERS = (
     "who has blocked it",
     "copyright",
 )
+# Automix, always on. At download, SponsorBlock "music_offtopic" segments
+# (skits, talking intros) are cut out of the file. One ffmpeg pass then
+# measures loudness (loudnorm, first pass) and leading/trailing silence.
+# Playback normalises with loudnorm's second pass, skips that silence and
+# fades in and out.
+SPONSORBLOCK_REMOVE = ["music_offtopic"]
+# Linear mode (a plain gain) needs the measured range within LRA and the
+# boosted true peak under TP; loudnorm otherwise falls back to its dynamic mode.
+LOUDNORM_TARGET = "I=-14:TP=-1.5:LRA=11"
+SILENCE_FILTER = "silencedetect=noise=-45dB:d=0.5"
+MAX_LEADING_TRIM = 20.0  # Never skip more than this at the start
+MIN_PLAYED_SECONDS = 10.0  # Trimming that leaves less is ignored
+FADE_IN_SECONDS = 1.0
+SEEK_FADE_IN_SECONDS = 0.3  # Softens the cut when restarting mid-track
+FADE_OUT_SECONDS = 4.0
+ANALYSIS_TIMEOUT = 180
+LOUDNORM_KEYS = ("input_i", "input_tp", "input_lra", "input_thresh", "target_offset")
+# Optional crossfade (per session, off by default): the last seconds of a track
+# overlap the first ones of the next. Both need an automix window this long.
+CROSSFADE_SECONDS = 6.0
+CROSSFADE_MIN_TRACK = 15.0
+FRAMES_PER_SECOND = 50  # discord.py reads 20 ms PCM frames
+PCM_FRAME_SIZE = discord.opus.Encoder.FRAME_SIZE  # 3840 bytes, 48 kHz s16 stereo
+
 # Only create a temp directory if one wasn't provided. Using tempfile.mkdtemp()
 # directly as the default argument would create an orphan directory on every run
 # because default arguments are evaluated eagerly.
@@ -125,6 +153,20 @@ class MusicPlayer:
         self.seek_paused = False
         # Bumped on each track start; a stale `after` callback is ignored.
         self.play_gen = 0
+        self.crossfade = False  # Session setting, shared by everyone
+        self.mixer = None  # CrossfadeMixer handed to the voice client
+        # Status panel: the one message of the session that is edited in place.
+        self.panel_message = None
+        self.panel_text = None  # What the message currently shows
+        self.panel_task = None  # Scheduled (throttled) refresh, if any
+        self.panel_dirty = False
+        self.panel_last_edit = float("-inf")  # time.monotonic() of last write
+        self.panel_lock = asyncio.Lock()
+        self.expired = False
+        self.last_action = None  # Short line: "⏭️ Skipped via the web page"
+        self.load_line = None  # Playlist progress / final result
+        self.load_final = False  # load_line is a result, not progress
+        self.single_downloads = 0  # Single-track downloads in progress
 
     @property
     def loading(self):
@@ -153,6 +195,7 @@ class MusicPlayer:
         self.epoch += 1
         self.play_gen += 1  # The stopped track's callback must not advance
         self.pending_action = None
+        self.mixer = None
         tracks = list(self.queue) + list(self.history)
         if self.now_playing:
             tracks.append(self.now_playing)
@@ -236,6 +279,8 @@ def expire_session(player):
         sessions.pop(player.sid, None)
         print(f"Web session expired: {player.sid}")
         player.sid = None
+        player.expired = True
+        refresh_panel(player)
     if not player.in_voice():
         tracks = list(player.queue) + list(player.history)
         if player.now_playing:
@@ -281,33 +326,159 @@ async def session_cleanup_loop():
 
 
 async def open_session(ctx, player, announce=True):
-    """Reuse the guild's live session or start one, and post its link."""
+    """Reuse the guild's live session or start one, and post its status panel."""
     touch(player)
     created = False
     if not player.sid:
         player.sid = secrets.token_urlsafe(16)
         sessions[player.sid] = ctx.guild.id
+        player.expired = False
         created = True
         print(f"Web session opened for {ctx.guild.name}: {player.sid}")
     if not (created or announce):
         return
     player.text_channel = ctx.channel
-    try:
-        await ctx.channel.send(
-            f"📺 Watch the clip live: {PUBLIC_BASE_URL}/{player.sid}"
-        )
-    except Exception as e:
-        print(f"Could not post session link: {e}")
+    await post_panel(player)
 
 
-async def announce(player, text):
-    """Post a short notice in the session's text channel."""
+# --- Status panel -----------------------------------------------------------
+# One message per session, edited in place instead of posting an announcement
+# for every event. Every state change calls refresh_panel().
+
+PANEL_MIN_INTERVAL = 1.5  # Seconds between edits (Discord rate limits)
+_NO_MENTIONS = discord.AllowedMentions.none()
+
+
+def _short(title, limit=100):
+    title = str(title)
+    return title if len(title) <= limit else title[: limit - 1] + "…"
+
+
+def render_panel(player):
+    if player.expired:
+        return "⌛ Session expired"
+    lines = []
+    if player.sid:
+        lines.append(f"📺 Watch the clip live: {PUBLIC_BASE_URL}/{player.sid}")
+    if not player.in_voice():
+        lines.append(f"💤 Idle — {COMMAND_PREFIX}play to resume")
+    elif player.now_playing:
+        line = f"🎵 Now playing: **{_short(player.now_playing['title'])}**"
+        if player.paused_at is not None:
+            line += " ⏸️ paused"
+        lines.append(line)
+    else:
+        lines.append("🎵 Nothing playing yet")
+    if player.queue:
+        line = f"⏭️ Up next: {_short(player.queue[0]['title'])}"
+        if len(player.queue) > 1:
+            line += f" and {len(player.queue) - 1} more"
+        lines.append(line)
+    if player.crossfade:
+        lines.append("🔀 Crossfade on")
+    if player.load_line:
+        lines.append(player.load_line)
+    elif player.single_downloads:
+        lines.append("📥 Downloading…")
+    if player.last_action:
+        lines.append(player.last_action)
+    return "\n".join(lines)
+
+
+async def _send_panel(player):
+    """Post the panel as a new message (caller holds panel_lock)."""
+    text = render_panel(player)
+    message = await player.text_channel.send(text, allowed_mentions=_NO_MENTIONS)
+    player.panel_message = message
+    player.panel_text = text
+    player.panel_last_edit = time.monotonic()
+
+
+async def post_panel(player):
+    """Post a fresh panel at the bottom and delete the previous one."""
     if player.text_channel is None:
         return
+    old = player.panel_message
+    async with player.panel_lock:
+        try:
+            await _send_panel(player)
+        except Exception as e:
+            print(f"Could not post status panel: {e}")
+            return
+    if old is not None:
+        try:
+            await old.delete()
+        except Exception:
+            pass
+
+
+async def _write_panel(player):
+    async with player.panel_lock:
+        text = render_panel(player)
+        if player.panel_message is not None:
+            if text == player.panel_text:
+                return
+            try:
+                await player.panel_message.edit(
+                    content=text, allowed_mentions=_NO_MENTIONS
+                )
+                player.panel_text = text
+                return
+            except discord.NotFound:
+                player.panel_message = None  # Deleted by someone: post anew
+            except Exception as e:
+                print(f"Could not edit status panel: {e}")
+                return
+        if player.text_channel is None:
+            return
+        try:
+            await _send_panel(player)
+        except Exception as e:
+            print(f"Could not post status panel: {e}")
+
+
+async def _panel_worker(player):
+    while player.panel_dirty:
+        wait = player.panel_last_edit + PANEL_MIN_INTERVAL - time.monotonic()
+        if wait > 0:
+            await asyncio.sleep(wait)
+        player.panel_dirty = False  # Changes during the edit trigger another
+        await _write_panel(player)
+        player.panel_last_edit = time.monotonic()
+
+
+def refresh_panel(player):
+    """Schedule a panel update. Coalesced: at most one edit per
+    PANEL_MIN_INTERVAL, and the last state wins."""
+    if player.text_channel is None:
+        return
+    player.panel_dirty = True
+    if player.panel_task is not None and not player.panel_task.done():
+        return
     try:
-        await player.text_channel.send(text)
-    except Exception as e:
-        print(f"Could not announce: {e}")
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    player.panel_task = loop.create_task(_panel_worker(player))
+
+
+def set_action(player, text):
+    """Show `text` as the panel's last-action line (None clears it)."""
+    player.last_action = text
+    if player.load_final:  # A finished load result lasts until the next change
+        player.load_line, player.load_final = None, False
+    refresh_panel(player)
+
+
+async def ack(ctx):
+    """React with a check mark on the user's command message."""
+    message = getattr(ctx, "message", None)
+    if message is None:
+        return
+    try:
+        await message.add_reaction("✅")
+    except Exception:
+        pass
 
 
 class _NullMessage:
@@ -605,6 +776,108 @@ async def join_voice_channel(ctx):
         return False
 
 
+def _remove_offtopic(ydl, info, filepath):
+    """Cut SponsorBlock "music_offtopic" segments out of the file, in place.
+
+    Best effort: no segments, an unreachable API or a failed cut leaves the
+    file as downloaded. The cut is a stream copy; yt-dlp's concat output keeps
+    audio and video aligned and writes the moov atom first (faststart).
+    """
+    pp_info = dict(info)
+    for download in info.get("requested_downloads") or []:
+        if download.get("filepath") == filepath:
+            pp_info.update(download)
+    pp_info["filepath"] = filepath
+    try:
+        _, pp_info = SponsorBlockPP(ydl, categories=SPONSORBLOCK_REMOVE).run(pp_info)
+        cutter = ModifyChaptersPP(ydl, remove_sponsor_segments=SPONSORBLOCK_REMOVE)
+        leftovers, _ = cutter.run(pp_info)
+        for leftover in leftovers:
+            if os.path.exists(leftover):
+                os.remove(leftover)
+    except Exception as e:
+        print(f"SponsorBlock skipped: {e}")
+
+
+def _parse_analysis(stderr):
+    """Read silencedetect and loudnorm (print_format=json) output.
+
+    Returns {"duration", "start", "end", "loudnorm"}; any part that cannot be
+    read gets its neutral default (no trim, no normalisation).
+    """
+    duration = None
+    match = re.search(r"Duration: (\d+):(\d+):(\d+(?:\.\d+)?)", stderr)
+    if match:
+        h, m, sec = match.groups()
+        duration = int(h) * 3600 + int(m) * 60 + float(sec)
+
+    silences = []  # [start, end or None]
+    for kind, value in re.findall(r"silence_(start|end): (-?\d+(?:\.\d+)?)", stderr):
+        if kind == "start":
+            silences.append([float(value), None])
+        elif silences and silences[-1][1] is None:
+            silences[-1][1] = float(value)
+
+    start, end = 0.0, duration
+    if silences and silences[0][0] <= 0.05 and silences[0][1] is not None:
+        start = min(silences[0][1], MAX_LEADING_TRIM)
+    if silences and duration:
+        tail_start, tail_end = silences[-1]
+        if tail_start > 0.05 and (tail_end is None or tail_end >= duration - 0.1):
+            end = tail_start
+    if end is not None and end - start < MIN_PLAYED_SECONDS:
+        start, end = 0.0, duration  # Mostly silence: play it untouched
+
+    loudnorm = None
+    blocks = re.findall(r"\{[^{}]*\"input_i\"[^{}]*\}", stderr)
+    if blocks:
+        try:
+            raw = json.loads(blocks[-1])
+            values = {key: float(raw[key]) for key in LOUDNORM_KEYS}
+            if all(math.isfinite(v) for v in values.values()):
+                loudnorm = values
+        except (ValueError, KeyError, TypeError):
+            pass
+
+    return {"duration": duration, "start": start, "end": end, "loudnorm": loudnorm}
+
+
+def analyse_media(filepath):
+    """One audio-only ffmpeg pass: loudness (loudnorm first pass) and silence.
+
+    Blocking (a few seconds per track): call it from an executor thread.
+    Never raises; a failure yields the defaults.
+    """
+    cmd = [
+        "ffmpeg",
+        "-hide_banner",
+        "-nostdin",
+        "-nostats",
+        "-vn",
+        "-sn",
+        "-dn",
+        "-i",
+        filepath,
+        "-af",
+        f"{SILENCE_FILTER},loudnorm={LOUDNORM_TARGET}:print_format=json",
+        "-f",
+        "null",
+        "-",
+    ]
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            errors="replace",
+            timeout=ANALYSIS_TIMEOUT,
+        )
+        return _parse_analysis(proc.stderr)
+    except Exception as e:
+        print(f"Audio analysis failed: {e}")
+        return _parse_analysis("")
+
+
 def _download_once(url):
     """Single download attempt. Raises on any failure."""
     # Ensure temp directory exists
@@ -626,47 +899,244 @@ def _download_once(url):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         print(f"Downloading: {url}")
         info = ydl.extract_info(url, download=True)
+        filepath = _find_download(info)
+        _remove_offtopic(ydl, info, filepath)
 
-        video_id = info.get("id", "")
-        duration = info.get("duration")
+    analysis = analyse_media(filepath)
+    duration = analysis["duration"] or info.get("duration")
+    duration = float(duration) if duration else None
+    end = analysis["end"] if analysis["end"] is not None else duration
+    print(
+        f"Automix: start={analysis['start']:.2f}s end={end}s "
+        f"loudnorm={'yes' if analysis['loudnorm'] else 'no'}"
+    )
+    return {
+        "id": secrets.token_hex(4),
+        "filepath": filepath,
+        "title": info.get("title", "Unknown"),
+        "duration": duration,  # Of the file, after the SponsorBlock cut
+        "start": analysis["start"],  # File time where playback starts
+        "end": end,  # File time where it stops (None: unknown, play it all)
+        "loudnorm": analysis["loudnorm"],  # Measured values, or None
+        "thumbnail": info.get("thumbnail"),
+        "url": info.get("webpage_url") or url,
+    }
 
-        def track(filepath):
-            return {
-                "id": secrets.token_hex(4),
-                "filepath": filepath,
-                "title": info.get("title", "Unknown"),
-                "duration": float(duration) if duration else None,
-                "thumbnail": info.get("thumbnail"),
-                "url": info.get("webpage_url") or url,
-            }
 
-        # yt-dlp reports the final (merged) path
-        for download in info.get("requested_downloads") or []:
-            filepath = download.get("filepath")
-            if filepath and os.path.exists(filepath) and os.path.getsize(filepath) > 0:
-                return track(filepath)
+def _find_download(info):
+    """Path of the downloaded file. Raises if there is none."""
 
-        # Fallback: find the downloaded file
-        temp_files = os.listdir(temp_dir)
+    def usable(filepath):
+        return filepath and os.path.exists(filepath) and os.path.getsize(filepath) > 0
 
-        for f in temp_files:
-            if video_id in f:
-                filepath = os.path.join(temp_dir, f)
-                # Verify file exists and has content
-                if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
-                    return track(filepath)
+    # yt-dlp reports the final (merged) path
+    for download in info.get("requested_downloads") or []:
+        if usable(download.get("filepath")):
+            return download["filepath"]
 
-        # If not found by ID, take the most recent
-        if temp_files:
-            latest_file = max(
-                temp_files,
-                key=lambda f: os.path.getctime(os.path.join(temp_dir, f)),
-            )
-            filepath = os.path.join(temp_dir, latest_file)
-            if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
-                return track(filepath)
+    # Fallback: find the downloaded file
+    video_id = info.get("id", "")
+    temp_files = os.listdir(temp_dir)
+    for f in temp_files:
+        if video_id in f and usable(os.path.join(temp_dir, f)):
+            return os.path.join(temp_dir, f)
 
-        raise RuntimeError("File not found after download")
+    # If not found by ID, take the most recent
+    if temp_files:
+        latest_file = max(
+            temp_files,
+            key=lambda f: os.path.getctime(os.path.join(temp_dir, f)),
+        )
+        if usable(os.path.join(temp_dir, latest_file)):
+            return os.path.join(temp_dir, latest_file)
+
+    raise RuntimeError("File not found after download")
+
+
+def playback_options(track, offset, fade_in=None, fade_out=FADE_OUT_SECONDS):
+    """FFmpeg options to play `track` from `offset` (file time, seconds).
+
+    Returns (offset, kwargs for FFmpegPCMAudio); the offset is clamped to the
+    automix window [start, end - 1]. Input -ss/-t keep FFmpeg in file time
+    while the filters see a timeline starting at 0, so the fade-out is placed
+    relative to the seek point. `fade_in` (None: automatic) and `fade_out`
+    are overridden by the crossfade.
+    """
+    # The file carries video for the web page; Discord only needs audio.
+    end = track.get("end")
+    if end is None:  # Not analysed: play the whole file, untouched
+        kwargs = {"options": "-vn"}
+        if offset > 0:
+            kwargs["before_options"] = f"-ss {offset:.3f}"
+        return offset, kwargs
+
+    start = track.get("start") or 0.0
+    offset = max(start, min(offset, end - 1.0))
+    remaining = end - offset
+    filters = []
+    measured = track.get("loudnorm")
+    if measured:
+        filters.append(
+            f"loudnorm={LOUDNORM_TARGET}"
+            f":measured_I={measured['input_i']}"
+            f":measured_TP={measured['input_tp']}"
+            f":measured_LRA={measured['input_lra']}"
+            f":measured_thresh={measured['input_thresh']}"
+            f":offset={measured['target_offset']}"
+            ":linear=true"
+        )
+    if fade_in is None:
+        fade_in = FADE_IN_SECONDS if offset <= start + 0.05 else SEEK_FADE_IN_SECONDS
+    fade_in = min(fade_in, remaining / 2)
+    fade_out = min(fade_out, remaining)
+    filters.append(f"afade=t=in:st=0:d={fade_in:.3f}")
+    filters.append(f"afade=t=out:st={remaining - fade_out:.3f}:d={fade_out:.3f}")
+
+    before = f"-ss {offset:.3f} " if offset > 0 else ""
+    return offset, {
+        "before_options": f"{before}-t {remaining:.3f}",
+        "options": f"-vn -af {','.join(filters)}",
+    }
+
+
+def crossfade_eligible(track):
+    """True if `track` is long enough (and analysed) to take part in a
+    crossfade."""
+    end = track.get("end") if track else None
+    if end is None:
+        return False
+    return end - (track.get("start") or 0.0) >= CROSSFADE_MIN_TRACK
+
+
+class CrossfadeMixer(discord.AudioSource):
+    """The source handed to the voice client: plays one track's FFmpeg source
+    and, once a crossfade is attached, mixes the tail of the outgoing track
+    under the head of the next one.
+
+    The FFmpeg filters do the fades, so mixing is a saturating sample-wise
+    add, done only while two sources overlap. When the current track reaches
+    its fade-out, `on_tail(mixer, gen)` is called once (on the audio thread)
+    so the event loop can `attach()` the next track. A chain of crossfaded
+    tracks is a single voice-client playback: the `after` callback fires once,
+    when the last one ends, and reads `gen` to know which track that was.
+    """
+
+    def __init__(self, source, gen, frames=None, fade_frames=0, on_tail=None):
+        self._lock = threading.Lock()
+        self.source = source
+        self.outgoing = None  # Previous track, draining under `source`
+        self.gen = gen
+        self._frames_left = frames  # Frames until `source` ends (None: unknown)
+        self._fade_frames = fade_frames  # Length of its fade-out, in frames
+        self._on_tail = on_tail
+        self._tail_signalled = False
+        self._pending = None  # First frame of an attached source, already read
+        self.finished = False
+
+    @property
+    def _current_error(self):
+        # Read by discord.py's AudioPlayer when the source ends.
+        return getattr(self.source, "_current_error", None)
+
+    def is_opus(self):
+        return False
+
+    def remaining_seconds(self):
+        if self._frames_left is None:
+            return None
+        return self._frames_left / FRAMES_PER_SECOND
+
+    def rearm(self):
+        """Signal the tail again on the next frame (the crossfade was put off,
+        e.g. by a pause)."""
+        self._tail_signalled = False
+
+    def attach(self, source, first_frame, gen, frames, fade_frames):
+        """Start mixing `source` (whose first frame was already read) over the
+        current one. False if playback has ended or a crossfade is running."""
+        with self._lock:
+            if self.finished or self.outgoing is not None:
+                return False
+            self.outgoing, self.source = self.source, source
+            self._pending = first_frame
+            self.gen = gen
+            self._frames_left = frames
+            self._fade_frames = fade_frames
+            self._tail_signalled = False
+            return True
+
+    def read(self):
+        with self._lock:
+            if self.finished:
+                return b""
+            source, outgoing, data = self.source, self.outgoing, self._pending
+            self._pending = None
+        if data is None:
+            data = source.read()
+        if outgoing is not None:
+            old = outgoing.read()
+            if len(old) == PCM_FRAME_SIZE and len(data) == PCM_FRAME_SIZE:
+                data = audioop.add(data, old, 2)  # Clips instead of wrapping
+            elif not data:
+                data = old
+            if not old:  # The outgoing track is over: back to a single source
+                with self._lock:
+                    if self.outgoing is outgoing:
+                        self.outgoing = None
+                outgoing.cleanup()
+        if not data:
+            with self._lock:
+                # A source attached just as `source` ended plays on.
+                attached = self.source is not source
+                if not attached:
+                    self.finished = True
+            return self.read() if attached else b""
+        if self._frames_left is not None:
+            self._frames_left -= 1
+            if (
+                not self._tail_signalled
+                and self._on_tail is not None
+                and self._fade_frames > 0
+                and self._frames_left <= self._fade_frames
+            ):
+                self._tail_signalled = True
+                try:
+                    self._on_tail(self, self.gen)
+                except Exception as e:
+                    print(f"Crossfade signal failed: {e}")
+        return data
+
+    def cleanup(self):
+        with self._lock:
+            self.finished = True
+            sources = [self.source, self.outgoing]
+            self.outgoing = None
+        for source in sources:
+            if source is not None and hasattr(source, "cleanup"):
+                try:
+                    source.cleanup()
+                except Exception as e:
+                    print(f"Audio source cleanup failed: {e}")
+
+
+def open_track_source(player, track, offset, fade_in=None):
+    """Start FFmpeg for `track` from `offset`. Returns (offset, source, frames,
+    fade_frames): the clamped offset, the source, its length in frames (None
+    if unknown) and the length of its fade-out (0: cannot crossfade)."""
+    eligible = crossfade_eligible(track)
+    fade_out = CROSSFADE_SECONDS if player.crossfade and eligible else FADE_OUT_SECONDS
+    offset, kwargs = playback_options(track, offset, fade_in, fade_out)
+    source = discord.FFmpegPCMAudio(track["filepath"], **kwargs)
+    end = track.get("end")
+    if end is None:
+        return offset, source, None, 0
+    remaining = max(0.0, end - offset)
+    frames = round(remaining * FRAMES_PER_SECOND)
+    fade_frames = 0
+    if eligible:
+        # Toggled on mid-track, the fade already running is 4 s: overlap that.
+        fade_frames = round(min(fade_out, remaining) * FRAMES_PER_SECOND)
+    return offset, source, frames, fade_frames
 
 
 def _is_permanent_failure(message):
@@ -726,23 +1196,26 @@ async def download_and_queue_song(
                     await ctx.send("❌ Unable to join voice channel!")
                     return None
 
-        status_message = (
-            _NullMessage() if quiet else await ctx.send("⏳ Downloading...")
-        )
         loop = asyncio.get_running_loop()
-        track = await loop.run_in_executor(None, download_media, url)
+        if not quiet:
+            player.single_downloads += 1
+            refresh_panel(player)
+        try:
+            track = await loop.run_in_executor(None, download_media, url)
+        finally:
+            if not quiet:
+                player.single_downloads = max(0, player.single_downloads - 1)
 
         if _cancelled(player, epoch):
             discard_tracks([track])
-            await status_message.delete()
+            refresh_panel(player)
             return None
 
         player.add_to_queue(track)
-        if from_web:
-            text = f"➕ Added from the web page: **{track['title']}**"
+        if quiet:
+            refresh_panel(player)
         else:
-            text = f"✅ **{track['title']}** added to queue."
-        await status_message.edit(content=text)
+            set_action(player, f"➕ Added: {_short(track['title'])}")
 
         if not player.is_playing:
             await play_next(ctx)
@@ -752,34 +1225,25 @@ async def download_and_queue_song(
         if quiet:
             print(f"Playlist item failed: {e}")
             return None
+        refresh_panel(player)
         await ctx.send(f"❌ Download error: {str(e)}")
-        if "status_message" in locals():
-            try:
-                await status_message.delete()
-            except:
-                pass
         return None
-
-
-async def _edit_quietly(message, content):
-    """Edit a status message; a deleted one is not worth an error."""
-    try:
-        await message.edit(content=content)
-    except Exception as e:
-        print(f"Could not edit message: {e}")
 
 
 async def queue_playlist(ctx, player, entries, from_web=False):
     """Download playlist entries one by one into the queue while earlier
-    ones play. `loading` keeps play_next from leaving voice meanwhile."""
+    ones play. `loading` keeps play_next from leaving voice meanwhile.
+    Progress lives in the status panel, not in channel messages."""
     epoch = player.epoch
     stopped = False
     loaded = 0
     total = len(entries)
-    # One message for the whole playlist, edited at the end: a line per
-    # track would flood the channel and bury the session link.
-    source = " from the web page" if from_web else ""
-    status_message = await ctx.send(f"📥 Loading {total} tracks{source}…")
+
+    def progress(text, final=False):
+        player.load_line, player.load_final = text, final
+        refresh_panel(player)
+
+    progress(f"📥 Loading 0/{total}…")
     player.loading_jobs += 1
     try:
         for entry in entries:
@@ -802,18 +1266,17 @@ async def queue_playlist(ctx, player, entries, from_web=False):
             )
             if track is not None and not _cancelled(player, epoch):
                 loaded += 1
+                progress(f"📥 Loading {loaded}/{total}…")
     finally:
         player.loading_jobs = max(0, player.loading_jobs - 1)
 
     if stopped or _cancelled(player, epoch):
-        await _edit_quietly(
-            status_message, f"⏹️ Loading stopped ({loaded}/{total} tracks loaded)"
-        )
+        progress(f"⏹️ Loading stopped ({loaded}/{total})", final=True)
         return
-    text = f"✅ {loaded}/{total} tracks loaded{source}"
+    text = f"✅ {loaded}/{total} tracks loaded"
     if loaded < total:
         text += f" ({total - loaded} unavailable)"
-    await _edit_quietly(status_message, text)
+    progress(text, final=True)
     # The last track may have finished while the queue was empty during
     # loading: start the queue again, or leave if there is nothing left.
     if not player.is_playing:
@@ -845,6 +1308,8 @@ async def _advance(ctx, player):
     """Retire the current track according to pending_action and start the
     next one. Must run under player.lock."""
     action, player.pending_action = player.pending_action, None
+    if action is None:
+        player.last_action = None  # The track ended by itself
     finished = player.now_playing
     player.now_playing = None
     player.started_at = None
@@ -880,7 +1345,7 @@ async def _advance(ctx, player):
         if player.voice_client and player.voice_client.is_connected():
             await player.voice_client.disconnect()
         # The web session survives: it expires after SESSION_IDLE_HOURS.
-        await ctx.send("🎵 Queue is empty!")
+        refresh_panel(player)
         return
 
     # Check voice connection
@@ -888,6 +1353,7 @@ async def _advance(ctx, player):
         if not await join_voice_channel(ctx):
             player.queue.insert(0, next_track)
             player.is_playing = False
+            refresh_panel(player)
             await ctx.send("❌ Unable to join voice channel!")
             return
 
@@ -896,26 +1362,36 @@ async def _advance(ctx, player):
     loop = asyncio.get_running_loop()
 
     def after_playing(error):
-        # Runs on the audio thread: only hand over to the event loop.
+        # Runs on the audio thread: only hand over to the event loop. A
+        # crossfade chain ends on a later track than the one started here.
         if error:
             print(f"Playback error: {error}")
         try:
-            asyncio.run_coroutine_threadsafe(play_next(ctx, gen, player), loop)
+            asyncio.run_coroutine_threadsafe(play_next(ctx, mixer.gen, player), loop)
         except Exception as e:
             print(f"Error scheduling next song: {e}")
 
+    def on_tail(source_mixer, tail_gen):
+        # Audio thread, once per track, as its fade-out starts.
+        if player.crossfade:
+            asyncio.run_coroutine_threadsafe(
+                _start_crossfade(player, source_mixer, tail_gen), loop
+            )
+
     player.now_playing = next_track
     player.is_playing = True
-    # The file carries video for the web page; Discord only needs audio.
-    ffmpeg_kwargs = {"options": "-vn"}
-    if offset > 0:
-        ffmpeg_kwargs["before_options"] = f"-ss {offset:.3f}"
-    audio_source = discord.FFmpegPCMAudio(next_track["filepath"], **ffmpeg_kwargs)
+    offset, audio_source, frames, fade_frames = open_track_source(
+        player, next_track, offset
+    )
+    mixer = CrossfadeMixer(audio_source, gen, frames, fade_frames, on_tail)
+    player.mixer = mixer
     try:
-        player.voice_client.play(audio_source, after=after_playing)
+        player.voice_client.play(mixer, after=after_playing)
     except Exception:
         player.now_playing = None
         player.is_playing = False
+        player.mixer = None
+        mixer.cleanup()  # Its FFmpeg process is already running
         discard_tracks([next_track])
         raise
     now = time.monotonic()
@@ -924,17 +1400,70 @@ async def _advance(ctx, player):
         player.voice_client.pause()
         player.paused_at = now
     player.last_active = _clock()
-    if action == "seek" and next_track is finished:
-        return  # Too noisy to announce
-    # The track already plays: a failed announcement must not mark the
-    # player idle (play_next would then try to start a second track).
+    refresh_panel(player)
+
+
+async def _start_crossfade(player, mixer, gen):
+    """Overlap the next queued track with the end of the current one.
+
+    Called when the current track's fade-out starts. The next track becomes
+    now_playing right away (history and queue change as for a normal advance)
+    while the old one drains underneath; nothing calls play() or stop(), so
+    the `after` callback fires once, at the end of the chain. Any explicit
+    control stops the whole mixer and so cancels the overlap.
+    """
     try:
-        if next_track is finished:
-            await ctx.send(f"🔁 Restarting: **{next_track['title']}**")
-        else:
-            await ctx.send(f"🎵 Now playing: **{next_track['title']}**")
+        async with player.lock:
+            if (
+                not player.crossfade
+                or player.should_stop
+                or gen != player.play_gen
+                or player.mixer is not mixer
+                or player.pending_action is not None
+                or not player.is_playing
+                or not player.in_voice()
+                or not player.queue
+            ):
+                return
+            if player.paused_at is not None:
+                mixer.rearm()  # Try again once resumed
+                return
+            current, upcoming = player.now_playing, player.queue[0]
+            if not (crossfade_eligible(current) and crossfade_eligible(upcoming)):
+                return
+            if not os.path.exists(upcoming["filepath"]):
+                return  # The normal advance reports it
+            overlap = mixer.remaining_seconds()
+            if overlap is None or overlap < 1.0:
+                return  # Too late: let it end normally
+            offset, source, frames, fade_frames = open_track_source(
+                player, upcoming, 0.0, fade_in=overlap
+            )
+            # FFmpeg needs a moment to start; read its first frame here so
+            # the audio thread never waits for it.
+            loop = asyncio.get_running_loop()
+            try:
+                first = await loop.run_in_executor(None, source.read)
+            except Exception:
+                source.cleanup()
+                raise
+            if not first or not mixer.attach(
+                source, first, player.play_gen + 1, frames, fade_frames
+            ):
+                source.cleanup()
+                return
+            player.play_gen += 1
+            player.queue.remove(upcoming)
+            push_history(player, current)
+            player.now_playing = upcoming
+            player.started_at = time.monotonic() - offset
+            player.paused_at = None
+            player.paused_total = 0.0
+            player.last_action = None
+            player.last_active = _clock()
+            refresh_panel(player)
     except Exception as e:
-        print(f"Could not announce track: {e}")
+        print(f"Crossfade failed: {e}")
 
 
 # --- Controls shared by Discord commands and the web page -------------------
@@ -999,6 +1528,8 @@ async def control_previous(player):
     """Restart the current track, or go back to the last played one.
     Returns "restart" or "previous"."""
     elapsed = player.elapsed() or 0.0
+    if player.now_playing:  # Played time counts from the automix start
+        elapsed -= player.now_playing.get("start") or 0.0
     if elapsed > PREVIOUS_RESTART_SECONDS or not player.history:
         action = "restart"
     else:
@@ -1013,9 +1544,12 @@ async def control_seek(player, position):
     async with player.lock:
         _require_playing(player)
         position = max(0.0, float(position))
-        duration = player.now_playing.get("duration")
-        if duration:
-            position = max(0.0, min(position, duration - 1))
+        track = player.now_playing
+        start, end = track.get("start") or 0.0, track.get("end")
+        if end is not None:  # Automix window, as playback_options clamps it
+            position = max(start, min(position, end - 1))
+        elif track.get("duration"):
+            position = max(0.0, min(position, track["duration"] - 1))
         if player.pending_action == "seek":
             player.seek_position = position  # Not applied yet: retarget it
             return position
@@ -1070,6 +1604,22 @@ async def control_resume(player):
         player.paused_total += time.monotonic() - player.paused_at
         player.paused_at = None
         return True
+
+
+def control_crossfade(player, enabled):
+    """Turn the session's crossfade on or off. It applies from the next
+    transition; an overlap already running finishes."""
+    player.crossfade = bool(enabled)
+    player.last_active = _clock()
+    refresh_panel(player)
+
+
+def seek_label(player, applied):
+    """Panel line for a seek; the time is relative to the track's automix
+    start, as the web page shows it."""
+    start = (player.now_playing or {}).get("start") or 0.0
+    rel = int(max(0.0, applied - start))
+    return f"⏩ Seeked to {rel // 60}:{rel % 60:02d}"
 
 
 def _find_queued(player, track_id):
@@ -1181,6 +1731,7 @@ async def on_voice_state_update(member, before, after):
             player = music_players[guild.id]
             player.voice_client = None
             player.is_playing = False
+            refresh_panel(player)
             # The web session stays; it expires after SESSION_IDLE_HOURS.
 
 
@@ -1206,16 +1757,20 @@ async def play(ctx, url: str = None):
     player.should_stop = False
 
     try:
-        wait_msg = await ctx.send("⏳ Analyzing source...")
+        await ack(ctx)
+        player.load_line, player.load_final = "🔎 Analyzing the link…", False
+        refresh_panel(player)
 
         # Try to extract as playlist
         loop = asyncio.get_running_loop()
-        playlist_entries = await loop.run_in_executor(None, get_playlist_info, url)
+        try:
+            playlist_entries = await loop.run_in_executor(None, get_playlist_info, url)
+        finally:
+            player.load_line = None
+            refresh_panel(player)
 
         if playlist_entries:
             # It's a playlist
-            await wait_msg.delete()
-
             # If the link targets a specific song *and* carries a playlist/radio
             # (e.g. watch?v=XXX&list=RD...), ask the user what they want.
             specific_video_id = get_video_id_from_url(url)
@@ -1251,17 +1806,11 @@ async def play(ctx, url: str = None):
             await queue_playlist(ctx, player, playlist_entries)
         else:
             # It's a single video
-            await wait_msg.delete()
             if not player.should_stop:
                 await download_and_queue_song(ctx, player, url)
 
     except Exception as e:
         await ctx.send(f"❌ An error occurred: {str(e)}")
-        if "wait_msg" in locals():
-            try:
-                await wait_msg.delete()
-            except:
-                pass
 
 
 @bot.command(name="stop")
@@ -1275,7 +1824,10 @@ async def stop(ctx):
         player.stop_and_clear()
     await player.disconnect_voice_client()
     # The web session stays (same link on the next !play) until it expires.
-    await ctx.send("⏹️ Music stopped and queue cleared.")
+    if not player.loading:
+        player.load_line, player.load_final = None, False
+    set_action(player, "⏹️ Stopped")
+    await ack(ctx)
 
 
 @bot.command(name="reset")
@@ -1299,6 +1851,12 @@ async def reset_voice(ctx):
         fresh.text_channel = player.text_channel
         fresh.last_active = player.last_active
         fresh.history = player.history
+        fresh.panel_message = player.panel_message
+        fresh.panel_text = player.panel_text
+        fresh.expired = player.expired
+        fresh.crossfade = player.crossfade
+        if player.panel_task is not None:
+            player.panel_task.cancel()
         music_players[ctx.guild.id] = fresh
         leftovers = list(player.queue)
         if player.now_playing:
@@ -1310,6 +1868,8 @@ async def reset_voice(ctx):
 
     # Wait a bit (the voice state update arrives in the meantime)
     await asyncio.sleep(2)
+    if player:
+        refresh_panel(music_players[ctx.guild.id])
     await ctx.send("✅ Voice connection reset!")
 
 
@@ -1329,26 +1889,31 @@ async def list_queue(ctx):
     await ctx.send(message)
 
 
+_FAILED = object()
+
+
 async def _run_command_control(ctx, control):
-    """Run a control for a Discord command; returns its result or None."""
+    """Run a control for a Discord command; returns its result (possibly
+    None) or _FAILED after replying with the error."""
     player = music_players.get(ctx.guild.id)
     if not player:
         await ctx.send("❌ No music is currently playing.")
-        return None
+        return _FAILED
     try:
-        return await control(player)
+        result = await control(player)
     except ControlError as e:
         await ctx.send(f"❌ {e.english}")
-        return None
+        return _FAILED
+    await ack(ctx)
+    refresh_panel(player)
+    return result
 
 
 @bot.command(name="next")
 async def next_track(ctx):
-    player = music_players.get(ctx.guild.id)
-    if player and player.in_voice() and player.is_playing:
-        await ctx.send("⏭️ Skipping...")
     # Stopping triggers the after_playing callback, which plays the next track.
-    await _run_command_control(ctx, control_next)
+    if await _run_command_control(ctx, control_next) is not _FAILED:
+        set_action(music_players[ctx.guild.id], "⏭️ Skipped")
 
 
 def parse_position(text):
@@ -1371,23 +1936,38 @@ async def seek(ctx, position: str):
     if seconds is None:
         await ctx.send("❌ Invalid position. Use seconds or mm:ss.")
         return
-    applied = await _run_command_control(ctx, lambda p: control_seek(p, seconds))
-    if applied is not None:
-        await ctx.send(f"⏩ Seeking to {int(applied) // 60}:{int(applied) % 60:02d}")
+
+    def relative_seek(player):
+        # The position counts from the automix start, as the page shows it.
+        start = (player.now_playing or {}).get("start") or 0.0
+        return control_seek(player, start + seconds)
+
+    applied = await _run_command_control(ctx, relative_seek)
+    if applied is not _FAILED:
+        player = music_players[ctx.guild.id]
+        set_action(player, seek_label(player, applied))
+
+
+@bot.command(name="crossfade")
+async def crossfade(ctx, mode: str = None):
+    mode = (mode or "").lower()
+    if mode not in ("on", "off"):
+        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}crossfade on|off`")
+        return
+    player = music_players.setdefault(ctx.guild.id, MusicPlayer())
+    touch(player)
+    control_crossfade(player, mode == "on")
+    await ack(ctx)
 
 
 @bot.command(name="pause")
 async def pause(ctx):
-    changed = await _run_command_control(ctx, control_pause)
-    if changed is not None:
-        await ctx.send("⏸️ Paused." if changed else "⏸️ Already paused.")
+    await _run_command_control(ctx, control_pause)
 
 
 @bot.command(name="resume")
 async def resume(ctx):
-    changed = await _run_command_control(ctx, control_resume)
-    if changed is not None:
-        await ctx.send("▶️ Resumed." if changed else "▶️ Not paused.")
+    await _run_command_control(ctx, control_resume)
 
 
 @bot.event
@@ -1411,9 +1991,10 @@ async def on_command_error(ctx, error):
 #   GET /                      landing text
 #   GET /{sid}                 the page (it handles unknown/ended sessions)
 #   GET /api/{sid}/state       session state JSON, 404 {"active": false} if none
-#   POST /api/{sid}/control    {"action", "id"?, "index"?, "url"?, "position"?}
-#                              -> {"ok": ...}; actions: next, previous, pause,
-#                              resume, remove, move, add, seek, jump
+#   POST /api/{sid}/control    {"action", "id"?, "index"?, "url"?, "position"?,
+#                              "enabled"?} -> {"ok": ...}; actions: next,
+#                              previous, pause, resume, remove, move, add,
+#                              seek, jump, crossfade ({"enabled": bool})
 #   GET /media/{sid}/{id}      the mp4 of a playing, queued or history track
 # Paths are never built from the request: tracks are looked up by id.
 
@@ -1457,7 +2038,10 @@ async def web_state(request):
             track = player.now_playing
             now_playing = _track_summary(track)
             now_playing["video_url"] = f"/media/{sid}/{track['id']}"
-            now_playing["elapsed"] = player.elapsed()
+            now_playing["elapsed"] = player.elapsed()  # File time
+            # Automix window (file time): the page's progress bar spans it.
+            now_playing["start"] = track.get("start") or 0.0
+            now_playing["end"] = track.get("end") or track.get("duration")
         queue = [_track_summary(t) for t in player.queue]
 
     return web.json_response(
@@ -1469,6 +2053,11 @@ async def web_state(request):
             "loading": player.loading,
             "paused": now_playing is not None and player.paused_at is not None,
             "can_previous": now_playing is not None and player.pending_action is None,
+            "crossfade": player.crossfade,
+            # True while the previous track still drains under this one.
+            "crossfading": now_playing is not None
+            and player.mixer is not None
+            and player.mixer.outgoing is not None,
             "server_time": time.time(),
             "now_playing": now_playing,
             "queue": queue,
@@ -1533,6 +2122,7 @@ async def web_control(request):
         "add",
         "seek",
         "jump",
+        "crossfade",
     ):
         return _control_error(400, "Action inconnue.")
 
@@ -1554,6 +2144,8 @@ async def web_control(request):
         return _control_error(400, "Position invalide.")
     if action == "add" and not isinstance(data.get("url"), str):
         return _control_error(400, "Lien manquant.")
+    if action == "crossfade" and not isinstance(data.get("enabled"), bool):
+        return _control_error(400, "Requête invalide.")
 
     touch(player)
     if player.sid != sid:  # Expired just now
@@ -1562,37 +2154,32 @@ async def web_control(request):
     try:
         if action == "next":
             await control_next(player)
-            await announce(player, "⏭️ Skipped from the web page")
+            set_action(player, "⏭️ Skipped via the web page")
         elif action == "previous":
             if await control_previous(player) == "restart":
-                await announce(player, "⏮️ Restarted from the web page")
+                set_action(player, "⏮️ Restarted via the web page")
             else:
-                await announce(player, "⏮️ Previous track from the web page")
+                set_action(player, "⏮️ Previous track via the web page")
         elif action == "pause":
-            if await control_pause(player):
-                await announce(player, "⏸️ Paused from the web page")
+            await control_pause(player)
+            refresh_panel(player)
         elif action == "resume":
-            if await control_resume(player):
-                await announce(player, "▶️ Resumed from the web page")
+            await control_resume(player)
+            refresh_panel(player)
         elif action == "remove":
             track = await control_remove(player, track_id)
-            await announce(
-                player, f"🗑️ Removed from the web page: **{track['title']}**"
-            )
+            set_action(player, f"🗑️ Removed: {_short(track['title'])}")
         elif action == "move":
-            track = await control_move(player, track_id, index)
-            await announce(
-                player,
-                f"↕️ Moved from the web page: **{track['title']}** "
-                f"(now #{index + 1})",
-            )
+            await control_move(player, track_id, index)
+            set_action(player, "🔀 Queue reordered")
         elif action == "seek":
-            await control_seek(player, position)  # Not announced: too noisy
+            applied = await control_seek(player, position)
+            set_action(player, seek_label(player, applied))
+        elif action == "crossfade":
+            control_crossfade(player, data["enabled"])
         elif action == "jump":
             track = await control_jump(player, guild_id, track_id)
-            await announce(
-                player, f"▶️ Jumped to **{track['title']}** from the web page"
-            )
+            set_action(player, f"▶️ Jumped to: {_short(track['title'])}")
         elif action == "add":
             control_add(player, guild_id, data["url"])
             return web.json_response({"ok": True}, status=202)
