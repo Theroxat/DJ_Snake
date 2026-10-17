@@ -5,9 +5,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 A Discord music bot (discord.py) that downloads audio from YouTube with yt-dlp
-and plays it in voice channels, with an independent queue per server. All the
-bot logic lives in a single file, `bot.py`. It is deployed with Docker Compose
-alongside a PO token provider sidecar.
+and plays it in voice channels, with an independent queue per server. The bot
+logic lives in the `djsnake/` package; `bot.py` at the root is only the entry
+point. It is deployed with Docker Compose alongside a PO token provider
+sidecar.
 
 ## Working Style: Orchestrate, Don't Code
 
@@ -42,16 +43,26 @@ Outside Compose, `POT_BASE_URL` defaults to `http://pot-provider:4416`, which
 will not resolve. Point it at a reachable provider, or expect intermittent
 "Sign in to confirm you're not a bot" failures.
 
-There is no test suite. CI (`.github/workflows/ci.yml`) runs these checks, and
-a change must pass them:
+CI (`.github/workflows/ci.yml`) runs these checks on Python 3.10 to 3.12, and a
+change must pass them:
 
 ```bash
+pip install -r requirements-dev.txt                                  # pytest, pytest-asyncio, black, flake8
 flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics   # hard failure
 black --check --diff .                                               # hard failure
 python -c "import bot"                                               # import smoke test
+pytest -q                                                            # test suite
 ```
 
-The bot is tested by hand in Discord, e.g. `!play <youtube url>`.
+The tests (`tests/`, settings in `pytest.ini`) need no network, Discord or
+YouTube: `tests/fakes.py` fakes the voice client, channels and
+`discord.FFmpegPCMAudio`, and `tests/conftest.py` sets `TEMP_DIR`, `DATA_DIR`
+and `WEB_THEME` before `djsnake` is imported and empties the shared state
+between tests. The web API runs through aiohttp's `TestClient`. Tests that need
+the real `ffmpeg` binary are marked `ffmpeg` and skipped without it. Patch
+`media.download_media`, `media.get_playlist_info`, `state.clock` or
+`sessions.PANEL_MIN_INTERVAL` on their module: callers look them up there.
+Playback in Discord is still tested by hand, e.g. `!play <youtube url>`.
 
 ## Configuration
 
@@ -68,7 +79,34 @@ which is no longer read), `TEMP_DIR`, `POT_BASE_URL`, `WEB_PORT` (47823),
 be able to write it), `WEB_THEME` (`arcade`, the theme of guilds that never
 chose one), and `YTDLP_AUTO_UPDATE` (entrypoint only).
 
-## Architecture (`bot.py`)
+## Architecture (`djsnake/`)
+
+Module map, lowest layer first (each imports only the ones above it):
+
+- `config.py`: environment variables and constants, read once at import
+  (`WEB_INDEX` resolves `web/index.html` from the repository root).
+- `state.py`: shared mutable state: the `bot` instance, `music_players`,
+  `sessions`, `guild_themes`, `edit_tokens`, `background_tasks` and `clock()`.
+  Always use it as `state.music_players` (never `from .state import ...`), so
+  every module and test sees the same objects.
+- `player.py`: `MusicPlayer`, `discard_tracks()`, `file_in_use()`,
+  `push_history()`.
+- `sessions.py`: session expiry (`touch()`, `session_player()`,
+  `session_cleanup_loop()`, `open_session()`) and the status panel
+  (`refresh_panel()`, `set_action()`, `ack()`, `short()`).
+- `themes.py`: theme storage, logos and `!theme edit` tokens.
+- `media.py`: YouTube URL parsing, yt-dlp (`download_media()`,
+  `get_playlist_info()`), the SponsorBlock cut, `analyse_media()`,
+  `playback_options()`, `crossfade_eligible()`.
+- `mixer.py`: `CrossfadeMixer`.
+- `playback.py`: voice connection, `download_and_queue_song()`,
+  `queue_playlist()`, `play_next()` / `_advance()` / `_start_crossfade()`,
+  `open_track_source()`.
+- `controls.py`: `ControlError`, the `control_*` functions, `WebContext`.
+- `web.py`: the aiohttp routes and `start_web_server()`.
+- `commands.py`: the Discord commands, `before_invoke`, `on_command_error`.
+- `app.py`: `on_ready`, `on_voice_state_update`, `setup_hook`, `main()`;
+  importing it registers the commands. `bot.py` calls `main()`.
 
 - **Per-guild state**: `music_players` maps guild ID to a `MusicPlayer` holding
   the voice client, the queue of `{id, filepath, title, duration, thumbnail,
@@ -151,7 +189,7 @@ chose one), and `YTDLP_AUTO_UPDATE` (entrypoint only).
   makes one, and posts `{PUBLIC_BASE_URL}/{sid}`; that channel becomes
   `player.text_channel` for notices. It expires after `SESSION_IDLE_HOURS`
   without activity (playback or being in voice, a command via
-  `bot.before_invoke`, a web control): lazily in `_session_player()` plus
+  `bot.before_invoke`, a web control): lazily in `session_player()` plus
   `session_cleanup_loop()` every 10 min. Expiry deletes the player's files.
 - **Web server**: aiohttp, started in `setup_hook` on the bot's loop, bound to
   `0.0.0.0:WEB_PORT`. Routes, the contract `web/index.html` relies on:
@@ -233,10 +271,10 @@ has two defenses:
    the container so that upgrade actually happens on a long-running deployment.
    It logs to `logs/refresh.log`. Its comments and log lines are in French.
 
-`REMOTE_COMPONENTS = ["ejs:github"]` in `bot.py` lets yt-dlp fetch the EJS
-challenge solver. Without it, signature and `n` challenge solving fail and some
-formats become unavailable. It needs the `deno` runtime, which the image
-installs.
+`REMOTE_COMPONENTS = ["ejs:github"]` in `djsnake/config.py` lets yt-dlp fetch
+the EJS challenge solver. Without it, signature and `n` challenge solving fail
+and some formats become unavailable. It needs the `deno` runtime, which the
+image installs.
 
 ### "Sign in to confirm you're not a bot"
 
@@ -249,10 +287,10 @@ The `pot-provider` service in `docker-compose.yml` mints those tokens, and
 **The plugin version must match the server image tag**, so bump them together.
 The entrypoint therefore upgrades yt-dlp only, never the plugin.
 
-`EXTRACTOR_ARGS` in `bot.py` points the plugin at the service. The key name is
-load-bearing: `youtube:getpot_bgutil_baseurl` is deprecated and *rejected*, and
-the plugin then silently falls back to its default, so the setting looks applied
-but is not. The current key is `youtubepot-bgutilhttp:base_url`. To check that a
+`EXTRACTOR_ARGS` in `djsnake/config.py` points the plugin at the service. The
+key name is load-bearing: `youtube:getpot_bgutil_baseurl` is deprecated and
+*rejected*, and the plugin then silently falls back to its default, so the
+setting looks applied but is not. The current key is `youtubepot-bgutilhttp:base_url`. To check that a
 config change is actually read, point it at a dead port and confirm yt-dlp warns
 about that port.
 
