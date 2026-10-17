@@ -16,7 +16,7 @@
 
 </div>
 
-<a href="https://theroxat.github.io/DJ_Snake/demo/"><img src="docs/screenshots/demo.webp" alt="DJ Snake joins a Discord voice channel and posts the clip link, then the clip page plays a synced video next to the queue and switches themes" width="100%"></a>
+<a href="https://theroxat.github.io/DJ_Snake/demo/"><img src="docs/screenshots/demo.webp" alt="DJ Snake joins a Discord voice channel and posts the clip link, then the clip page plays a synced video with a drag-and-drop queue, jump and seek controls" width="100%"></a>
 
 > **This is a self-hosted bot for your own server.** It is an independent project,
 > not affiliated with or endorsed by YouTube or Discord. It runs on your machine

@@ -13,7 +13,7 @@ GitHub Pages site, served from `/docs` on `main` at
   - `media/*.webm` are 25 s excerpts of real CC-BY films (with `thumb*.jpg`), rebuilt by
     `make-media.sh` (needs the source videos, ffmpeg or the `dj-snake` image).
 - `screenshots/`: images used by the README and the landing page
-  (`demo.webp` is an animated WebP (1280x800, 12 fps, opens on a mock Discord channel then cuts to the clip page); `themes.png` is the theme grid).
+  (`demo.webp` is an animated WebP (1280x800, 12 fps, opens on a mock Discord channel then the clip page: drag-reorder, jump, seek); `themes.png` is the theme grid).
 - `social-preview.png`: 1280x640 image to upload by hand in the repository
   settings (Social preview).
 - `.nojekyll`: tells Pages to serve files as they are.
