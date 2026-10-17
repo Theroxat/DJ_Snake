@@ -1,7 +1,10 @@
 services:
   dj-snake:
+    # Users: `docker compose pull && docker compose up -d` (set DJ_SNAKE_TAG to
+    # pin a version, e.g. 1.0.0). Developers: `docker compose up -d --build`
+    # builds from this checkout and tags the result with the same name.
     build: .
-    image: dj-snake:latest
+    image: ghcr.io/theroxat/dj_snake:${DJ_SNAKE_TAG:-latest}
     container_name: dj-snake
     restart: unless-stopped
     # Reads DISCORD_TOKEN and the optional COMMAND_PREFIX / MAX_PLAYLIST_SIZE /
