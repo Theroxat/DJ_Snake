@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DJ Snake — a self-hosted Discord music bot</title>
+<meta name="description" content="A self-hosted Discord music bot with a live clip page: the video of the current track, synced with the audio, plus web controls, automix and seven themes.">
+<meta name="theme-color" content="#0a0a0a">
+<meta property="og:type" content="website">
+<meta property="og:title" content="DJ Snake — a self-hosted Discord music bot">
+<meta property="og:description" content="Live, synced clip page, automix and seven themes. Self-host it with Docker.">
+<meta property="og:image" content="https://theroxat.github.io/DJ_Snake/social-preview.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0a; --text: #f3e7cf; --muted: #f3e7cfb3; --red: #ff2c41; --yellow: #ffd400; --cyan: #00d4ff;
+  --display: "Archivo Black", Impact, sans-serif; --body: "Space Mono", ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--text); font: 400 16px/1.6 var(--body);
+  background-image: repeating-linear-gradient(0deg, #ffffff06 0 2px, transparent 2px 4px);
+}
+a { color: var(--cyan); }
+a:focus-visible, button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 3px; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+header.top { display: flex; align-items: center; gap: 16px; padding: 18px 0; border-bottom: 2px solid var(--text); }
+.logo { font: 400 26px/1 var(--display); text-transform: uppercase; letter-spacing: -.025em; margin-right: auto; }
+.logo span, h1 span { color: var(--red); }
+nav a { color: var(--text); text-decoration: none; font-weight: 700; margin-left: 18px; text-transform: uppercase; font-size: 14px; }
+nav a:hover { color: var(--yellow); }
+.hero { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 40px; align-items: center; padding: 56px 0 48px; }
+h1 { font: 400 clamp(52px, 9vw, 104px)/.92 var(--display); text-transform: uppercase; letter-spacing: -.03em; margin: 0; }
+.lead { font-size: 19px; font-weight: 700; margin: 24px 0 28px; }
+.btns { display: flex; gap: 18px; flex-wrap: wrap; }
+.btn {
+  display: inline-block; padding: 12px 20px; border: 2px solid var(--text); color: var(--text); text-decoration: none;
+  font-weight: 700; text-transform: uppercase; font-size: 15px; box-shadow: 6px 6px 0 var(--yellow);
+  transition: transform .1s, box-shadow .1s;
+}
+.btn.primary { background: var(--red); color: var(--bg); border-color: var(--red); box-shadow: 6px 6px 0 var(--text); }
+.btn.alt { box-shadow: 6px 6px 0 var(--cyan); }
+.btn:hover { transform: translate(3px, 3px); box-shadow: 3px 3px 0 var(--yellow); }
+.btn.primary:hover { box-shadow: 3px 3px 0 var(--text); }
+.btn.alt:hover { box-shadow: 3px 3px 0 var(--cyan); }
+.shot { width: 100%; height: auto; display: block; border: 2px solid var(--text); box-shadow: 10px 10px 0 var(--red); }
+h2 { font: 400 clamp(26px, 4vw, 38px)/1.1 var(--display); text-transform: uppercase; letter-spacing: -.02em; margin: 0 0 24px; }
+section { padding: 40px 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 22px; padding: 0; margin: 0; list-style: none; }
+.card { border: 2px solid var(--text); padding: 20px; box-shadow: 6px 6px 0 var(--c, var(--yellow)); }
+.card h3 { font: 400 19px/1.2 var(--display); text-transform: uppercase; margin: 0 0 8px; }
+.card p { margin: 0; color: var(--muted); font-size: 15px; }
+.card:nth-child(3n+2) { --c: var(--cyan); }
+.card:nth-child(3n+3) { --c: var(--red); }
+.themes { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.themes figcaption, .note { color: var(--muted); font-size: 14px; margin-top: 10px; }
+pre {
+  margin: 0; padding: 20px; overflow-x: auto; background: #000; border: 2px solid var(--text);
+  box-shadow: 6px 6px 0 var(--cyan); font: 400 15px/1.7 var(--body); color: var(--text);
+}
+pre .c { color: var(--muted); }
+pre .p { color: var(--yellow); user-select: none; }
+footer { border-top: 2px solid var(--text); margin-top: 32px; padding: 28px 0 48px; color: var(--muted); font-size: 14px; }
+footer p { margin: 0 0 10px; }
+@media (max-width: 800px) {
+  .hero { grid-template-columns: 1fr; padding-top: 36px; }
+  nav a { margin-left: 12px; }
+  .shot { box-shadow: 6px 6px 0 var(--red); }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .btn { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="logo">DJ <span>Snake</span></div>
+    <nav aria-label="Main">
+      <a href="demo/">Demo</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/Theroxat/DJ_Snake">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div>
+        <h1>DJ<br><span>Snake</span></h1>
+        <p class="lead">A self-hosted Discord music bot. It plays YouTube in your voice channel and serves a live clip page where the video stays in sync with the audio.</p>
+        <div class="btns">
+          <a class="btn primary" href="demo/">Try the live demo</a>
+          <a class="btn alt" href="https://github.com/Theroxat/DJ_Snake">View on GitHub</a>
+        </div>
+      </div>
+      <img class="shot" src="screenshots/demo.webp" width="960" height="540" alt="Animation of the clip page: a video plays next to the queue, then the palette menu switches between the Minimal, Club and Terminal themes.">
+    </div>
+
+    <section aria-labelledby="features">
+      <h2 id="features">What you get</h2>
+      <ul class="grid">
+        <li class="card"><h3>Live clip page</h3><p>Every server gets a link with the muted video of the current track, synced with the voice audio, and a queue anyone with the link can control.</p></li>
+        <li class="card"><h3>Automix</h3><p>Off-topic segments cut with SponsorBlock, loudness normalised to -14 LUFS, silences trimmed, smooth fades. Optional crossfade between tracks.</p></li>
+        <li class="card"><h3>Seven themes</h3><p>Arcade, Minimal, Nuit, Vinyle, Club, Terminal and a custom one with your colors, name and logo. Admins pick the default, viewers pick their own.</p></li>
+        <li class="card"><h3>One queue per server</h3><p>Independent queues, playlists and radio links, with previous, seek, jump, reorder and remove from Discord or from the page.</p></li>
+        <li class="card"><h3>One live status message</h3><p>A single panel edited in place instead of a channel full of announcements. Commands answer with a reaction.</p></li>
+        <li class="card"><h3>Self-hosted, low upkeep</h3><p>Docker Compose with a PO token sidecar. yt-dlp upgrades itself on start, and it keeps working when YouTube changes.</p></li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="themes">
+      <h2 id="themes">Make it yours</h2>
+      <figure class="themes" style="margin:0">
+        <img class="shot" style="box-shadow:10px 10px 0 var(--cyan)" src="screenshots/themes.png" width="1224" height="516" alt="The clip page in its six preset themes: Arcade, Minimal, Nuit, Vinyle, Club and Terminal.">
+        <figcaption>Six presets plus a custom theme. <a href="demo/">Switch them yourself in the demo</a>, or open <a href="demo/?edit=demo">the theme editor</a>.</figcaption>
+      </figure>
+    </section>
+
+    <section id="install" aria-labelledby="install-h">
+      <h2 id="install-h">Self-host it in 3 commands</h2>
+<pre><code><span class="c"># create a Discord bot, enable the Message Content intent, then:</span>
+<span class="p">$</span> git clone https://github.com/Theroxat/DJ_Snake.git &amp;&amp; cd DJ_Snake
+<span class="p">$</span> cp .env.example .env   <span class="c"># set DISCORD_TOKEN</span>
+<span class="p">$</span> docker compose pull &amp;&amp; docker compose up -d</code></pre>
+      <p class="note">Then join a voice channel and send <code>!play &lt;youtube url&gt;</code>. Full setup, configuration and troubleshooting are in the <a href="https://github.com/Theroxat/DJ_Snake#readme">README</a>.</p>
+    </section>
+  </main>
+
+  <footer>
+    <p>DJ Snake is MIT licensed and meant to be self-hosted for your own server. Respect YouTube's Terms of Service and the copyright of the content you play.</p>
+    <p><a href="https://github.com/Theroxat/DJ_Snake">Source</a> · <a href="https://github.com/Theroxat/DJ_Snake/issues">Issues</a> · <a href="demo/">Live demo</a> (fictional data)</p>
+  </footer>
+</div>
+</body>
+</html>
