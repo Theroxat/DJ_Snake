@@ -264,7 +264,7 @@ async def web_control(request):
             track = await control_jump(player, guild_id, track_id)
             set_action(player, f"▶️ Jumped to: {short(track['title'])}")
         elif action == "add":
-            control_add(player, guild_id, data["url"])
+            await control_add(player, guild_id, data["url"])
             return web.json_response({"ok": True}, status=202)
     except ControlError as e:
         return _control_error(e.status, e.french)

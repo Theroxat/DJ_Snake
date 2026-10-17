@@ -1,5 +1,5 @@
-"""YouTube media: URL parsing, yt-dlp download, automix analysis and FFmpeg
-playback options. Everything blocking here runs in an executor."""
+"""YouTube media: URL parsing, yt-dlp search and download, automix analysis
+and FFmpeg playback options. Everything blocking here runs in an executor."""
 
 import json
 import math
@@ -153,6 +153,37 @@ def get_playlist_info(url):
     except Exception as e:
         print(f"Error extracting playlist: {e}")
         return []
+
+
+def search_youtube(query, count):
+    """Flat YouTube search (no download): up to `count` videos as
+    [{id, title, duration, channel, live_status}]. Blocking, raises on failure.
+    The query is only ever used after the "ytsearchN:" prefix."""
+    ydl_opts = {
+        "extract_flat": True,
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        "remote_components": REMOTE_COMPONENTS,
+        "extractor_args": EXTRACTOR_ARGS,
+    }
+    query = " ".join(str(query).split())[:200]
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(f"ytsearch{int(count)}:{query}", download=False)
+    results = []
+    for entry in (info or {}).get("entries") or []:
+        if not entry or not _VIDEO_ID_RE.match(entry.get("id") or ""):
+            continue
+        results.append(
+            {
+                "id": entry["id"],
+                "title": entry.get("title") or "",
+                "duration": entry.get("duration"),
+                "channel": entry.get("channel") or entry.get("uploader") or "",
+                "live_status": entry.get("live_status"),
+            }
+        )
+    return results
 
 
 def _remove_offtopic(ydl, info, filepath):
