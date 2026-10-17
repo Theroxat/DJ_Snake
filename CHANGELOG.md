@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-17
+
 ### Added
 
 - Spotify links: `!play` and the clip page's add action accept Spotify
@@ -17,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   best match (duration, title and artist, official video first) is queued;
   tracks without a match are skipped and counted. Nothing is downloaded from
   Spotify.
+- GitHub link in the clip page header.
+
+### Changed
+
+- Long track titles are clamped to two lines, and queue titles are more
+  readable.
+- Refreshed demo and showcase (README, project page, social preview), which
+  now highlight Spotify links.
 
 ## [1.0.0] - 2026-10-17
 
@@ -57,5 +67,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Queued tracks being wiped on routine gateway reconnects.
 - Python 3.13+ compatibility.
 
-[Unreleased]: https://github.com/Theroxat/DJ_Snake/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Theroxat/DJ_Snake/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Theroxat/DJ_Snake/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Theroxat/DJ_Snake/releases/tag/v1.0.0

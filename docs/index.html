@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DJ Snake — a self-hosted Discord music bot</title>
-<meta name="description" content="A self-hosted Discord music bot with a live clip page: the video of the current track, synced with the audio, plus web controls and automix.">
+<meta name="description" content="A self-hosted Discord music bot for YouTube or Spotify links, with a live clip page: the video of the current track, synced with the audio, plus web controls and automix.">
 <meta name="theme-color" content="#0a0a0a">
 <meta property="og:type" content="website">
 <meta property="og:title" content="DJ Snake — a self-hosted Discord music bot">
-<meta property="og:description" content="Live, synced clip page, web controls and automix. Self-host it with Docker.">
+<meta property="og:description" content="YouTube or Spotify links, a live synced clip page, web controls and automix. Self-host it with Docker.">
 <meta property="og:image" content="https://theroxat.github.io/DJ_Snake/social-preview.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -54,6 +54,7 @@ section { padding: 40px 0; }
 .card { border: 2px solid var(--text); padding: 20px; box-shadow: 6px 6px 0 var(--c, var(--yellow)); }
 .card h3 { font: 400 19px/1.2 var(--display); text-transform: uppercase; margin: 0 0 8px; }
 .card p { margin: 0; color: var(--muted); font-size: 15px; }
+.card.spotify { --c: #1db954; grid-column: 1 / -1; }
 .card:nth-child(3n+2) { --c: var(--cyan); }
 .card:nth-child(3n+3) { --c: var(--red); }
 .note { color: var(--muted); font-size: 14px; margin-top: 10px; }
@@ -88,7 +89,7 @@ footer p { margin: 0 0 10px; }
     <div class="hero">
       <div>
         <h1>DJ<br><span>Snake</span></h1>
-        <p class="lead">A self-hosted Discord music bot. It plays YouTube in your voice channel and serves a live clip page where the video stays in sync with the audio.</p>
+        <p class="lead">A self-hosted Discord music bot. It plays YouTube or Spotify links in your voice channel and serves a live clip page where the video stays in sync with the audio.</p>
         <div class="btns">
           <a class="btn primary" href="demo/">Try the live demo</a>
           <a class="btn alt" href="https://github.com/Theroxat/DJ_Snake">View on GitHub</a>
@@ -100,9 +101,10 @@ footer p { margin: 0 0 10px; }
     <section aria-labelledby="features">
       <h2 id="features">What you get</h2>
       <ul class="grid">
+        <li class="card spotify"><h3>Paste a Spotify playlist</h3><p>Send a Spotify playlist, album or track link. DJ Snake reads the track list, finds each song on YouTube (the official music video first, no live, cover or remix versions) and skips what it cannot find. Nothing is downloaded from Spotify and no account is needed.</p></li>
         <li class="card"><h3>Live clip page</h3><p>Every server gets a link with the muted video of the current track, synced with the voice audio, and a queue anyone with the link can control.</p></li>
         <li class="card"><h3>Automix</h3><p>Off-topic segments cut with SponsorBlock, loudness normalised to -14 LUFS, silences trimmed, smooth fades. Optional crossfade between tracks.</p></li>
-        <li class="card"><h3>Web controls</h3><p>Pause, seek, jump to a track, drag to reorder, remove, or paste a YouTube link to add it, right from the clip page.</p></li>
+        <li class="card"><h3>Web controls</h3><p>Pause, seek, jump to a track, drag to reorder, remove, or paste a YouTube or Spotify link to add it, right from the clip page.</p></li>
         <li class="card"><h3>One queue per server</h3><p>Independent queues, playlists and radio links, with previous, seek, jump, reorder and remove from Discord or from the page.</p></li>
         <li class="card"><h3>One live status message</h3><p>A single panel edited in place instead of a channel full of announcements. Commands answer with a reaction.</p></li>
         <li class="card"><h3>Self-hosted, low upkeep</h3><p>Docker Compose with a PO token sidecar. yt-dlp upgrades itself on start, and it keeps working when YouTube changes. The page is themable, too.</p></li>
@@ -115,7 +117,7 @@ footer p { margin: 0 0 10px; }
 <span class="p">$</span> git clone https://github.com/Theroxat/DJ_Snake.git &amp;&amp; cd DJ_Snake
 <span class="p">$</span> cp .env.example .env   <span class="c"># set DISCORD_TOKEN</span>
 <span class="p">$</span> docker compose pull &amp;&amp; docker compose up -d</code></pre>
-      <p class="note">Then join a voice channel and send <code>!play &lt;youtube url&gt;</code>. Full setup, configuration and troubleshooting are in the <a href="https://github.com/Theroxat/DJ_Snake#readme">README</a>.</p>
+      <p class="note">Then join a voice channel and send <code>!play &lt;YouTube or Spotify link&gt;</code>. Full setup, configuration and troubleshooting are in the <a href="https://github.com/Theroxat/DJ_Snake#readme">README</a>.</p>
     </section>
   </main>
 

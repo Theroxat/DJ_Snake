@@ -2,11 +2,12 @@
 
 # DJ Snake
 
-**A self-hosted Discord music bot that plays YouTube videos in your voice channel, with a live clip page that shows the video in sync.**
+**A self-hosted Discord music bot that plays YouTube or Spotify links in your voice channel, with a live clip page that shows the video in sync.**
 
 [**Live demo**](https://theroxat.github.io/DJ_Snake/demo/) · [Project page](https://theroxat.github.io/DJ_Snake/) · [Releases](https://github.com/Theroxat/DJ_Snake/releases) · [Changelog](CHANGELOG.md)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/Theroxat/DJ_Snake/ci.yml?branch=main&label=CI&logo=githubactions&logoColor=white)](https://github.com/Theroxat/DJ_Snake/actions/workflows/ci.yml)
+![Spotify](https://img.shields.io/badge/Spotify-playlists%20%C2%B7%20albums%20%C2%B7%20tracks-1DB954?logo=spotify&logoColor=white)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776ab?logo=python&logoColor=white)
 ![Tests](https://img.shields.io/badge/tests-159%20passing-2ea44f)
 [![Release](https://img.shields.io/github/v/release/Theroxat/DJ_Snake?color=ff2c41)](https://github.com/Theroxat/DJ_Snake/releases)
@@ -25,8 +26,8 @@
 
 ## Features
 
+- **Spotify playlists, albums and tracks.** Paste a link and the bot finds every song on YouTube, preferring the official music video, with no Spotify account or API key needed (see [Spotify links](#spotify-links)).
 - YouTube URLs and playlists. Tracks are fully downloaded before they play (no streaming).
-- Spotify playlists, albums and tracks: each track is matched to a YouTube video (see [Spotify links](#spotify-links)).
 - Independent queue per server.
 - Live clip page: muted video synced with the audio, plus web controls (next, previous, pause, resume, seek, jump, remove, reorder, add).
 - Automix, always on: SponsorBlock `music_offtopic` segments are cut, loudness is normalised to -14 LUFS, leading and trailing silence is trimmed, and tracks fade in and out.
@@ -79,11 +80,27 @@ The prefix is `!` by default (`COMMAND_PREFIX`).
 
 ## Spotify links
 
-`!play` (and the clip page's add box) also take Spotify links: `https://open.spotify.com/playlist/...`, `/album/...`, `/track/...` or `spotify:playlist:...` URIs. Short `spotify.link` links are refused; open them and copy the `open.spotify.com` address.
+Paste a Spotify playlist, album or track into `!play` or the clip page's add box and DJ Snake plays it, with no Spotify account and no API key.
 
-The bot never plays or downloads anything from Spotify. It reads the track list (title, artists, duration), searches YouTube for each track and queues the best match: the duration must be close, the title and artist must match, official music videos come first (the clip page shows the video), then official audio and "- Topic" uploads, and live, cover, remix, karaoke, nightcore or sped-up versions are avoided unless the Spotify title says so. It can still pick a wrong version. Tracks with no good match are skipped and counted in the status message ("✅ 8/10 tracks loaded (2 not found on YouTube)"). Lists load in the background like YouTube playlists, up to `MAX_PLAYLIST_SIZE`.
+```
+!play https://open.spotify.com/playlist/4rT7xKq2LmNb9VcZ0aYdEw
+```
 
-By default no configuration is needed: the list comes from Spotify's public embed page, which shows at most 100 tracks of a playlist or album. To read longer lists, create an app in the [Spotify developer dashboard](https://developer.spotify.com/dashboard) and set `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET`; the bot then uses the Web API and falls back to the embed page if the API refuses a playlist (Spotify hides its own editorial playlists from new apps). Private playlists cannot be read either way.
+How it works:
+
+1. The bot reads the track list (title, artists, duration) from the link. It never plays or downloads anything from Spotify.
+2. It searches YouTube for each track and scores the results: the duration must be close, and the title and artist must match.
+3. Official music videos come first (the clip page shows the video), then official audio and "- Topic" uploads. Live, cover, remix, karaoke, nightcore and sped-up versions are skipped unless the Spotify title says so.
+4. Tracks load in the background like a YouTube playlist, up to `MAX_PLAYLIST_SIZE`, and songs with no good match are skipped and counted in the status message: "✅ 28/30 tracks loaded (2 not found on YouTube)".
+
+Accepted links are `open.spotify.com` `/playlist/`, `/album/` and `/track/` addresses and `spotify:playlist:...` style URIs.
+
+Limits:
+
+- Without credentials the list comes from Spotify's public embed page, which shows at most 100 tracks of a playlist or album. For longer lists, create an app in the [Spotify developer dashboard](https://developer.spotify.com/dashboard) and set `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET`. The bot then uses the Web API, and falls back to the embed page if the API refuses a playlist (Spotify hides its own editorial playlists from new apps).
+- Private playlists cannot be read either way.
+- The match can occasionally be the wrong version of a song.
+- Short `spotify.link` links are refused: open them and copy the `open.spotify.com` address.
 
 DJ Snake is not affiliated with or endorsed by Spotify.
 
