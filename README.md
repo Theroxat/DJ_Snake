@@ -1,290 +1,139 @@
-# 🎵 Discord Music Bot
+# DJ Snake
 
-A powerful and easy-to-use Discord bot that plays music from YouTube in voice channels. Built with discord.py and yt-dlp for reliable music streaming.
+![Clip page](docs/screenshots/clip-page.png)
 
-[![CI/CD Pipeline](https://github.com/Theroxat/DJ_Snake/workflows/CI/CD%20Pipeline/badge.svg)](https://github.com/Theroxat/DJ_Snake/actions)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+A Discord music bot that downloads YouTube audio and video, plays it in voice channels with an independent queue per server, and serves a live "clip page" with a synced muted video and web controls.
 
-## ✨ Features
+[![CI](https://github.com/Theroxat/DJ_Snake/actions/workflows/ci.yml/badge.svg)](https://github.com/Theroxat/DJ_Snake/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)
 
-- 🎶 **High-quality music streaming** from YouTube using yt-dlp
-- 📋 **Playlist support** with automatic queue management (up to 30 tracks by default)
-- 🔧 **Robust voice connection** system with error recovery
-- 🌐 **Multi-server support** - each server has its own independent queue
-- 🛡️ **Security-focused** with environment variable configuration
-- 🔄 **Auto-cleanup** of temporary files and voice connections
-- ⚡ **Fast and responsive** with asynchronous processing
-- 🐍 **Virtual environment** support for clean Python setup
+## Features
 
-## 🚀 Quick Start
+- YouTube URLs and playlists. There is no search. Tracks are fully downloaded before they play (no streaming).
+- Independent queue per server.
+- Live clip page: muted video synced with the audio, plus web controls (next, previous, pause, resume, seek, jump, remove, reorder, add).
+- Automix, always on: SponsorBlock `music_offtopic` segments are cut, loudness is normalised to -14 LUFS, leading and trailing silence is trimmed, and tracks fade in and out.
+- Optional crossfade between tracks.
+- One live status message per session, edited in place instead of spamming the channel.
+- Radio/mix links ask whether to play the single track or the whole playlist.
+- yt-dlp upgrades itself on start, and a PO token sidecar handles YouTube's bot check.
 
-1. **Clone the repository**
+## Quick start (Docker Compose)
+
+1. In the [Discord Developer Portal](https://discord.com/developers/applications), create an application and add a bot.
+2. Under Bot, enable the **Message Content Intent**. It is the only privileged intent needed.
+3. Invite the bot with the `bot` scope and these permissions: View Channels, Send Messages, Read Message History, Add Reactions, Connect, Speak.
+4. Deploy:
+
 ```bash
 git clone https://github.com/Theroxat/DJ_Snake.git
 cd DJ_Snake
-```
-
-2. **Create and activate virtual environment**
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
-3. **Install dependencies**
-```bash
-# Install FFmpeg (required)
-sudo apt install ffmpeg  # Ubuntu/Debian
-brew install ffmpeg      # macOS
-
-# Install Python dependencies
-pip install -r requirements.txt
-```
-
-4. **Configure the bot**
-```bash
-cp .env.example .env
-# Edit .env and add your Discord bot token
-```
-
-5. **Run the bot**
-```bash
-python bot.py
-```
-
-📖 **For detailed setup instructions, see [INSTALLATION.md](INSTALLATION.md)**
-
-## 🎮 Commands
-
-| Command | Description | Example |
-|---------|-------------|---------|
-| `!play <URL>` | Play music from YouTube URL or search | `!play https://youtu.be/dQw4w9WgXcQ` |
-| `!list` | Show current queue | `!list` |
-| `!next` | Skip to next track | `!next` |
-| `!pause` | Pause playback | `!pause` |
-| `!resume` | Resume playback | `!resume` |
-| `!stop` | Stop playback and clear queue | `!stop` |
-| `!reset` | Reset voice connection | `!reset` |
-
-## 🔧 Configuration
-
-### Environment Variables
-
-Create a `.env` file with the following variables:
-
-```env
-# Required
-DISCORD_TOKEN=your_bot_token_here
-
-# Optional
-COMMAND_PREFIX=!
-MAX_PLAYLIST_SIZE=30
-# yt-dlp format; tracks are downloaded as one mp4 (video for the web page,
-# audio for Discord). Default: max 720p H.264 + m4a audio.
-MEDIA_FORMAT=bestvideo[height<=720][vcodec^=avc1]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]/best
-WEB_PORT=47823
-# Host IP the web port is published on (docker-compose). Default 127.0.0.1;
-# set a LAN IP or 0.0.0.0 to reach it from a reverse proxy or tunnel.
-WEB_BIND=127.0.0.1
-# Public URL of the clip page, posted in Discord (default http://localhost:WEB_PORT)
-PUBLIC_BASE_URL=https://dj.example.com
-# Hours without activity before a web session link expires
-SESSION_IDLE_HOURS=6
-```
-
-### Discord Bot Setup
-
-1. Create a bot at [Discord Developer Portal](https://discord.com/developers/applications)
-2. Enable these **Privileged Gateway Intents**:
-   - Message Content Intent ✅
-   - Voice State Intent ✅
-3. Bot permissions needed:
-   - Send Messages
-   - Connect to Voice Channels
-   - Speak in Voice Channels
-   - Use Voice Activity
-
-## 🐳 Docker Deployment
-
-### Using Docker Compose (Recommended)
-
-The image bundles everything the bot needs: FFmpeg, the Opus codec (Discord
-voice) and Deno (JS runtime required by recent yt-dlp for YouTube).
-
-```bash
-# Clone the repository
-git clone https://github.com/Theroxat/DJ_Snake.git
-cd DJ_Snake
-
-# Configure environment
-cp .env.example .env
-# Edit .env and add your DISCORD_TOKEN
-
-# Build and start the bot in the background
+cp .env.example .env        # set DISCORD_TOKEN
 docker compose up -d --build
-
-# View live logs
-docker compose logs -f
-
-# Stop the bot
-docker compose down
+docker compose logs -f dj-snake
 ```
 
-The container reads your token (and the optional settings) from `.env` via
-`env_file`, so the secret is never baked into the image. It restarts
-automatically unless you stop it (`restart: unless-stopped`).
+5. Join a voice channel and send `!play https://www.youtube.com/watch?v=...`.
 
-> If voice ever fails to connect behind a restrictive NAT, uncomment
-> `network_mode: host` in `docker-compose.yml`.
+## Commands
 
-### Using Docker directly
+The prefix is `!` by default (`COMMAND_PREFIX`).
 
-```bash
-# Build the image
-docker build -t dj-snake .
+| Command | Description |
+| --- | --- |
+| `!play <url>` | Join your voice channel and queue a YouTube video or playlist. |
+| `!list` | Show the current queue. |
+| `!next` | Skip to the next track. |
+| `!pause` / `!resume` | Pause or resume playback. |
+| `!seek <pos>` | Jump to a position in the track, in seconds or `mm:ss`, as the clip page shows it. |
+| `!crossfade on\|off` | Enable or disable crossfade for this session (off by default). |
+| `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
+| `!reset` | Force a clean voice reconnect. |
 
-# Run the container
-docker run -d \
-  --name dj-snake \
-  --env-file .env \
-  --restart unless-stopped \
-  dj-snake
+## Clip page
+
+When the bot joins voice it posts a link such as `https://dj.example.com/<session>` and keeps a status message in that text channel. The page shows the video of the current track, the queue, and a progress bar, and lets you skip, go back, pause, resume, seek, play a queued track now, remove, reorder and add YouTube URLs.
+
+A session belongs to the server and survives the bot leaving voice. It expires after `SESSION_IDLE_HOURS` (6 by default) without playback, voice presence, commands or web actions; its files are then deleted.
+
+**Exposing it.** The container listens on `WEB_PORT`. Compose publishes it on `WEB_BIND`, which defaults to `127.0.0.1` (this machine only). To reach it from elsewhere, put a reverse proxy or a tunnel in front, and set `PUBLIC_BASE_URL` to the public address so the posted link is correct.
+
+```
+# Caddyfile
+dj.example.com {
+    reverse_proxy 127.0.0.1:47823
+}
 ```
 
-## 🛠️ Development
+```bash
+# or a Cloudflare Tunnel, then PUBLIC_BASE_URL=https://dj.example.com
+cloudflared tunnel --url http://127.0.0.1:47823
+```
 
-### Setting up Development Environment
+Anyone who has the link can control the queue. Treat it as a secret and share it only with people you trust.
+
+## Configuration
+
+Set these in `.env` (see `.env.example`).
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `DISCORD_TOKEN` | none (required) | Bot token. A `token` file is a fallback. |
+| `COMMAND_PREFIX` | `!` | Prefix for text commands. |
+| `MAX_PLAYLIST_SIZE` | `30` | Maximum tracks loaded from a playlist. |
+| `MEDIA_FORMAT` | max 720p H.264 + m4a | yt-dlp format selector. |
+| `TEMP_DIR` | fresh temp directory | Where downloaded tracks are stored. |
+| `POT_BASE_URL` | `http://pot-provider:4416` | PO token provider URL (matches Compose). |
+| `WEB_PORT` | `47823` | Clip page port, in the container and on the host. |
+| `WEB_BIND` | `127.0.0.1` | Host IP the port is published on (Compose only). |
+| `PUBLIC_BASE_URL` | empty (`http://localhost:WEB_PORT`) | Public address used in the posted clip link. |
+| `SESSION_IDLE_HOURS` | `6` | Idle hours before a clip link expires. |
+| `YTDLP_AUTO_UPDATE` | `1` | Upgrade yt-dlp on container start (`0` to skip). |
+
+## Running without Docker
+
+Requires Python 3.10+, `ffmpeg` and `deno` on your `PATH`, and a reachable PO token provider (for example the `pot-provider` container with its port published). Point `POT_BASE_URL` at it, or expect intermittent "Sign in to confirm you're not a bot" errors.
 
 ```bash
-# Clone the repository
-git clone https://github.com/Theroxat/DJ_Snake.git
-cd DJ_Snake
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/macOS
-# or
-venv\Scripts\activate     # Windows
-
-# Install dependencies including dev tools
+python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-pip install pytest black flake8
-
-# Test the bot
-python bot.py
+python3 bot.py
 ```
 
-### Code Quality
+On Python 3.13+, `audioop-lts` is also needed for voice (see `requirements.txt`).
 
-```bash
-# Format code
-black .
+## Keeping YouTube working
 
-# Lint code
-flake8 .
+YouTube breaks yt-dlp extractors every few weeks, usually showing up as `HTTP Error 403: Forbidden`.
 
-# Run security checks
-bandit -r .
+- `docker-entrypoint.sh` upgrades yt-dlp on every container start (best effort; `YTDLP_AUTO_UPDATE=0` disables it).
+- `scripts/refresh-dj-snake.sh` restarts the container so a long-running deployment picks up the upgrade. Run it weekly from cron. It logs to `logs/refresh.log`, in French.
+
+```cron
+0 4 * * 1 /path/to/DJ_Snake/scripts/refresh-dj-snake.sh
 ```
 
-## 🏗️ Architecture
+- The `bgutil-ytdlp-pot-provider` plugin version (`requirements.txt`) must match the `pot-provider` image tag in `docker-compose.yml`. Bump them together; the entrypoint never upgrades the plugin.
 
-- **MusicPlayer Class**: Manages per-server queues and playback state
-- **Voice Connection System**: Robust connection handling with error recovery
-- **Download System**: Uses yt-dlp with fallback strategies
-- **Queue Management**: Automatic file cleanup and session management
+## Troubleshooting
 
-For detailed architecture information, see [CLAUDE.md](CLAUDE.md).
+- **The bot ignores commands:** enable the Message Content Intent in the Developer Portal and check the bot can read and send in that channel.
+- **Voice error 4006 or no audio:** send `!reset` to force a clean reconnect.
+- **`HTTP Error 403: Forbidden`:** yt-dlp is outdated. Restart the container (or run `scripts/refresh-dj-snake.sh`).
+- **"Sign in to confirm you're not a bot":** check that `pot-provider` is healthy (`docker compose ps`) and that `POT_BASE_URL` points at it.
+- **The clip link does not open:** check `WEB_BIND` and `WEB_PORT`, that your proxy or tunnel reaches the port, and that `PUBLIC_BASE_URL` matches the public address.
+- **The link says the session is unknown:** it expired after `SESSION_IDLE_HOURS`. Run `!play` again for a fresh one.
 
-## 🔒 Security
+## Limits and disclaimer
 
-- ✅ **Token protection** via environment variables
-- ✅ **Input validation** for URLs and commands
-- ✅ **Resource limits** to prevent abuse
-- ✅ **No credential storage** in code
-- ✅ **Docker security** with non-root user
+- YouTube only, at most 720p, and playlists are capped at `MAX_PLAYLIST_SIZE`.
+- This project is for personal use. Respect YouTube's Terms of Service and the copyright of the content you play; you are responsible for how you use it.
 
-## 🚨 Troubleshooting
+## Contributing
 
-### Common Issues
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md), and [CLAUDE.md](CLAUDE.md) for an architecture overview.
 
-**Bot doesn't respond to commands**
-- Ensure Message Content Intent is enabled
-- Check bot permissions in the server
-- Verify the bot is online and connected
+## License
 
-**"FFmpeg not found" error**
-- Install FFmpeg: `sudo apt install ffmpeg` (Linux) or `brew install ffmpeg` (macOS)
-- On Windows, add FFmpeg to your PATH
-
-**Voice connection issues**
-- Try the `!reset` command
-- Ensure the bot has Connect and Speak permissions
-- Check if the voice channel is full
-
-**`HTTP Error 403: Forbidden` on download**
-
-This almost always means yt-dlp is out of date. YouTube changes its extraction
-every few weeks and older versions stop working, even though they still read
-the video page fine.
-
-- Running directly: `pip install --upgrade yt-dlp`
-- Running in Docker: `docker compose restart dj-snake`. The container updates
-  yt-dlp on every start, so a restart is enough — no rebuild needed. On a
-  server, `scripts/refresh-dj-snake.sh` does this weekly from cron.
-
-**`Sign in to confirm you're not a bot`**
-
-YouTube challenges traffic from server IPs. The `pot-provider` service answers
-those challenges with a Proof-of-Origin token, so make sure it is running:
-
-```bash
-docker compose ps            # pot-provider should be "healthy"
-docker compose up -d         # start it if it is not
-```
-
-If it is healthy and the error persists, check that the plugin and the server
-are on the same version — `bgutil-ytdlp-pot-provider` in `requirements.txt` must
-match the `pot-provider` image tag in `docker-compose.yml`.
-
-**Other YouTube download errors**
-- Some videos are region-locked or age-restricted
-- `Signature solving failed` means the Deno JS runtime is missing; it is
-  included in the Docker image, but a direct install needs it on the PATH
-
-## 📋 Requirements
-
-- **Python 3.8+**
-- **FFmpeg** (for audio processing)
-- **Discord Bot Token**
-- **Stable internet connection**
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [discord.py](https://github.com/Rapptz/discord.py) - Discord API wrapper
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) - YouTube downloader
-- [FFmpeg](https://ffmpeg.org/) - Audio processing
-
-## 📞 Support
-
-- **Documentation**: [Installation Guide](INSTALLATION.md)
-- **Issues**: [GitHub Issues](https://github.com/Theroxat/DJ_Snake/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/Theroxat/DJ_Snake/discussions)
-
----
-
-**⭐ If you find this project useful, please consider giving it a star!**
+[MIT](LICENSE). Built on [discord.py](https://github.com/Rapptz/discord.py), [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [bgutil-ytdlp-pot-provider](https://github.com/Brainicism/bgutil-ytdlp-pot-provider).

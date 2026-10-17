@@ -1,38 +1,24 @@
 ---
 name: Bug report
-about: Create a report to help us improve
+about: Report something that does not work
 title: '[BUG] '
 labels: 'bug'
 assignees: ''
-
 ---
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+**What happened**
+What you did, what you expected, what you got.
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+**Steps to reproduce**
+1. `!play <url>` (or the action on the clip page)
+2. ...
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+**Deployment**
+- [ ] Docker Compose
+- [ ] Local (Python version: )
 
-**Screenshots/Logs**
-If applicable, add screenshots or console logs to help explain your problem.
+**yt-dlp version**
+`docker exec dj-snake python -m yt_dlp --version` (or `python -m yt_dlp --version` locally)
 
-**Environment (please complete the following information):**
- - OS: [e.g. Ubuntu 20.04, Windows 10, macOS 12]
- - Python Version: [e.g. 3.9.7]
- - Bot Version: [e.g. latest, v1.0.0]
- - Discord.py Version: [e.g. 2.3.2]
-
-**Configuration**
-- Command prefix: [e.g. !]
-- Deployment method: [e.g. Docker, Python directly]
-- Any custom environment variables
-
-**Additional context**
-Add any other context about the problem here.
+**Logs**
+`docker compose logs --tail 100 dj-snake`. Redact your Discord token and any private URLs.
