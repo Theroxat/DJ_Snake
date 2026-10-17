@@ -55,6 +55,33 @@ WEB_INDEX = os.path.join(
 # hours without activity (playback, a command or a web control).
 SESSION_IDLE_HOURS = float(os.getenv("SESSION_IDLE_HOURS", "6"))
 SESSION_CLEANUP_SECONDS = 600
+# Persistent data (survives restarts): per-guild web page themes and logos.
+DATA_DIR = os.getenv("DATA_DIR") or "/app/data"
+THEMES_FILE = os.path.join(DATA_DIR, "themes.json")
+LOGO_DIR = os.path.join(DATA_DIR, "logos")
+# Clip page themes. "perso" is a custom palette on top of a preset's shapes.
+THEME_PRESETS = ("arcade", "minimal", "nuit", "vinyle", "club", "terminal")
+THEME_SKINS = THEME_PRESETS + ("perso",)
+# Fallback theme for guilds that never chose one.
+WEB_THEME = (os.getenv("WEB_THEME") or "arcade").strip().lower()
+if WEB_THEME not in THEME_PRESETS:
+    print(f"⚠️  WEB_THEME={WEB_THEME!r} is not a preset; using 'arcade'.")
+    WEB_THEME = "arcade"
+PERSO_DEFAULTS = {
+    "base": "nuit",
+    "bg": "#101820",
+    "text": "#f2f2f2",
+    "accent": "#ffb703",
+}
+THEME_NAME_MAX = 32
+THEME_EDIT_SECONDS = 30 * 60  # Lifetime of a `!theme edit` link
+MAX_LOGO_BYTES = 512 * 1024
+LOGO_TYPES = {
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "webp": "image/webp",
+    "gif": "image/gif",
+}
 # Played tracks kept (files on disk) so "previous" can go back.
 HISTORY_SIZE = 5
 # "Previous" restarts the current track once it has played this long.
@@ -326,6 +353,199 @@ async def session_cleanup_loop():
                 _session_player(sid)
         except Exception as e:
             print(f"Session cleanup error: {e}")
+
+
+# --- Themes -----------------------------------------------------------------
+# Each guild picks the clip page's default theme (viewers can still override
+# it locally). Stored in THEMES_FILE as {guild id: {skin, base, bg, text,
+# accent, name, logo}}, logo being {"ext", "v"} or null; the logo itself is
+# LOGO_DIR/<guild id>.<ext>. Every path comes from the guild id and a fixed
+# extension, never from a request.
+
+_COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
+guild_themes = {}
+# `!theme edit` links: token -> (guild id, expiry on _clock()). In memory only.
+edit_tokens = {}
+
+
+def valid_color(value):
+    return isinstance(value, str) and _COLOR_RE.fullmatch(value) is not None
+
+
+def clean_theme_name(value):
+    """The stripped community name, or None if it is not acceptable."""
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    if len(value) > THEME_NAME_MAX or any(ord(c) < 32 or ord(c) == 127 for c in value):
+        return None
+    return value
+
+
+def _clean_theme(raw):
+    """A stored theme record with every bad or missing field dropped."""
+    record = {}
+    if not isinstance(raw, dict):
+        return record
+    if raw.get("skin") in THEME_SKINS:
+        record["skin"] = raw["skin"]
+    if raw.get("base") in THEME_PRESETS:
+        record["base"] = raw["base"]
+    for key in ("bg", "text", "accent"):
+        if valid_color(raw.get(key)):
+            record[key] = raw[key].lower()
+    name = clean_theme_name(raw.get("name"))
+    if name:
+        record["name"] = name
+    logo = raw.get("logo")
+    if (
+        isinstance(logo, dict)
+        and logo.get("ext") in LOGO_TYPES
+        and type(logo.get("v")) is int
+    ):
+        record["logo"] = {"ext": logo["ext"], "v": logo["v"]}
+    return record
+
+
+def load_themes():
+    """(Re)load THEMES_FILE into guild_themes. A missing file is no error."""
+    guild_themes.clear()
+    try:
+        with open(THEMES_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return
+    except (OSError, ValueError) as e:
+        print(f"⚠️  Could not read {THEMES_FILE}: {e}")
+        return
+    if not isinstance(data, dict):
+        return
+    for key, raw in data.items():
+        try:
+            guild_id = int(key)
+        except ValueError:
+            continue
+        record = _clean_theme(raw)
+        if record:
+            guild_themes[guild_id] = record
+
+
+def _write_atomic(path, data):
+    """Write bytes to `path` through a temp file and os.replace()."""
+    directory = os.path.dirname(path)
+    os.makedirs(directory, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=directory, prefix=".tmp-")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def save_themes():
+    """Persist guild_themes. Raises OSError (e.g. DATA_DIR not writable)."""
+    data = {str(gid): record for gid, record in guild_themes.items()}
+    _write_atomic(THEMES_FILE, json.dumps(data, indent=2).encode("utf-8"))
+
+
+def theme_for(guild_id):
+    """The guild's full theme, defaults filled in."""
+    theme = {"skin": WEB_THEME, **PERSO_DEFAULTS, "name": "", "logo": None}
+    theme.update(guild_themes.get(guild_id, {}))
+    return theme
+
+
+def theme_state(sid, guild_id):
+    """The `theme` field of the web state."""
+    theme = theme_for(guild_id)
+    logo = theme.pop("logo")
+    theme["logo_url"] = f"/theme-logo/{sid}?v={logo['v']}" if logo else None
+    return theme
+
+
+def logo_path(guild_id, ext):
+    return os.path.join(LOGO_DIR, f"{int(guild_id)}.{ext}")
+
+
+def sniff_image(data):
+    """The extension of a PNG, JPEG, WebP or GIF by its magic bytes, else None.
+    SVG (scriptable) and everything else is refused."""
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "jpg"
+    if data[:6] in (b"GIF87a", b"GIF89a"):
+        return "gif"
+    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "webp"
+    return None
+
+
+def _remove_logo_files(guild_id, keep=None):
+    for ext in LOGO_TYPES:
+        if ext != keep:
+            try:
+                os.remove(logo_path(guild_id, ext))
+            except FileNotFoundError:
+                pass
+
+
+def set_logo(guild_id, data, ext):
+    """Store the guild's logo (replacing any previous one) and save."""
+    _write_atomic(logo_path(guild_id, ext), data)
+    _remove_logo_files(guild_id, keep=ext)
+    record = guild_themes.setdefault(guild_id, {})
+    record["logo"] = {"ext": ext, "v": int(time.time() * 1000)}
+    save_themes()
+
+
+def remove_logo(guild_id):
+    record = guild_themes.get(guild_id)
+    if record and record.pop("logo", None) is not None:
+        save_themes()
+    _remove_logo_files(guild_id)
+
+
+def reset_theme(guild_id):
+    """Back to WEB_THEME: drops the guild's colors, name and logo."""
+    if guild_themes.pop(guild_id, None) is not None:
+        save_themes()
+    _remove_logo_files(guild_id)
+
+
+def _prune_edit_tokens():
+    now = _clock()
+    for token, (_, expires) in list(edit_tokens.items()):
+        if expires <= now:
+            edit_tokens.pop(token, None)
+
+
+def issue_edit_token(guild_id):
+    _prune_edit_tokens()
+    token = secrets.token_urlsafe(24)
+    edit_tokens[token] = (guild_id, _clock() + THEME_EDIT_SECONDS)
+    return token
+
+
+def check_edit_token(given, guild_id):
+    """True if `given` is a live edit token for this guild (constant-time)."""
+    _prune_edit_tokens()
+    if not isinstance(given, str) or not 0 < len(given) <= 128:
+        return False
+    given = given.encode("utf-8", "replace")
+    ok = False
+    for token, (gid, _) in list(edit_tokens.items()):
+        if secrets.compare_digest(token.encode(), given) and gid == guild_id:
+            ok = True
+    return ok
+
+
+load_themes()
 
 
 async def open_session(ctx, player, announce=True):
@@ -1963,6 +2183,73 @@ async def crossfade(ctx, mode: str = None):
     await ack(ctx)
 
 
+@bot.command(name="theme")
+@commands.has_guild_permissions(manage_guild=True)
+async def theme(ctx, choice: str = None):
+    """Show or set the clip page's default theme for this server."""
+    guild_id = ctx.guild.id
+    choice = (choice or "").strip().lower()
+    player = music_players.get(guild_id)
+    if not choice:
+        current = theme_for(guild_id)["skin"]
+        source = "server default" if guild_id in guild_themes else "fallback"
+        await ctx.send(
+            f"🎨 Clip page theme: **{current}** ({source})\n"
+            f"Presets: {', '.join(THEME_SKINS)}\n"
+            f"`{COMMAND_PREFIX}theme <preset>` sets it, "
+            f"`{COMMAND_PREFIX}theme reset` restores `{WEB_THEME}`, "
+            f"`{COMMAND_PREFIX}theme edit` sends you an editor link "
+            "(custom colors, name, logo)."
+        )
+        return
+
+    if choice == "edit":
+        player = music_players.setdefault(guild_id, MusicPlayer())
+        if player.sid and _session_player(player.sid) is None:
+            player.sid = None  # Expired: open_session makes a fresh one
+        # The editor lives on the session's page: open one if needed (as a
+        # join does, without joining voice).
+        await open_session(ctx, player, announce=False)
+        token = issue_edit_token(guild_id)
+        try:
+            await ctx.author.send(
+                f"🎨 Theme editor for **{ctx.guild.name}** (valid "
+                f"{THEME_EDIT_SECONDS // 60} min, do not share it):\n"
+                f"{PUBLIC_BASE_URL}/{player.sid}?edit={token}"
+            )
+        except discord.HTTPException:
+            edit_tokens.pop(token, None)
+            await ctx.send(
+                "❌ I can't send you a direct message. Allow DMs from server "
+                f"members, then run `{COMMAND_PREFIX}theme edit` again."
+            )
+            return
+        await ack(ctx)
+        return
+
+    try:
+        if choice == "reset":
+            reset_theme(guild_id)
+            label = WEB_THEME
+        elif choice in THEME_SKINS:
+            guild_themes.setdefault(guild_id, {})["skin"] = choice
+            save_themes()
+            label = choice
+        else:
+            await ctx.send(
+                f"❌ Unknown theme. Presets: {', '.join(THEME_SKINS)}, "
+                "or `reset` / `edit`."
+            )
+            return
+    except OSError as e:
+        print(f"Could not save theme: {e}")
+        await ctx.send("❌ Could not save the theme (is DATA_DIR writable?).")
+        return
+    await ack(ctx)
+    if player:
+        set_action(player, f"🎨 Clip page theme: {label}")
+
+
 @bot.command(name="pause")
 async def pause(ctx):
     await _run_command_control(ctx, control_pause)
@@ -1980,6 +2267,15 @@ async def on_command_error(ctx, error):
         return
     if isinstance(error, commands.MissingRequiredArgument):
         await ctx.send(f"❌ Missing argument. Try `{COMMAND_PREFIX}help`.")
+        return
+    if isinstance(error, commands.NoPrivateMessage):
+        await ctx.send("❌ This command only works in a server.")
+        return
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send(
+            f"❌ You need the **Manage Server** permission to use "
+            f"`{COMMAND_PREFIX}{ctx.command}`."
+        )
         return
     print(f"Command error in '{ctx.command}': {error}")
     try:
@@ -1999,7 +2295,12 @@ async def on_command_error(ctx, error):
 #                              previous, pause, resume, remove, move, add,
 #                              seek, jump, crossfade ({"enabled": bool})
 #   GET /media/{sid}/{id}      the mp4 of a playing, queued or history track
-# Paths are never built from the request: tracks are looked up by id.
+#   POST /api/{sid}/theme      {skin, base, bg, text, accent, name}, with the
+#                              X-Edit-Token header of a `!theme edit` link
+#   POST|DELETE /api/{sid}/theme/logo   raw PNG/JPEG/WebP/GIF body (same token)
+#   GET /theme-logo/{sid}      the guild's logo (?v= busts caches)
+# Paths are never built from the request: tracks are looked up by id, themes
+# and logos by the session's guild id.
 
 
 def _track_summary(track):
@@ -2019,7 +2320,9 @@ async def web_landing(request):
 async def web_page(request):
     if not os.path.isfile(WEB_INDEX):
         return web.Response(status=404, text="Page not found")
-    return web.FileResponse(WEB_INDEX, headers={"Cache-Control": "no-cache"})
+    # The URL may carry a `!theme edit` token: never leak it as a referrer.
+    headers = {"Cache-Control": "no-cache", "Referrer-Policy": "same-origin"}
+    return web.FileResponse(WEB_INDEX, headers=headers)
 
 
 async def web_state(request):
@@ -2064,6 +2367,7 @@ async def web_state(request):
             "server_time": time.time(),
             "now_playing": now_playing,
             "queue": queue,
+            "theme": theme_state(sid, sessions[sid]),
         },
         headers=headers,
     )
@@ -2090,6 +2394,34 @@ def _control_error(status, message):
     return web.json_response({"ok": False, "error": message}, status=status)
 
 
+async def _read_body(request, limit):
+    """The request body, or None if it is larger than `limit` bytes."""
+    if (request.content_length or 0) > limit:
+        return None
+    # StreamReader.read() may return a partial chunk: read until EOF.
+    body = b""
+    while len(body) <= limit:
+        chunk = await request.content.read(limit + 1 - len(body))
+        if not chunk:
+            break
+        body += chunk
+    return None if len(body) > limit else body
+
+
+async def _read_json(request):
+    """(dict, None) or (None, error response) for a small JSON body."""
+    body = await _read_body(request, MAX_CONTROL_BODY)
+    if body is None:
+        return None, _control_error(400, "Requête trop volumineuse.")
+    try:
+        data = json.loads(body)
+    except (ValueError, RecursionError):
+        return None, _control_error(400, "Requête invalide.")
+    if not isinstance(data, dict):
+        return None, _control_error(400, "Requête invalide.")
+    return data, None
+
+
 async def web_control(request):
     sid = request.match_info["sid"]
     player = _session_player(sid)
@@ -2097,23 +2429,9 @@ async def web_control(request):
         return _control_error(404, "Session inconnue ou expirée.")
     guild_id = sessions[sid]
 
-    if (request.content_length or 0) > MAX_CONTROL_BODY:
-        return _control_error(400, "Requête trop volumineuse.")
-    # StreamReader.read() may return a partial chunk: read until EOF.
-    body = b""
-    while len(body) <= MAX_CONTROL_BODY:
-        chunk = await request.content.read(MAX_CONTROL_BODY + 1 - len(body))
-        if not chunk:
-            break
-        body += chunk
-    if len(body) > MAX_CONTROL_BODY:
-        return _control_error(400, "Requête trop volumineuse.")
-    try:
-        data = json.loads(body)
-    except (ValueError, RecursionError):
-        return _control_error(400, "Requête invalide.")
-    if not isinstance(data, dict):
-        return _control_error(400, "Requête invalide.")
+    data, error = await _read_json(request)
+    if error is not None:
+        return error
     action = data.get("action")
     if action not in (
         "next",
@@ -2191,12 +2509,133 @@ async def web_control(request):
     return web.json_response({"ok": True})
 
 
+def _theme_auth(request):
+    """(player, guild id, None) for a valid edit token on a live session,
+    else (None, None, error response)."""
+    sid = request.match_info["sid"]
+    player = _session_player(sid)
+    if player is None:
+        return None, None, _control_error(404, "Session inconnue ou expirée.")
+    guild_id = sessions[sid]
+    if not check_edit_token(request.headers.get("X-Edit-Token"), guild_id):
+        return (
+            None,
+            None,
+            _control_error(
+                403,
+                "Lien d'édition invalide ou expiré. "
+                "Relance !theme edit dans Discord.",
+            ),
+        )
+    return player, guild_id, None
+
+
+def _theme_saved(request, player, guild_id):
+    touch(player)
+    set_action(player, "🎨 Clip page theme updated via the web page")
+    theme = theme_state(request.match_info["sid"], guild_id)
+    return web.json_response({"ok": True, "theme": theme})
+
+
+_SAVE_FAILED = "Enregistrement impossible sur le serveur."
+
+
+async def web_theme(request):
+    player, guild_id, error = _theme_auth(request)
+    if error is not None:
+        return error
+    data, error = await _read_json(request)
+    if error is not None:
+        return error
+    if data.get("skin") not in THEME_SKINS:
+        return _control_error(400, "Thème inconnu.")
+    if data.get("base") not in THEME_PRESETS:
+        return _control_error(400, "Style de base inconnu.")
+    if not all(valid_color(data.get(k)) for k in ("bg", "text", "accent")):
+        return _control_error(400, "Couleur invalide (format #rrggbb).")
+    name = clean_theme_name(data.get("name", ""))
+    if name is None:
+        return _control_error(
+            400, f"Nom invalide ({THEME_NAME_MAX} caractères maximum)."
+        )
+    record = guild_themes.setdefault(guild_id, {})
+    record.update(
+        skin=data["skin"],
+        base=data["base"],
+        bg=data["bg"].lower(),
+        text=data["text"].lower(),
+        accent=data["accent"].lower(),
+        name=name,
+    )
+    try:
+        save_themes()
+    except OSError as e:
+        print(f"Could not save theme: {e}")
+        return _control_error(500, _SAVE_FAILED)
+    return _theme_saved(request, player, guild_id)
+
+
+async def web_theme_logo(request):
+    player, guild_id, error = _theme_auth(request)
+    if error is not None:
+        return error
+    if request.method == "DELETE":
+        try:
+            remove_logo(guild_id)
+        except OSError as e:
+            print(f"Could not remove logo: {e}")
+            return _control_error(500, _SAVE_FAILED)
+        return _theme_saved(request, player, guild_id)
+    body = await _read_body(request, MAX_LOGO_BYTES)
+    if body is None:
+        return _control_error(400, "Image trop lourde (512 Ko maximum).")
+    ext = sniff_image(body)
+    if ext is None:
+        return _control_error(
+            400, "Format non pris en charge (PNG, JPEG, WebP ou GIF)."
+        )
+    try:
+        set_logo(guild_id, body, ext)
+    except OSError as e:
+        print(f"Could not save logo: {e}")
+        return _control_error(500, _SAVE_FAILED)
+    return _theme_saved(request, player, guild_id)
+
+
+async def web_theme_logo_file(request):
+    sid = request.match_info["sid"]
+    if _session_player(sid) is None:
+        raise web.HTTPNotFound()
+    guild_id = sessions[sid]
+    logo = guild_themes.get(guild_id, {}).get("logo")
+    if not logo:
+        raise web.HTTPNotFound()
+    try:
+        with open(logo_path(guild_id, logo["ext"]), "rb") as f:
+            data = f.read(MAX_LOGO_BYTES + 1)
+    except OSError:
+        raise web.HTTPNotFound()
+    return web.Response(
+        body=data,
+        content_type=LOGO_TYPES[logo["ext"]],
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'",
+            "Cache-Control": "public, max-age=86400",
+        },
+    )
+
+
 def build_web_app():
     app = web.Application()
     app.router.add_get("/", web_landing)
     app.router.add_get("/api/{sid}/state", web_state)
     app.router.add_post("/api/{sid}/control", web_control)
+    app.router.add_post("/api/{sid}/theme", web_theme)
+    app.router.add_post("/api/{sid}/theme/logo", web_theme_logo)
+    app.router.add_delete("/api/{sid}/theme/logo", web_theme_logo)
     app.router.add_get("/media/{sid}/{track_id}", web_media)
+    app.router.add_get("/theme-logo/{sid}", web_theme_logo_file)
     app.router.add_get("/{sid}", web_page)
     return app
 

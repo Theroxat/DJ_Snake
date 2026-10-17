@@ -15,6 +15,7 @@ A Discord music bot that downloads YouTube audio and video, plays it in voice ch
 - Live clip page: muted video synced with the audio, plus web controls (next, previous, pause, resume, seek, jump, remove, reorder, add).
 - Automix, always on: SponsorBlock `music_offtopic` segments are cut, loudness is normalised to -14 LUFS, leading and trailing silence is trimmed, and tracks fade in and out.
 - Optional crossfade between tracks.
+- Seven clip page themes (Arcade, Minimal, Nuit, Vinyle, Club, Terminal and a custom one with your colors, community name and logo). Server admins set the default, and each viewer can pick their own.
 - One live status message per session, edited in place instead of spamming the channel.
 - Radio/mix links ask whether to play the single track or the whole playlist.
 - yt-dlp upgrades itself on start, and a PO token sidecar handles YouTube's bot check.
@@ -50,6 +51,7 @@ The prefix is `!` by default (`COMMAND_PREFIX`).
 | `!crossfade on\|off` | Enable or disable crossfade for this session (off by default). |
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
+| `!theme [preset\|reset\|edit]` | Show or set the clip page's default theme for the server. `edit` DMs you a private editor link. Needs the Manage Server permission. |
 
 ## Clip page
 
@@ -73,6 +75,17 @@ cloudflared tunnel --url http://127.0.0.1:47823
 
 Anyone who has the link can control the queue. Treat it as a secret and share it only with people you trust.
 
+### Themes
+
+The clip page has six preset themes (`arcade`, the default look, plus `minimal`, `nuit`, `vinyle`, `club` and `terminal`) and a custom one, `perso`, built from three colors (background, text, accent) on top of a preset's fonts and shapes. Viewers can switch theme for themselves with the palette button in the page header; their choice stays in their browser.
+
+Members with the **Manage Server** permission set the server's default:
+
+- `!theme` shows the current theme and the presets, `!theme <preset>` sets it, and `!theme reset` goes back to `WEB_THEME` (and drops the custom colors, name and logo).
+- `!theme edit` sends you, by direct message, a private link to the page's theme editor. It is valid for 30 minutes. There you can pick the default theme, build a `perso` palette, set a community name shown instead of "DJ Snake", and upload a logo (PNG, JPEG, WebP or GIF, 512 KB max). If the server has no live session, one is opened without joining voice.
+
+Themes and logos are stored in `DATA_DIR` (`./data` with Compose), so they survive restarts and rebuilds. The container runs as UID 1000, which must be able to write that directory.
+
 ## Configuration
 
 Set these in `.env` (see `.env.example`).
@@ -89,6 +102,8 @@ Set these in `.env` (see `.env.example`).
 | `WEB_BIND` | `127.0.0.1` | Host IP the port is published on (Compose only). |
 | `PUBLIC_BASE_URL` | empty (`http://localhost:WEB_PORT`) | Public address used in the posted clip link. |
 | `SESSION_IDLE_HOURS` | `6` | Idle hours before a clip link expires. |
+| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`) and logos. Compose mounts `./data` there. |
+| `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`. |
 | `YTDLP_AUTO_UPDATE` | `1` | Upgrade yt-dlp on container start (`0` to skip). |
 
 ## Running without Docker

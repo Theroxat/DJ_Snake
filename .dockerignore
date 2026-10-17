@@ -27,6 +27,9 @@ config.json
 scripts/
 logs/
 
+# Persistent data (bind-mounted at runtime)
+data/
+
 # Downloaded audio
 *.mp3
 *.mp4

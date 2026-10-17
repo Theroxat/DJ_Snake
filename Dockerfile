@@ -25,8 +25,10 @@ COPY bot.py .
 COPY web/ web/
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# Run as an unprivileged user.
-RUN useradd --create-home botuser \
+# Run as an unprivileged user. UID 1000 matches the usual first host user, so
+# the bind-mounted ./data directory (themes, logos) is writable by the bot.
+RUN useradd --create-home --uid 1000 botuser \
+    && mkdir -p /app/data \
     && chown -R botuser:botuser /app
 USER botuser
 

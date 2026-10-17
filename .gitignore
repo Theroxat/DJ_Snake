@@ -64,6 +64,11 @@ downloads/
 *.log
 logs/
 
+# Persistent bot data (themes, logos); the directory itself is kept so that
+# Docker does not create it as root.
+/data/*
+!/data/.gitkeep
+
 # Testing
 .pytest_cache/
 .coverage

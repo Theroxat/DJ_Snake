@@ -63,8 +63,10 @@ which is no longer read), `TEMP_DIR`, `POT_BASE_URL`, `WEB_PORT` (47823),
 `WEB_BIND` (host IP the web port is published on, compose only, default
 `127.0.0.1`; set a LAN IP or `0.0.0.0` for a reverse proxy or tunnel),
 `PUBLIC_BASE_URL` (e.g. `https://dj.example.com`; empty falls back to
-`http://localhost:WEB_PORT`), `SESSION_IDLE_HOURS` (6), and `YTDLP_AUTO_UPDATE`
-(entrypoint only).
+`http://localhost:WEB_PORT`), `SESSION_IDLE_HOURS` (6), `DATA_DIR`
+(`/app/data`, mounted from `./data` by Compose; the container's UID 1000 must
+be able to write it), `WEB_THEME` (`arcade`, the theme of guilds that never
+chose one), and `YTDLP_AUTO_UPDATE` (entrypoint only).
 
 ## Architecture (`bot.py`)
 
@@ -157,7 +159,8 @@ which is no longer read), `TEMP_DIR`, `POT_BASE_URL`, `WEB_PORT` (47823),
   `GET /api/{sid}/state` returns `{active, in_voice, guild, channel, loading,
   paused, can_previous, crossfade, crossfading, server_time, now_playing: {id,
   title, duration, thumbnail, url, video_url, elapsed, start, end} | null, queue: [{id, title, duration,
-  thumbnail, url}]}` (404 `{"active": false}` when the sid is unknown or
+  thumbnail, url}], theme: {skin, base, bg, text, accent, name, logo_url}}`
+  (404 `{"active": false}` when the sid is unknown or
   expired; out of voice, `now_playing` is null and `queue` empty; `elapsed`
   freezes while paused). `POST /api/{sid}/control` takes `{action:
   next|previous|pause|resume|remove|move|add|seek|jump|crossfade, id?, index?,
@@ -169,7 +172,32 @@ which is no longer read), `TEMP_DIR`, `POT_BASE_URL`, `WEB_PORT` (47823),
   non-YouTube URL), 404 (unknown sid or track id) or 409 (not in voice, nothing
   playing). `GET /media/{sid}/{id}` streams the playing, a queued or a history
   track's mp4 with Range support. Files are found by track id, never by a path
-  from the request.
+  from the request. Theme routes: `POST /api/{sid}/theme`,
+  `POST|DELETE /api/{sid}/theme/logo`, `GET /theme-logo/{sid}` (see Themes).
+- **Themes**: the page is fully token-driven: each preset is a `[data-skin]`
+  block of CSS custom properties on `<html>` (Arcade is the original look);
+  `perso` takes `--c-bg/--c-text/--c-accent` and derives the rest with
+  `color-mix`, inheriting fonts and shapes from the preset in `data-base`;
+  `data-shape` (the skin, or the base for perso) scopes a few Arcade-only
+  details. Per-guild defaults live in `guild_themes`, persisted to
+  `{DATA_DIR}/themes.json` (`{guild id: {skin, base, bg, text, accent, name,
+  logo: {ext, v} | null}}`, written atomically with a temp file and
+  `os.replace`, cleaned field by field on load); a logo is
+  `{DATA_DIR}/logos/{guild id}.{ext}`. `theme_for()` fills in `WEB_THEME` and
+  the perso defaults. `!theme edit` issues an edit token
+  (`secrets.token_urlsafe(24)`, in memory in `edit_tokens` with the guild id,
+  30 min) and DMs `{PUBLIC_BASE_URL}/{sid}?edit=<token>`, opening a session
+  (and its panel) without joining voice if the guild has none. Theme routes
+  take it in `X-Edit-Token`, compared with `secrets.compare_digest` and
+  bound to the session's guild: `POST /api/{sid}/theme` (`{skin, base, bg,
+  text, accent, name}`, JSON <= 4 KB, colors `#rrggbb`, name <= 32 chars) and
+  `POST|DELETE /api/{sid}/theme/logo` (raw body <= 512 KB, PNG/JPEG/WebP/GIF
+  by magic bytes, never SVG) answer `{"ok": true, "theme": ...}` or a French
+  error (400 bad input, 403 bad or expired token, 404 unknown session, 500
+  write failed). `GET /theme-logo/{sid}` serves the logo with `nosniff`;
+  `logo_url` carries `?v=` for cache busting. The page strips the token from
+  the URL at load and keeps it in memory only; a viewer's own preset choice is
+  in localStorage, and the custom theme is admin-only.
 - **Status panel**: each web session has one message in its text channel
   (`player.panel_message`), edited in place instead of announcing events:
   clip link, now playing / paused / idle, up next, loading progress and the
@@ -184,7 +212,8 @@ which is no longer read), `TEMP_DIR`, `POT_BASE_URL`, `WEB_PORT` (47823),
   session). `join_voice_channel()` wraps it. `!reset` forces a reconnect.
 - **Commands**: `!play`, `!list`, `!next`, `!pause`, `!resume`, `!seek`
   (position relative to the track's automix `start`, as the page shows it),
-  `!crossfade on|off`, `!stop`, `!reset`.
+  `!crossfade on|off`, `!stop`, `!reset`, `!theme [preset|reset|edit]`
+  (Manage Server permission via `commands.has_guild_permissions`).
 - Voice needs `PyNaCl`, `davey` (DAVE encryption, required by discord.py 2.7+)
   and, on Python 3.13+, `audioop-lts`. The Docker image uses Python 3.12. CI
   tests on 3.10 to 3.12.
