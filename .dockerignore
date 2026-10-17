@@ -12,6 +12,12 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 
+# Tests and dev tooling (not needed at runtime)
+tests/
+pytest.ini
+requirements-dev.txt
+.pytest_cache/
+
 # Git & CI
 .git/
 .github/
