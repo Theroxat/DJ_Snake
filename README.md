@@ -1,10 +1,16 @@
 # DJ Snake
 
-![Clip page](docs/screenshots/clip-page.png)
+<p align="center">
+  <a href="https://theroxat.github.io/DJ_Snake/demo/"><img src="docs/screenshots/demo.webp" alt="The clip page: a synced video next to the queue, switching between themes" width="860"></a>
+  <br>
+  <sub><a href="docs/screenshots/clip-page.png">Static screenshot</a> · <a href="https://theroxat.github.io/DJ_Snake/demo/"><b>Try the live demo</b></a> (fictional data) · <a href="https://theroxat.github.io/DJ_Snake/">Project page</a></sub>
+</p>
 
-A Discord music bot that downloads YouTube audio and video, plays it in voice channels with an independent queue per server, and serves a live "clip page" with a synced muted video and web controls.
+A self-hosted Discord music bot that downloads YouTube audio and video, plays it in voice channels with an independent queue per server, and serves a live "clip page" with a synced muted video and web controls. It is meant to run on your own machine for your own server.
 
 [![CI](https://github.com/Theroxat/DJ_Snake/actions/workflows/ci.yml/badge.svg)](https://github.com/Theroxat/DJ_Snake/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Theroxat/DJ_Snake)](https://github.com/Theroxat/DJ_Snake/releases)
+[![Docker image](https://img.shields.io/badge/ghcr.io-theroxat%2Fdj__snake-blue?logo=docker&logoColor=white)](https://github.com/Theroxat/DJ_Snake/pkgs/container/dj_snake)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)
 
@@ -25,15 +31,23 @@ A Discord music bot that downloads YouTube audio and video, plays it in voice ch
 1. In the [Discord Developer Portal](https://discord.com/developers/applications), create an application and add a bot.
 2. Under Bot, enable the **Message Content Intent**. It is the only privileged intent needed.
 3. Invite the bot with the `bot` scope and these permissions: View Channels, Send Messages, Read Message History, Add Reactions, Connect, Speak.
-4. Deploy:
+4. Deploy, with the prebuilt image (recommended):
 
 ```bash
 git clone https://github.com/Theroxat/DJ_Snake.git
 cd DJ_Snake
 cp .env.example .env        # set DISCORD_TOKEN
-docker compose up -d --build
+docker compose pull && docker compose up -d
 docker compose logs -f dj-snake
 ```
+
+   Or build from source (for local changes):
+
+```bash
+docker compose up -d --build
+```
+
+   The prebuilt image is `ghcr.io/theroxat/dj_snake:latest`; the compose file also keeps `build: .` for local builds.
 
 5. Join a voice channel and send `!play https://www.youtube.com/watch?v=...`.
 
@@ -76,6 +90,8 @@ cloudflared tunnel --url http://127.0.0.1:47823
 Anyone who has the link can control the queue. Treat it as a secret and share it only with people you trust.
 
 ### Themes
+
+![The six preset themes](docs/screenshots/themes.png)
 
 The clip page has six preset themes (`arcade`, the default look, plus `minimal`, `nuit`, `vinyle`, `club` and `terminal`) and a custom one, `perso`, built from three colors (background, text, accent) on top of a preset's fonts and shapes. Viewers can switch theme for themselves with the palette button in the page header; their choice stays in their browser.
 
@@ -144,6 +160,10 @@ YouTube breaks yt-dlp extractors every few weeks, usually showing up as `HTTP Er
 
 - YouTube only, at most 720p, and playlists are capped at `MAX_PLAYLIST_SIZE`.
 - This project is for personal use. Respect YouTube's Terms of Service and the copyright of the content you play; you are responsible for how you use it.
+
+## Demo site
+
+`docs/` is a GitHub Pages site: a landing page and a live demo of the real clip page running on fake data. See [docs/README.md](docs/README.md).
 
 ## Contributing
 

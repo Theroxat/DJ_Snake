@@ -1,0 +1,1559 @@
+<!doctype html>
+<html lang="fr" data-skin="arcade" data-shape="arcade">
+<head>
+<script src="shim.js"></script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DJ Snake — Clip Party</title>
+<script>
+// Apply the viewer's own theme before the first paint (the server default
+// arrives with the first state poll).
+try {
+  const v = localStorage.getItem("djsnake.skin");
+  if (["arcade", "minimal", "nuit", "vinyle", "club", "terminal"].includes(v)) {
+    document.documentElement.dataset.skin = v;
+    document.documentElement.dataset.shape = v;
+  }
+} catch (e) {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&family=VT323&family=Inter:wght@400;600;700&family=Nunito:wght@400;700;800&family=Fredoka:wght@400;600;700&family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&family=Orbitron:wght@500;700&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* ======================================================================
+   THEME TOKENS. Each preset is a [data-skin] block of custom properties on
+   <html>. "Shape" (fonts, radius, shadows, effects) is split from colors so
+   the custom skin (perso) inherits the shape of a preset via data-base.
+   data-shape (= skin, or base for perso) scopes a few Arcade-only details.
+   The page below only references tokens; Arcade is the original look.
+   ====================================================================== */
+
+/* ---- 1. Arcade (the original look) ---- */
+[data-skin="arcade"], [data-skin="perso"][data-base="arcade"] {
+  --font-display: "Archivo Black", Impact, sans-serif;
+  --font-body: "Space Mono", ui-monospace, monospace;
+  --font-mono: "VT323", ui-monospace, monospace;
+  --fs: 15px; --display-weight: 400; --display-case: uppercase; --display-ls: -0.025em;
+  --hud-size: 20px; --hud-case: uppercase; --hud-ls: .04em; --btn-size: 15px; --wordmark-size: 28px;
+  --radius: 0; --radius-btn: 0; --radius-sm: 0; --bw: 2px; --bar-radius: 0px;
+  --shadow-frame: 6px 6px 0 var(--accent);
+  --shadow-card: none;
+  --shadow-btn: 6px 6px 0 var(--accent-2);
+  --shadow-btn-hover: 3px 3px 0 var(--accent-2);
+  --shadow-btn-active: 0 0 0 var(--accent-2);
+  --shadow-pp: 6px 6px 0 var(--text);
+  --shadow-input: 4px 4px 0 var(--accent-3);
+  --shadow-pop: 6px 6px 0 var(--accent-3);
+  --hover-transform: translate(2px, 2px); --active-transform: translate(6px, 6px);
+  --scanlines: 1; --scan-color: #ffffff06; --scan-blend: overlay;
+  --text-glow: none; --display-glow: none; --logo-mark: "";
+}
+[data-skin="arcade"] {
+  --bg: #0a0a0a; --surface: #0a0a0a; --text: #f3e7cf; --muted: #f3e7cf99;
+  --accent: #ff2c41; --accent-2: #ffd400; --accent-3: #00d4ff; --on-accent: #0a0a0a;
+  --border: #f3e7cf; --hair: #f3e7cf1a; --track: transparent;
+  --hover-bg: #f3e7cf; --hover-text: #0a0a0a; --hover-muted: #b8323a;
+  --focus: #00d4ff; --ok: #9bff3b; --video-bg: #000; --pp-border: #f3e7cf;
+}
+
+/* ---- 2. Minimal ---- */
+[data-skin="minimal"], [data-skin="perso"][data-base="minimal"] {
+  --font-display: "Inter", system-ui, "Segoe UI", sans-serif;
+  --font-body: "Inter", system-ui, "Segoe UI", sans-serif;
+  --font-mono: "Inter", system-ui, sans-serif;
+  --fs: 15px; --display-weight: 700; --display-case: none; --display-ls: -0.02em;
+  --hud-size: 13px; --hud-case: none; --hud-ls: .01em; --btn-size: 14px; --wordmark-size: 24px;
+  --radius: 14px; --radius-btn: 10px; --radius-sm: 8px; --bw: 1px; --bar-radius: 4px;
+  --shadow-frame: 0 1px 2px rgba(20,28,45,.08), 0 12px 32px rgba(20,28,45,.10);
+  --shadow-card: 0 1px 2px rgba(20,28,45,.06);
+  --shadow-btn: 0 1px 2px rgba(20,28,45,.08);
+  --shadow-btn-hover: 0 3px 8px rgba(20,28,45,.12);
+  --shadow-btn-active: 0 0 0 rgba(0,0,0,0);
+  --shadow-pp: 0 4px 12px color-mix(in srgb, var(--accent) 35%, transparent);
+  --shadow-input: inset 0 1px 2px rgba(20,28,45,.05);
+  --shadow-pop: 0 12px 32px rgba(20,28,45,.16);
+  --hover-transform: translateY(-1px); --active-transform: translateY(0);
+  --scanlines: 0; --scan-color: transparent; --scan-blend: normal;
+  --text-glow: none; --display-glow: none; --logo-mark: "";
+}
+[data-skin="minimal"] {
+  --bg: #f1f2f5; --surface: #ffffff; --text: #1f2430; --muted: #6a7082;
+  --accent: #4a6fa5; --accent-2: #4a6fa5; --accent-3: #7b93b8; --on-accent: #ffffff;
+  --border: #d6d9e0; --hair: #e5e7ec; --track: #e5e7ec;
+  --hover-bg: #eef0f4; --hover-text: #1f2430; --hover-muted: #6a7082;
+  --focus: #4a6fa5; --ok: #2f9e6b; --video-bg: #14171f; --pp-border: #4a6fa5;
+}
+
+/* ---- 3. Nuit ---- */
+[data-skin="nuit"], [data-skin="perso"][data-base="nuit"] {
+  --font-display: "Nunito", system-ui, sans-serif;
+  --font-body: "Nunito", system-ui, sans-serif;
+  --font-mono: "Nunito", system-ui, sans-serif;
+  --fs: 15px; --display-weight: 800; --display-case: none; --display-ls: 0;
+  --hud-size: 14px; --hud-case: none; --hud-ls: .02em; --btn-size: 14px; --wordmark-size: 26px;
+  --radius: 22px; --radius-btn: 999px; --radius-sm: 12px; --bw: 1px; --bar-radius: 6px;
+  --shadow-frame: 0 18px 40px rgba(0,0,0,.45);
+  --shadow-card: 0 8px 24px rgba(0,0,0,.25);
+  --shadow-btn: 0 4px 14px rgba(0,0,0,.3);
+  --shadow-btn-hover: 0 6px 18px rgba(0,0,0,.4);
+  --shadow-btn-active: 0 1px 4px rgba(0,0,0,.4);
+  --shadow-pp: 0 6px 22px color-mix(in srgb, var(--accent) 28%, transparent);
+  --shadow-input: inset 0 2px 6px rgba(0,0,0,.25);
+  --shadow-pop: 0 16px 40px rgba(0,0,0,.5);
+  --hover-transform: translateY(-1px); --active-transform: translateY(1px);
+  --scanlines: 0; --scan-color: transparent; --scan-blend: normal;
+  --text-glow: none; --display-glow: none; --logo-mark: "";
+}
+[data-skin="nuit"] {
+  --bg: #11131b; --surface: #1a1d29; --text: #d5d9e6; --muted: #8a90a8;
+  --accent: #9aa5dd; --accent-2: #86b3c4; --accent-3: #b49bc9; --on-accent: #11131b;
+  --border: #2b3042; --hair: #242838; --track: #242838;
+  --hover-bg: #222637; --hover-text: #e6e9f3; --hover-muted: #9aa0b8;
+  --focus: #b9c2f2; --ok: #7fcfa0; --video-bg: #07080c; --pp-border: #9aa5dd;
+}
+
+/* ---- 4. Vinyle ---- */
+[data-skin="vinyle"], [data-skin="perso"][data-base="vinyle"] {
+  --font-display: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+  --font-body: "DM Sans", system-ui, sans-serif;
+  --font-mono: "DM Mono", ui-monospace, monospace;
+  --fs: 15px; --display-weight: 600; --display-case: none; --display-ls: .005em;
+  --hud-size: 14px; --hud-case: none; --hud-ls: 0; --btn-size: 15px; --wordmark-size: 30px;
+  --radius: 26px; --radius-btn: 999px; --radius-sm: 14px; --bw: 3px; --bar-radius: 8px;
+  --shadow-frame: 0 8px 0 color-mix(in srgb, var(--bg) 55%, black), 0 0 0 4px var(--accent-2);
+  --shadow-card: 0 5px 0 color-mix(in srgb, var(--bg) 55%, black);
+  --shadow-btn: 0 4px 0 color-mix(in srgb, var(--bg) 45%, black);
+  --shadow-btn-hover: 0 2px 0 color-mix(in srgb, var(--bg) 45%, black);
+  --shadow-btn-active: 0 0 0 transparent;
+  --shadow-pp: 0 5px 0 color-mix(in srgb, var(--accent) 55%, black);
+  --shadow-input: inset 0 3px 0 rgba(0,0,0,.18);
+  --shadow-pop: 0 8px 0 color-mix(in srgb, var(--bg) 55%, black);
+  --hover-transform: translateY(2px); --active-transform: translateY(4px);
+  --scanlines: 0; --scan-color: transparent; --scan-blend: normal;
+  --text-glow: none; --display-glow: none; --logo-mark: "";
+}
+[data-skin="vinyle"] {
+  --bg: #2a170d; --surface: #3a2112; --text: #fbe2b4; --muted: #fbe2b4a8;
+  --accent: #ff8a1f; --accent-2: #f2b705; --accent-3: #9bb53a; --on-accent: #2a170d;
+  --border: #6b3d1e; --hair: #fbe2b41f; --track: #1d0f08;
+  --hover-bg: #4a2b17; --hover-text: #fff1d3; --hover-muted: #f2b705;
+  --focus: #f2b705; --ok: #9bb53a; --video-bg: #160a05; --pp-border: #ffb15c;
+}
+
+/* ---- 5. Club ---- */
+[data-skin="club"], [data-skin="perso"][data-base="club"] {
+  --font-display: "Orbitron", "Eurostile", system-ui, sans-serif;
+  --font-body: "Rajdhani", system-ui, sans-serif;
+  --font-mono: "Share Tech Mono", ui-monospace, monospace;
+  --fs: 17px; --display-weight: 700; --display-case: uppercase; --display-ls: .06em;
+  --hud-size: 16px; --hud-case: uppercase; --hud-ls: .1em; --btn-size: 13px; --wordmark-size: 24px;
+  --radius: 8px; --radius-btn: 6px; --radius-sm: 4px; --bw: 1px; --bar-radius: 2px;
+  --shadow-frame: 0 0 0 1px var(--accent), 0 0 22px color-mix(in srgb, var(--accent) 65%, transparent), 0 0 70px color-mix(in srgb, var(--accent-3) 35%, transparent);
+  --shadow-card: 0 0 16px color-mix(in srgb, var(--accent-3) 30%, transparent);
+  --shadow-btn: 0 0 12px color-mix(in srgb, var(--accent-2) 45%, transparent);
+  --shadow-btn-hover: 0 0 20px color-mix(in srgb, var(--accent-2) 80%, transparent);
+  --shadow-btn-active: 0 0 6px color-mix(in srgb, var(--accent-2) 60%, transparent);
+  --shadow-pp: 0 0 24px color-mix(in srgb, var(--accent) 80%, transparent);
+  --shadow-input: 0 0 10px color-mix(in srgb, var(--accent-3) 35%, transparent);
+  --shadow-pop: 0 0 26px color-mix(in srgb, var(--accent) 50%, transparent);
+  --hover-transform: translateY(-1px); --active-transform: translateY(0);
+  --scanlines: .7; --scan-color: #ffffff0d; --scan-blend: overlay;
+  --text-glow: none; --display-glow: 0 0 14px color-mix(in srgb, var(--accent) 80%, transparent); --logo-mark: "◢ ";
+}
+[data-skin="club"] {
+  --bg: #0a0617; --surface: #130a2a; --text: #f1e8ff; --muted: #f1e8ff94;
+  --accent: #ff2bd6; --accent-2: #19f0ff; --accent-3: #8a5bff; --on-accent: #1a0020;
+  --border: #5b2fa3; --hair: #8a5bff33; --track: #1d1040;
+  --hover-bg: #24124d; --hover-text: #ffffff; --hover-muted: #19f0ff;
+  --focus: #19f0ff; --ok: #19f0ff; --video-bg: #05020d; --pp-border: #ff7ae8;
+}
+
+/* ---- 6. Terminal ---- */
+[data-skin="terminal"], [data-skin="perso"][data-base="terminal"] {
+  --font-display: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --font-body: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --fs: 14px; --display-weight: 700; --display-case: none; --display-ls: 0;
+  --hud-size: 13px; --hud-case: none; --hud-ls: 0; --btn-size: 14px; --wordmark-size: 22px;
+  --radius: 0; --radius-btn: 0; --radius-sm: 0; --bw: 1px; --bar-radius: 0px;
+  --shadow-frame: 0 0 0 1px var(--hair);
+  --shadow-card: none; --shadow-btn: none;
+  --shadow-btn-hover: 0 0 10px color-mix(in srgb, var(--text) 45%, transparent);
+  --shadow-btn-active: inset 0 0 0 1px var(--text);
+  --shadow-pp: none; --shadow-input: none; --shadow-pop: 0 0 0 1px var(--hair);
+  --hover-transform: none; --active-transform: none;
+  --scanlines: 1; --scan-color: #00000066; --scan-blend: normal;
+  --text-glow: 0 0 6px color-mix(in srgb, var(--text) 55%, transparent); --display-glow: none; --logo-mark: "> ";
+}
+[data-skin="terminal"] {
+  --bg: #040b05; --surface: #07120a; --text: #35ff72; --muted: #35ff7290;
+  --accent: #ffb000; --accent-2: #35ff72; --accent-3: #ffb000; --on-accent: #040b05;
+  --border: #1f8c42; --hair: #35ff7226; --track: #0b1d10;
+  --hover-bg: #0f2a16; --hover-text: #8dffb0; --hover-muted: #ffb000;
+  --focus: #ffb000; --ok: #35ff72; --video-bg: #020502; --pp-border: #ffb000;
+}
+
+/* ---- 7. Perso: colors derived from three picks (--c-*) ---- */
+[data-skin="perso"] {
+  --bg: var(--c-bg); --text: var(--c-text); --accent: var(--c-accent); --on-accent: var(--c-on-accent);
+  --surface: color-mix(in srgb, var(--c-bg) 90%, var(--c-text));
+  --muted: color-mix(in srgb, var(--c-text) 62%, var(--c-bg));
+  --border: color-mix(in srgb, var(--c-text) 24%, var(--c-bg));
+  --hair: color-mix(in srgb, var(--c-text) 12%, var(--c-bg));
+  --track: color-mix(in srgb, var(--c-text) 14%, var(--c-bg));
+  --accent-2: color-mix(in oklch, var(--c-accent) 70%, white);
+  --accent-3: color-mix(in oklch, var(--c-accent) 70%, var(--c-text));
+  --hover-bg: color-mix(in srgb, var(--c-text) 10%, var(--c-bg));
+  --hover-text: var(--c-text); --hover-muted: var(--muted);
+  --focus: var(--c-accent); --ok: color-mix(in srgb, var(--c-accent) 50%, #3ddc84);
+  --video-bg: color-mix(in srgb, var(--c-bg) 55%, black); --pp-border: var(--c-accent);
+}
+
+/* ======================================================================
+   Page (tokens only)
+   ====================================================================== */
+* { box-sizing: border-box; border-radius: 0; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 400 var(--fs)/1.45 var(--font-body);
+  text-shadow: var(--text-glow);
+  font-variant-numeric: tabular-nums slashed-zero;
+  overflow-x: hidden;
+}
+body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 100;
+  background: repeating-linear-gradient(var(--scan-color) 0 1px, transparent 1px 3px);
+  mix-blend-mode: var(--scan-blend); opacity: var(--scanlines);
+}
+.display { font-family: var(--font-display); text-transform: var(--display-case); letter-spacing: var(--display-ls); font-weight: var(--display-weight); text-shadow: var(--display-glow); }
+.hud { font-family: var(--font-mono); font-size: var(--hud-size); letter-spacing: var(--hud-ls); text-transform: var(--hud-case); }
+[hidden] { display: none !important; }
+
+/* Header */
+header {
+  position: relative; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 14px 24px; border-bottom: var(--bw) solid var(--border);
+}
+header.dragover { outline: 2px dashed var(--accent); outline-offset: -6px; }
+.logoimg { height: 36px; max-width: 120px; object-fit: contain; border-radius: var(--radius-sm); display: block; flex: none; }
+.wordmark { font-size: var(--wordmark-size); margin: 0; line-height: 1; overflow-wrap: anywhere; }
+.wordmark::before { content: var(--logo-mark); color: var(--accent); }
+.wordmark span { color: var(--accent); }
+.where { display: flex; flex-direction: column; min-width: 0; }
+.where b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46vw; }
+.spacer { flex: 1; }
+.badge { display: inline-flex; align-items: center; gap: 6px; border: var(--bw) solid var(--border); border-radius: var(--radius-btn); padding: 2px 10px; }
+.live { color: var(--ok); border-color: var(--ok); }
+.live.off { color: var(--muted); border-color: var(--hair); }
+.live:not(.off) i { animation: blink 1s steps(2, start) infinite; }
+.live i { font-style: normal; }
+@keyframes blink { to { visibility: hidden; } }
+.net { color: var(--accent-2); border-color: var(--accent-2); }
+.credits { display: none; color: var(--muted); }
+[data-shape="arcade"] .credits { display: inline; }
+
+/* Layout */
+main {
+  display: grid; grid-template-columns: minmax(0, 1fr) clamp(380px, 32vw, 480px); gap: 32px;
+  padding: 28px 24px 40px; max-width: 1500px; margin: 0 auto;
+}
+.stage { min-width: 0; }
+.frame {
+  position: relative; background: var(--video-bg); border: var(--bw) solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-frame); aspect-ratio: 16 / 9; overflow: hidden;
+}
+.frame:fullscreen { box-shadow: none; border: 0; border-radius: 0; aspect-ratio: auto; width: 100%; height: 100%; }
+video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: var(--video-bg); z-index: 0; }
+/* Two stacked players: the active one on top. A crossfade fades the new one in over the old. */
+video.front { z-index: 1; }
+video.dissolving { opacity: 0; }
+.overlay {
+  position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; text-align: center; padding: 16px; background: color-mix(in srgb, var(--bg) 80%, transparent);
+}
+.overlay .big { font-size: clamp(22px, 4vw, 40px); color: var(--accent-2); }
+.overlay .blink { animation: blink 1.2s steps(2, start) infinite; }
+.bar {
+  position: relative; display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; margin-top: 22px;
+}
+.trackinfo { flex: 1 1 260px; min-width: 0; }
+.title { font-size: clamp(18px, 2.4vw, 28px); margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.progline { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.seek {
+  position: relative; flex: 1; min-width: 0; height: 28px; display: flex; align-items: center;
+  cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.seek .prog { width: 100%; height: 8px; border: var(--bw) solid var(--border); border-radius: var(--bar-radius); background: var(--track); overflow: hidden; margin: 0; transition: border-color .08s; }
+.seek:hover .prog, .seek.active .prog { border-color: var(--accent-2); }
+.seek:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.seek.disabled { cursor: default; pointer-events: none; opacity: .5; }
+.seek .ghost { position: absolute; top: 4px; bottom: 4px; width: 2px; margin-left: -1px; background: var(--accent-2); pointer-events: none; }
+.seek .tip {
+  position: absolute; bottom: 100%; transform: translateX(-50%); margin-bottom: 2px; pointer-events: none; z-index: 5;
+  background: var(--bg); color: var(--accent-2); border: var(--bw) solid var(--accent-2); border-radius: var(--radius-sm);
+  padding: 0 8px; line-height: 1.2; white-space: nowrap;
+}
+@media (pointer: coarse) { .seek { height: 44px; } .seek .ghost { top: 10px; bottom: 10px; } }
+.prog i { display: block; height: 100%; width: 0; background: var(--accent); }
+.times { font-family: var(--font-mono); font-size: var(--hud-size); line-height: 1; color: var(--muted); white-space: nowrap; }
+.tools { display: flex; align-items: center; gap: 12px; }
+
+button, .btn {
+  font: var(--display-weight) var(--btn-size) var(--font-display); text-transform: var(--display-case); letter-spacing: var(--display-ls);
+  background: var(--surface); color: var(--text); border: var(--bw) solid var(--border); border-radius: var(--radius-btn);
+  padding: 8px 14px; cursor: pointer; box-shadow: var(--shadow-btn); text-shadow: none;
+  transition: transform .08s, box-shadow .08s, background .08s, color .08s;
+}
+button:hover { box-shadow: var(--shadow-btn-hover); transform: var(--hover-transform); }
+button:active { box-shadow: var(--shadow-btn-active); transform: var(--active-transform); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+
+/* Quiet buttons (Sync, Crossfade, theme palette, editor secondary actions) */
+button.synctoggle, button.ghost {
+  box-shadow: none; border-color: var(--hair); color: var(--muted); background: transparent;
+  font: 400 var(--hud-size) var(--font-mono); letter-spacing: var(--hud-ls); text-transform: var(--hud-case); padding: 4px 10px; min-height: 40px;
+}
+button.synctoggle:hover, button.ghost:hover { box-shadow: none; transform: none; color: var(--accent-3); border-color: var(--accent-3); }
+button.synctoggle:active, button.ghost:active { box-shadow: none; transform: none; }
+button.synctoggle[aria-expanded="true"], button.ghost[aria-expanded="true"] { color: var(--accent-3); border-color: var(--accent-3); }
+button.synctoggle b { color: var(--accent-2); font-weight: 400; }
+button.synctoggle:disabled, button.ghost:disabled { box-shadow: none; }
+button.palette { display: inline-flex; align-items: center; justify-content: center; }
+button.palette svg { width: 20px; height: 20px; fill: currentColor; display: block; }
+.transport button.xfade { align-self: center; min-width: 0; min-height: 40px; padding: 4px 10px; gap: 8px; }
+.xfade .box { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-radius: calc(var(--radius-sm) / 2); position: relative; top: -1px; }
+.xfade[aria-checked="true"] { color: var(--accent-3); border-color: var(--accent-3); }
+.xfade[aria-checked="true"] .box { background: var(--accent-2); border-color: var(--accent-2); }
+[data-shape="arcade"] .xfade[aria-checked="true"] .box { box-shadow: 2px 2px 0 var(--accent); }
+.offset {
+  position: absolute; right: 0; top: 100%; margin-top: 10px; z-index: 30; width: min(460px, 100%);
+  background: var(--surface); border: var(--bw) solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow-pop);
+  padding: 10px 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.offset .hud { color: var(--accent-3); }
+.offset input[type=range] { flex: 1 1 80px; min-width: 60px; accent-color: var(--accent); }
+.offset output { min-width: 5.5ch; white-space: nowrap; text-align: right; font-weight: 700; }
+.offset button { padding: 4px 10px; }
+[data-shape="arcade"] .offset button { box-shadow: 3px 3px 0 var(--accent-3); }
+[data-shape="arcade"] .offset button:hover { box-shadow: 1px 1px 0 var(--accent-3); transform: translate(2px, 2px); }
+[data-shape="arcade"] .offset button:active { box-shadow: 0 0 0 var(--accent-3); transform: translate(3px, 3px); }
+.hint { color: var(--muted); font-size: 12px; margin: 0; flex: 1 1 100%; }
+
+/* Theme menu (viewer's own choice) */
+.menu {
+  position: absolute; right: 16px; top: calc(100% + 6px); z-index: 60; min-width: 250px; max-width: calc(100% - 32px);
+  background: var(--surface); color: var(--text); border: var(--bw) solid var(--border); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-pop); padding: 6px; text-shadow: none;
+}
+.menu button {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; cursor: pointer; min-height: 42px;
+  background: transparent; color: var(--text); border: 0; padding: 6px 10px; border-radius: var(--radius-sm); box-shadow: none; transform: none;
+  font: 400 15px/1.3 var(--font-body); text-transform: none; letter-spacing: 0;
+}
+.menu button:hover, .menu button:focus-visible { background: var(--hover-bg); color: var(--hover-text); box-shadow: none; transform: none; }
+.menu button:active { box-shadow: none; transform: none; }
+.menu button[aria-checked="true"] { color: var(--accent); font-weight: 700; }
+.menu .tick { width: 1.2em; flex: none; }
+.dots { margin-left: auto; display: flex; gap: 4px; flex: none; }
+.dots i { width: 12px; height: 12px; border-radius: 50%; display: block; border: 1px solid color-mix(in srgb, var(--text) 35%, transparent); }
+.menu hr { border: 0; border-top: 1px solid var(--hair); margin: 6px 4px; }
+
+/* Sidebar */
+aside { min-width: 0; display: flex; flex-direction: column; gap: 28px; }
+h2 { margin: 0 0 10px; font-size: 18px; display: flex; align-items: baseline; gap: 10px; }
+h2 .hud { color: var(--accent); }
+.empty { color: var(--muted); border: var(--bw) dashed var(--hair); border-radius: var(--radius); padding: 14px; }
+ol { list-style: none; margin: 0; padding: 0; border: var(--bw) solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-card); max-height: 68vh; overflow-y: auto; }
+li { display: flex; align-items: center; gap: 12px; padding: 10px 14px; min-height: 76px; border-bottom: 1px solid var(--hair); cursor: pointer; }
+li:last-child { border-bottom: 0; }
+li:hover { background: var(--hover-bg); color: var(--hover-text); }
+li:active:not(.dragging) { background: var(--accent-2); color: var(--on-accent); }
+li.busy { opacity: .6; cursor: progress; }
+li:hover .idx { color: var(--hover-muted); }
+.idx { font-family: var(--font-mono); font-size: calc(var(--hud-size) + 4px); color: var(--accent); min-width: 2ch; text-align: center; }
+.idx .pl { display: none; }
+li:hover .idx .num { display: none; }
+li:hover .idx .pl { display: inline; }
+li img { width: 96px; aspect-ratio: 16 / 9; object-fit: cover; border: 1px solid var(--hair); border-radius: var(--radius-sm); flex: none; background: var(--video-bg); }
+li .n { flex: 1; min-width: 0; font-size: 14px; line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+li .d { font-family: var(--font-mono); font-size: var(--hud-size); color: var(--muted); }
+li:hover .d { color: var(--hover-text); }
+
+/* Transport */
+.transport { display: flex; align-items: stretch; gap: 16px; margin-top: 22px; flex-wrap: wrap; }
+.transport button { min-width: 56px; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; padding: 6px 16px; }
+.transport button svg { width: 22px; height: 22px; fill: currentColor; display: block; }
+.transport #pp { background: var(--accent); border-color: var(--pp-border); color: var(--on-accent); box-shadow: var(--shadow-pp); min-width: 72px; }
+.transport #pp:hover { box-shadow: var(--shadow-pp); filter: brightness(1.06); }
+.transport #pp:active { box-shadow: var(--shadow-pp); }
+[data-shape="arcade"] .transport #pp:hover { box-shadow: 3px 3px 0 var(--text); filter: none; }
+[data-shape="arcade"] .transport #pp:active { box-shadow: 0 0 0 var(--text); }
+button:disabled { opacity: .35; cursor: not-allowed; box-shadow: none; transform: none; }
+[data-shape="arcade"] button:disabled { box-shadow: 3px 3px 0 var(--hair); }
+button[aria-busy="true"] { opacity: .6; cursor: progress; }
+.pausebadge {
+  position: absolute; top: 10px; right: 10px; z-index: 2; background: var(--bg); color: var(--accent-2);
+  border: var(--bw) solid var(--accent-2); border-radius: var(--radius-btn); padding: 0 10px;
+}
+[data-shape="arcade"] .pausebadge { box-shadow: 3px 3px 0 var(--accent); }
+.pausebadge i { font-style: normal; animation: blink 1s steps(2, start) infinite; }
+.overlay .sub { color: var(--text); max-width: 46ch; margin: 0; font-size: 14px; }
+.idle-overlay .big { color: var(--accent-3); }
+
+/* Queue interaction */
+ol { position: relative; }
+li { position: relative; }
+li .n:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+a.yt {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+  color: var(--muted); transition: color .08s;
+}
+a.yt svg { width: 22px; height: 15.5px; fill: currentColor; display: block; }
+a.yt:hover, a.yt:focus-visible { color: var(--accent); }
+a.yt:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+li:hover a.yt { color: var(--hover-text); }
+li:hover a.yt:hover { color: var(--accent); }
+.title a.yt { width: 36px; height: 24px; vertical-align: middle; margin-left: 6px; }
+.title a.yt svg { width: 26px; height: 18px; }
+li button.grip, li button.rm {
+  flex: none; width: 40px; height: 40px; min-width: 40px; padding: 0; box-shadow: none; display: inline-flex;
+  align-items: center; justify-content: center; border-width: var(--bw); font-size: 20px; line-height: 1;
+}
+li button.grip { touch-action: none; cursor: grab; border-color: var(--hair); color: var(--muted); }
+li button.grip svg { width: 18px; height: 18px; fill: currentColor; }
+li button.rm { border-color: var(--hair); color: var(--accent); font-family: var(--font-mono); font-size: 28px; }
+li button.grip:hover, li button.rm:hover { transform: none; box-shadow: none; border-color: var(--accent); }
+li:hover button.grip, li:hover button.rm { background: var(--hover-bg); }
+li:hover button.grip, li:hover button.rm { border-color: var(--hover-text); }
+li:hover button.grip { color: var(--hover-text); }
+li:hover button.rm { color: var(--hover-muted); }
+li.dragging { z-index: 5; background: var(--hover-bg); color: var(--hover-text); box-shadow: var(--shadow-pop); border: var(--bw) solid var(--hover-text); cursor: grabbing; }
+[data-shape="arcade"] li.dragging { box-shadow: 4px 4px 0 var(--accent); }
+li.dragging .idx { color: var(--hover-muted); }
+li.dragging .d { color: var(--hover-text); }
+ol.sorting li:not(.dragging) { transition: transform .12s; }
+ol.sorting { user-select: none; -webkit-user-select: none; }
+
+.addform { display: flex; gap: 12px; flex: 1 1 260px; min-width: 0; }
+.addform input {
+  flex: 1 1 auto; min-width: 0; min-height: 48px; background: var(--surface); color: var(--text);
+  border: var(--bw) solid var(--border); border-radius: var(--radius-btn); padding: 8px 12px; font: 400 14px var(--font-body);
+  box-shadow: var(--shadow-input);
+}
+.addform input::placeholder { color: var(--muted); }
+.addform input:disabled { opacity: .4; }
+.addform button { min-height: 48px; flex: none; }
+[data-shape="arcade"] .addform button { box-shadow: 4px 4px 0 var(--accent-2); }
+
+/* Theme editor (only with a `!theme edit` link) */
+.editor {
+  background: var(--surface); border: var(--bw) solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-card);
+  padding: 18px; display: flex; flex-direction: column; gap: 14px; min-width: 0;
+}
+.editor h2 { margin: 0; font-size: 20px; }
+.editor label, .editor .lbl { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.editor input[type=color] { width: 100%; height: 44px; padding: 3px; background: var(--bg); border: var(--bw) solid var(--border); border-radius: var(--radius-sm); cursor: pointer; }
+.editor input[type=text], .editor select {
+  width: 100%; min-height: 44px; padding: 8px 12px; background: var(--bg); color: var(--text);
+  border: var(--bw) solid var(--border); border-radius: var(--radius-sm); font: 400 14px var(--font-body);
+}
+.drop { border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 14px; text-align: center; color: var(--muted); font-size: 13px; }
+.drop.dragover { border-color: var(--accent); color: var(--text); background: var(--hover-bg); }
+.drop input[type=file] { display: block; width: 100%; margin-top: 8px; font-size: 13px; color: var(--text); }
+.editor .btns { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.editor .msg { font-size: 13px; color: var(--accent); min-height: 1.2em; margin: 0; }
+.editor .msg.ok { color: var(--ok); }
+.editor .note { font-size: 12px; color: var(--muted); margin: 0; }
+
+#toast {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 120; max-width: min(92vw, 560px);
+  background: var(--surface); color: var(--text); border: var(--bw) solid var(--accent-3); border-radius: var(--radius-sm); box-shadow: var(--shadow-pop);
+  padding: 4px 14px; font-family: var(--font-mono); font-size: calc(var(--hud-size) + 2px); letter-spacing: var(--hud-ls); text-align: center;
+}
+#toast.err { border-color: var(--accent); color: var(--accent-2); }
+#toast.ok { border-color: var(--ok); color: var(--ok); }
+[data-shape="arcade"] #toast { box-shadow: 4px 4px 0 var(--accent-3); }
+[data-shape="arcade"] #toast.err { box-shadow: 4px 4px 0 var(--accent); }
+[data-shape="arcade"] #toast.ok { box-shadow: 4px 4px 0 var(--ok); }
+
+/* Ended screen */
+#ended {
+  position: fixed; inset: 0; z-index: 50; background: var(--bg);
+  display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center;
+}
+#ended .card { background: var(--surface); border: var(--bw) solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-frame); padding: 36px 28px; max-width: 560px; }
+#ended h1 { font-size: clamp(32px, 8vw, 64px); margin: 8px 0 16px; line-height: 1; }
+#ended p { color: var(--muted); margin: 8px 0; }
+
+@media (max-width: 900px) {
+  main { grid-template-columns: minmax(0, 1fr); gap: 28px; padding: 18px 16px 32px; }
+  header { padding: 12px 16px; }
+  ol { max-height: none; }
+  .where b { max-width: 60vw; }
+  .menu { right: 8px; }
+}
+@media (max-width: 480px) {
+  li { gap: 8px; padding: 6px 8px; min-height: 64px; }
+  .seek { height: 44px; }
+  .seek .ghost { top: 10px; bottom: 10px; }
+  a.yt { width: 40px; height: 40px; }
+  .title a.yt { width: 40px; height: 40px; margin: -8px 0 -8px 2px; }
+  li img { display: none; }
+  .transport { gap: 12px; }
+  .addform { flex-basis: 100%; }
+  .bar button, .offset button { min-height: 44px; min-width: 44px; }
+  button.synctoggle, button.ghost { min-height: 44px; }
+  .offset input[type=range] { min-height: 40px; }
+}
+@media (prefers-reduced-motion: reduce) { .live i, .blink, .pausebadge i { animation: none !important; } }
+</style>
+
+<style>
+body { padding-bottom: 56px; }
+.demo-ribbon { position: fixed; z-index: 99999; left: 50%; bottom: 10px; transform: translateX(-50%);
+  display: flex; gap: 10px; align-items: center; padding: 6px 14px; border-radius: 999px;
+  background: rgba(16,16,16,.88); color: #fff; font: 600 12px/1.2 system-ui, sans-serif;
+  letter-spacing: .02em; box-shadow: 0 2px 12px rgba(0,0,0,.4); max-width: calc(100vw - 24px); }
+.demo-ribbon a { color: #ffd166; text-decoration: underline; white-space: nowrap; }
+.demo-ribbon a:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+@media (max-width: 520px) { .demo-ribbon { font-size: 11px; gap: 8px; padding: 6px 10px; } }
+</style>
+</head>
+<body>
+<header id="header">
+  <img class="logoimg" id="logoimg" alt="" hidden>
+  <h1 class="wordmark display" id="wordmark">DJ <span>Snake</span></h1>
+  <div class="where hud"><span id="guild">—</span><b id="channel" class="hud" style="font-weight:400"></b></div>
+  <div class="spacer"></div>
+  <span id="net" class="badge net hud" hidden>Reconnexion…</span>
+  <span id="live" class="badge live off hud"><i>●</i> <span id="livetxt">HORS SYNC</span></span>
+  <span class="hud credits">CREDITS: ∞</span>
+  <button id="palbtn" class="ghost palette" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="thememenu" aria-label="Changer de thème" title="Changer de thème">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0 0 18c1.4 0 2-.9 2-1.8 0-.5-.2-.9-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.4 17 3 12 3zM7.5 12a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>
+  </button>
+  <div class="menu" id="thememenu" role="menu" aria-label="Thème" hidden></div>
+</header>
+
+<main>
+  <section class="stage">
+    <div class="frame" id="frame">
+      <video id="video" class="front" muted playsinline preload="auto"></video>
+      <video id="video2" muted playsinline preload="auto" aria-hidden="true"></video>
+      <div class="pausebadge hud" id="pausebadge" hidden><i>❚❚</i> PAUSE</div>
+      <div class="overlay" id="overlay">
+        <div class="hud blink" id="overlayhud" style="color:var(--accent-3)">PLAYER 1 — READY</div>
+        <div class="big display" id="overlaytxt">Connexion…</div>
+        <p class="sub" id="overlaysub" hidden></p>
+      </div>
+    </div>
+    <div class="transport" role="group" aria-label="Contrôles de lecture">
+      <button id="prev" type="button" aria-label="Morceau précédent" title="Précédent" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h3v14H5zM20 5v14L9 12z"/></svg></button>
+      <button id="pp" type="button" aria-label="Pause" title="Pause" disabled><svg id="ppicon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg></button>
+      <button id="next" type="button" aria-label="Morceau suivant" title="Suivant" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h3v14h-3zM4 5v14l11-7z"/></svg></button>
+      <button id="xfade" class="synctoggle xfade" type="button" role="switch" aria-checked="false" title="Fondu enchaîné entre les morceaux (pour tout le salon)" disabled><span class="box" aria-hidden="true"></span>Crossfade</button>
+      <form id="addform" class="addform" autocomplete="off">
+        <input id="addurl" type="text" inputmode="url" placeholder="Colle un lien YouTube…" aria-label="Lien YouTube à ajouter" disabled>
+        <button id="addbtn" type="submit" aria-label="Ajouter à la file" disabled>Ajouter</button>
+      </form>
+    </div>
+    <div class="bar">
+      <div class="trackinfo">
+        <h2 class="title display" id="title" style="display:block">&nbsp;</h2>
+        <div class="progline" id="progline" hidden>
+          <div class="seek disabled" id="seek" role="slider" tabindex="-1" aria-label="Position dans le morceau" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="00:00" aria-disabled="true">
+            <div class="prog"><i id="progfill"></i></div>
+            <span class="ghost" id="seekghost" hidden></span>
+            <span class="tip hud" id="seektip" hidden>00:00</span>
+          </div>
+          <span class="times"><span id="tcur">00:00</span> / <span id="tdur">--:--</span></span>
+        </div>
+      </div>
+      <div class="tools">
+        <button id="synctoggle" class="synctoggle" type="button" aria-expanded="false" aria-controls="syncpanel" title="Décalage image / son">⚙ Sync<b id="syncbadge" hidden></b></button>
+        <button id="fs" type="button">Plein écran</button>
+      </div>
+      <div class="offset" id="syncpanel" role="group" aria-label="Décalage de synchronisation" hidden>
+        <span class="hud" style="color:var(--accent-3)">Décalage</span>
+        <input id="offset" type="range" min="-2" max="2" step="0.05" value="0" aria-label="Décalage en secondes">
+        <output id="offsetval">0.00 s</output>
+        <button id="offsetreset" type="button" aria-label="Remettre le décalage à zéro">0</button>
+        <p class="hint">Le son vient de Discord, la vidéo est muette. Si l'image est en avance ou en retard sur le son, ajuste le décalage.</p>
+      </div>
+    </div>
+  </section>
+
+  <aside>
+    <section class="editor" id="editor" aria-labelledby="edh" hidden>
+      <h2 class="display" id="edh">Thème du serveur</h2>
+      <p class="note">Le thème par défaut de la page pour tout le serveur. Chaque spectateur peut toujours choisir le sien avec le bouton palette.</p>
+      <div>
+        <label for="e-skin">Thème</label>
+        <select id="e-skin">
+          <option value="arcade">Arcade</option><option value="minimal">Minimal</option><option value="nuit">Nuit</option>
+          <option value="vinyle">Vinyle</option><option value="club">Club</option><option value="terminal">Terminal</option>
+          <option value="perso">Perso (couleurs personnalisées)</option>
+        </select>
+      </div>
+      <div id="e-perso" hidden>
+        <div class="row3">
+          <div><label for="e-bg">Fond</label><input type="color" id="e-bg" value="#101820"></div>
+          <div><label for="e-text">Texte</label><input type="color" id="e-text" value="#f2f2f2"></div>
+          <div><label for="e-accent">Accent</label><input type="color" id="e-accent" value="#ffb703"></div>
+        </div>
+        <p class="note" style="margin-top:8px">Surface, bordures et textes secondaires sont déduits automatiquement.</p>
+        <div style="margin-top:14px">
+          <label for="e-base">Style de base (polices, formes, effets)</label>
+          <select id="e-base">
+            <option value="arcade">Arcade</option><option value="minimal">Minimal</option><option value="nuit">Nuit</option>
+            <option value="vinyle">Vinyle</option><option value="club">Club</option><option value="terminal">Terminal</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label for="e-name">Nom de la communauté</label>
+        <input type="text" id="e-name" maxlength="32" placeholder="DJ Snake" autocomplete="off">
+      </div>
+      <div>
+        <span class="lbl" id="logolbl">Logo (PNG, JPEG, WebP ou GIF, 512 Ko max), enregistré dès l'envoi</span>
+        <div class="drop" id="drop">
+          Glisse une image ici ou dans l'en-tête
+          <input type="file" id="e-logo" accept="image/png,image/jpeg,image/webp,image/gif" aria-labelledby="logolbl">
+        </div>
+      </div>
+      <div class="btns">
+        <button id="e-save" type="button">Enregistrer</button>
+        <button id="e-revert" class="ghost" type="button">Annuler les changements</button>
+        <button id="e-logoclear" class="ghost" type="button" hidden>Retirer le logo</button>
+      </div>
+      <p class="msg" id="e-msg" role="status" aria-live="polite"></p>
+    </section>
+    <div>
+      <h2 class="display"><span class="hud" id="qcount">00</span> À suivre</h2>
+      <ol id="queue" aria-label="File d'attente"></ol>
+      <div id="queueempty" class="empty">La file est vide.</div>
+    </div>
+  </aside>
+</main>
+
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+<div id="ended" hidden>
+  <div class="card">
+    <div class="hud" style="color:var(--accent)">GAME OVER</div>
+    <h1 class="display">Session terminée</h1>
+    <p>Le bot a quitté le salon vocal.</p>
+    <p>Quand DJ Snake reviendra, utilise le nouveau lien posté dans Discord.</p>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const sid = location.pathname.split("/").filter(Boolean)[0] || "";
+  const $ = (id) => document.getElementById(id);
+  // Two stacked <video>s: `video` is the synced one; `back` holds the previous
+  // clip while a crossfade dissolves into the new one.
+  let video = $("video"), back = $("video2");
+  video.muted = back.muted = true; // always muted: sound comes from Discord
+  const XFADE_S = 6;
+
+  const POLL_MS = 2000, ENDED_POLL_MS = 10000;
+  const HARD_SEEK = 1.0, NUDGE_MIN = 0.15, NUDGE_STOP = 0.1;
+  const OFFSET_KEY = "djsnake.offset";
+
+  let offset = 0;
+  try { offset = parseFloat(localStorage.getItem(OFFSET_KEY)) || 0; } catch (e) {}
+  offset = Math.max(-2, Math.min(2, offset));
+
+  let state = null;       // last now_playing snapshot
+  let anchor = 0;         // performance.now() base for elapsed extrapolation
+  let baseElapsed = 0;    // elapsed (incl. latency) at anchor
+  let curId = null;
+  let pendingSeek = false;
+  let failures = 0;
+  let timer = null;
+  let polling = false;
+  let lastQueueSig = "";
+  let inVoice = true, paused = false, canPrev = false, xfade = false;
+  let dissolveTimer = null;
+  let queue = [];          // current (possibly optimistic) queue
+  let dragging = false, deferredQueue = null;
+  let focusAfterRender = null;
+  let again = false;
+  const pending = new Set();
+
+  const fmt = (s) => {
+    if (s == null || !isFinite(s)) return "--:--";
+    s = Math.max(0, Math.floor(s));
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+    const p = (n) => String(n).padStart(2, "0");
+    return h ? `${h}:${p(m)}:${p(r)}` : `${p(m)}:${p(r)}`;
+  };
+
+  // ---- offset control
+  function setOffset(v, save) {
+    offset = Math.round(v * 100) / 100;
+    $("offset").value = offset;
+    const txt = (offset > 0 ? "+" : "") + offset.toFixed(2) + " s";
+    $("offsetval").textContent = txt;
+    $("syncbadge").textContent = " " + txt;
+    $("syncbadge").hidden = offset === 0;
+    if (save) { try { localStorage.setItem(OFFSET_KEY, String(offset)); } catch (e) {} }
+  }
+  setOffset(offset, false);
+  $("offset").addEventListener("input", (e) => setOffset(parseFloat(e.target.value), true));
+  $("offsetreset").addEventListener("click", () => setOffset(0, true));
+
+  function setPanel(open) {
+    $("syncpanel").hidden = !open;
+    $("synctoggle").setAttribute("aria-expanded", String(open));
+  }
+  $("synctoggle").addEventListener("click", () => setPanel($("syncpanel").hidden));
+  document.addEventListener("click", (e) => {
+    if (!$("syncpanel").hidden && !e.target.closest("#syncpanel, #synctoggle")) setPanel(false);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("syncpanel").hidden) { setPanel(false); $("synctoggle").focus(); }
+  });
+
+  // ---- fullscreen
+  $("fs").addEventListener("click", () => {
+    const f = $("frame");
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (f.requestFullscreen) f.requestFullscreen().catch(() => {});
+    else if (video.webkitEnterFullscreen) video.webkitEnterFullscreen();
+  });
+
+  // ---- UI helpers
+  function setLive(on, label) {
+    $("live").classList.toggle("off", !on);
+    $("livetxt").textContent = on ? "LIVE" : (label || "HORS SYNC");
+  }
+  function overlay(text, sub, idle) {
+    $("overlay").hidden = !text;
+    $("overlay").classList.toggle("idle-overlay", !!idle);
+    $("overlayhud").hidden = !!idle;
+    $("overlaysub").hidden = !sub;
+    $("overlaysub").textContent = sub || "";
+    if (text) $("overlaytxt").textContent = text;
+  }
+  let toastTimer = null;
+  function toast(msg, kind) {
+    const t = $("toast");
+    t.textContent = msg;
+    t.className = kind || "";
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.hidden = true; }, kind === "err" ? 5000 : 3000);
+  }
+  const YT = '<svg viewBox="0 0 24 17" aria-hidden="true"><path d="M23.5 2.7A3 3 0 0 0 21.4.5C19.5 0 12 0 12 0S4.5 0 2.6.5A3 3 0 0 0 .5 2.7C0 4.6 0 8.5 0 8.5s0 3.9.5 5.8a3 3 0 0 0 2.1 2.2C4.5 17 12 17 12 17s7.500 0 9.400-.5a3 3 0 0 0 2.100-2.200c.5-1.900.5-5.800.5-5.800s0-3.900-.5-5.800zM9.600 12.100V4.900l6.200 3.600z"/></svg>';
+  function ytLink(url) {
+    // url is a server string: only http(s) targets become links
+    if (!/^https?:\/\//i.test(url || "")) return null;
+    const a = mk("a", "yt");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.title = "Ouvrir sur YouTube";
+    a.setAttribute("aria-label", "Ouvrir sur YouTube");
+    a.innerHTML = YT; // static markup, no server data
+    return a;
+  }
+  function mk(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function safeImg(url, cls) {
+    const img = mk("img", cls);
+    img.alt = "";
+    img.loading = "lazy";
+    img.referrerPolicy = "no-referrer";
+    if (url) img.src = url;
+    return img;
+  }
+
+  const GRIP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h3v3H8zM13 5h3v3h-3zM8 10.5h3v3H8zM13 10.5h3v3h-3zM8 16h3v3H8zM13 16h3v3h-3z"/></svg>';
+
+  function renderQueue(q) {
+    queue = q;
+    if (dragging) { deferredQueue = q; return; }
+    const sig = JSON.stringify(q.map((t) => [t.id, t.title, t.duration, t.url, t.thumbnail]));
+    if (sig === lastQueueSig) return;
+    lastQueueSig = sig;
+    const ol = $("queue");
+    ol.textContent = "";
+    q.forEach((t, i) => {
+      const li = mk("li");
+      li.dataset.id = t.id;
+      const grip = mk("button", "grip");
+      grip.type = "button";
+      grip.innerHTML = GRIP; // static markup, no server data
+      grip.setAttribute("aria-label", "Déplacer « " + t.title + " » (glisser, ou flèches haut et bas)");
+      grip.dataset.id = t.id;
+      li.appendChild(grip);
+      const idx = mk("span", "idx");
+      idx.appendChild(mk("span", "num", String(i + 1).padStart(2, "0")));
+      idx.appendChild(mk("span", "pl", "▶"));
+      li.appendChild(idx);
+      li.title = "Lire maintenant";
+      if (t.thumbnail) li.appendChild(safeImg(t.thumbnail));
+      const n = mk("span", "n");
+      n.textContent = t.title;
+      n.tabIndex = 0;
+      n.setAttribute("role", "button");
+      n.setAttribute("aria-label", "Lire maintenant « " + t.title + " »");
+      li.appendChild(n);
+      const yt = ytLink(t.url);
+      if (yt) li.appendChild(yt);
+      li.appendChild(mk("span", "d", fmt(t.duration)));
+      const rm = mk("button", "rm", "×");
+      rm.type = "button";
+      rm.setAttribute("aria-label", "Retirer « " + t.title + " » de la file");
+      li.appendChild(rm);
+      ol.appendChild(li);
+    });
+    $("qcount").textContent = String(q.length).padStart(2, "0");
+    $("queueempty").hidden = q.length > 0;
+    ol.hidden = q.length === 0;
+    if (focusAfterRender != null) {
+      const g = [...ol.querySelectorAll("button.grip")].find((b) => b.dataset.id === focusAfterRender);
+      focusAfterRender = null;
+      if (g) g.focus();
+    }
+  }
+
+  // ---- queue actions (optimistic)
+  function moveLocal(from, to) {
+    const q = queue.slice();
+    const [it] = q.splice(from, 1);
+    q.splice(to, 0, it);
+    renderQueue(q);
+  }
+  function doMove(from, to, focusId) {
+    if (from === to || from < 0 || to < 0 || to >= queue.length) return;
+    const id = queue[from].id;
+    if (focusId) focusAfterRender = id;
+    moveLocal(from, to);
+    send("move", { id, index: to });
+  }
+  $("queue").addEventListener("click", (e) => {
+    if (e.target.closest("a.yt, button.grip")) return;
+    const rm = e.target.closest("button.rm");
+    if (rm) {
+      if (!inVoice) return;
+      const id = rm.closest("li").dataset.id;
+      rm.disabled = true;
+      renderQueue(queue.filter((t) => t.id !== id));
+      send("remove", { id });
+      return;
+    }
+    const li = e.target.closest("li");
+    if (li) jumpTo(li);
+  });
+  function jumpTo(li) {
+    if (!inVoice || dragging || pending.has("jump")) return;
+    li.classList.add("busy");
+    send("jump", { id: li.dataset.id });
+  }
+  $("queue").addEventListener("keydown", (e) => {
+    const n = e.target.closest && e.target.closest("span.n");
+    if (!n || (e.key !== "Enter" && e.key !== " ")) return;
+    e.preventDefault();
+    jumpTo(n.closest("li"));
+  });
+  $("queue").addEventListener("keydown", (e) => {
+    const g = e.target.closest && e.target.closest("button.grip");
+    if (!g || !inVoice || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+    e.preventDefault();
+    const from = queue.findIndex((t) => t.id === g.dataset.id);
+    doMove(from, from + (e.key === "ArrowUp" ? -1 : 1), true);
+  });
+
+  // pointer drag-and-drop (mouse + touch), started from the grip only
+  $("queue").addEventListener("pointerdown", (e) => {
+    const g = e.target.closest("button.grip");
+    if (!g || !inVoice || dragging || (e.pointerType === "mouse" && e.button !== 0)) return;
+    const ol = $("queue");
+    const li = g.closest("li");
+    const items = [...ol.children];
+    const from = items.indexOf(li);
+    const geo = items.map((x) => ({ top: x.offsetTop, h: x.offsetHeight }));
+    const h = geo[from].h;
+    const startY = e.clientY, startScroll = ol.scrollTop;
+    let to = from, lastY = startY;
+    dragging = true;
+    deferredQueue = null;
+    g.setPointerCapture(e.pointerId);
+    li.classList.add("dragging");
+    ol.classList.add("sorting");
+    e.preventDefault();
+
+    const layout = () => {
+      const dy = lastY - startY + (ol.scrollTop - startScroll);
+      li.style.transform = "translateY(" + dy + "px)";
+      const center = geo[from].top + h / 2 + dy;
+      to = 0;
+      items.forEach((_, j) => { if (j !== from && geo[j].top + geo[j].h / 2 < center) to++; });
+      items.forEach((x, j) => {
+        if (j === from) return;
+        let sh = 0;
+        if (j > from && j <= to) sh = -h;
+        else if (j < from && j >= to) sh = h;
+        x.style.transform = sh ? "translateY(" + sh + "px)" : "";
+      });
+    };
+    const move = (ev) => {
+      lastY = ev.clientY;
+      layout();
+      const r = ol.getBoundingClientRect();
+      if (ev.clientY < r.top + 24) { ol.scrollTop -= 8; layout(); }
+      else if (ev.clientY > r.bottom - 24) { ol.scrollTop += 8; layout(); }
+    };
+    const end = (cancel) => {
+      g.removeEventListener("pointermove", move);
+      g.removeEventListener("pointerup", up);
+      g.removeEventListener("pointercancel", cancelFn);
+      try { g.releasePointerCapture(e.pointerId); } catch (x) {}
+      dragging = false;
+      ol.classList.remove("sorting");
+      items.forEach((x) => { x.style.transform = ""; x.classList.remove("dragging"); });
+      const deferred = deferredQueue;
+      deferredQueue = null;
+      if (!cancel && to !== from) {
+        const id = queue[from].id;
+        lastQueueSig = ""; // force a rebuild of the rows in their new order
+        moveLocal(from, to);
+        send("move", { id, index: to });
+      } else if (deferred) {
+        renderQueue(deferred);
+      }
+    };
+    const up = () => end(false);
+    const cancelFn = () => end(true);
+    g.addEventListener("pointermove", move);
+    g.addEventListener("pointerup", up);
+    g.addEventListener("pointercancel", cancelFn);
+  });
+
+  function showEnded() {
+    $("ended").hidden = false;
+    setLive(false);
+    endDissolve();
+    video.pause();
+    state = null; curId = null; // a revived session reloads the video from scratch
+  }
+
+  // ---- sync
+  function targetPos() {
+    if (!state) return 0;
+    let t = baseElapsed + (paused ? 0 : (performance.now() - anchor) / 1000 + offset);
+    if (state.end) t = Math.min(t, state.end);
+    return Math.max(0, t);
+  }
+
+  function clearVideo(v) {
+    v.pause();
+    if (v.getAttribute("src")) { v.removeAttribute("src"); v.load(); }
+  }
+  // Finish (or cancel) a running dissolve: only the front video remains.
+  function endDissolve() {
+    clearTimeout(dissolveTimer);
+    dissolveTimer = null;
+    video.style.transition = "";
+    video.classList.remove("dissolving");
+    back.classList.remove("front");
+    back.style.transition = "";
+    clearVideo(back);
+  }
+
+  function loadTrack(np, crossfading) {
+    // Crossfade (the server says the audio overlaps): the clip on screen stays
+    // and keeps playing underneath while the new one loads in the other
+    // element, then fades in over it. A skip or a jump stays an instant swap.
+    const dissolve = crossfading && !!curId && !!video.getAttribute("src") && video.readyState >= 2 && !paused;
+    endDissolve();
+    curId = np.id;
+    pendingSeek = true;
+    if (dissolve) {
+      [video, back] = [back, video];
+      video.removeAttribute("aria-hidden");
+      back.setAttribute("aria-hidden", "true");
+      video.style.transition = "none";
+      video.classList.add("dissolving");
+      video.classList.add("front");
+      back.classList.remove("front");
+      video.dataset.dissolve = "1";
+    } else {
+      video.pause();
+      delete video.dataset.dissolve;
+      overlay("Chargement de la vidéo…");
+    }
+    video.src = np.video_url;
+    video.muted = true;
+    video.load();
+  }
+
+  function onMeta(e) {
+    if (e.target !== video || !pendingSeek) return;
+    pendingSeek = false;
+    try { video.currentTime = targetPos(); } catch (x) {}
+    if (!paused) { const p = video.play(); if (p && p.catch) p.catch(() => {}); }
+    overlay(null);
+    if (video.dataset.dissolve) {
+      delete video.dataset.dissolve;
+      // What is left of the audio overlap (the page may learn of it late).
+      const left = Math.max(0.4, XFADE_S - Math.max(0, targetPos() - (state ? state.start : 0)));
+      void video.offsetWidth; // commit opacity 0 before animating
+      video.style.transition = "opacity " + left.toFixed(2) + "s linear";
+      video.classList.remove("dissolving");
+      dissolveTimer = setTimeout(endDissolve, left * 1000 + 100);
+    }
+  }
+  function onErr(e) {
+    if (e.target !== video) return;
+    if (curId) overlay("Vidéo indisponible…");
+    setLive(false);
+  }
+  for (const v of [video, back]) {
+    v.addEventListener("loadedmetadata", onMeta);
+    v.addEventListener("error", onErr);
+  }
+
+  function correct() {
+    if (!state || !curId || pendingSeek || video.readyState < 1) return;
+    if (paused) {
+      if (dissolveTimer) endDissolve(); // a pause cuts the crossfade short
+      if (!video.paused) video.pause();
+      video.playbackRate = 1;
+      if (Math.abs(video.currentTime - targetPos()) > 0.3) { try { video.currentTime = targetPos(); } catch (e) {} }
+      setLive(false, "PAUSE");
+      return;
+    }
+    if (video.paused && !video.ended) { const p = video.play(); if (p && p.catch) p.catch(() => {}); }
+    const target = targetPos();
+    const drift = video.currentTime - target; // >0: video ahead
+    const abs = Math.abs(drift);
+    if (abs > HARD_SEEK) {
+      try { video.currentTime = target; } catch (e) {}
+      video.playbackRate = 1;
+    } else if (abs > NUDGE_MIN) {
+      video.playbackRate = drift > 0 ? 0.95 : 1.05;
+    } else if (abs <= NUDGE_STOP || video.playbackRate === 1) {
+      video.playbackRate = 1;
+    }
+    setLive(abs <= HARD_SEEK && !video.paused);
+  }
+
+  function tick() {
+    correct();
+    if (state) {
+      const e = curElapsed() - state.start; // bar spans start..end (file time)
+      const dur = state.end - state.start;
+      const pct = dur > 0 ? Math.max(0, Math.min(100, (e / dur) * 100)) : 0;
+      const sk = $("seek"), on = !!dur && inVoice;
+      sk.classList.toggle("disabled", !on);
+      sk.tabIndex = on ? 0 : -1;
+      sk.setAttribute("aria-disabled", String(!on));
+      sk.setAttribute("aria-valuemax", String(Math.floor(dur)));
+      if (!seeking) {
+        $("tcur").textContent = fmt(e);
+        $("progfill").style.width = pct + "%";
+        sk.setAttribute("aria-valuenow", String(Math.floor(e)));
+        sk.setAttribute("aria-valuetext", fmt(e));
+      }
+    }
+  }
+  function curElapsed() {
+    return Math.min(state.end || Infinity, baseElapsed + (paused ? 0 : (performance.now() - anchor) / 1000));
+  }
+
+  // ---- seek bar (click, drag, touch, keyboard)
+  const seekEl = $("seek");
+  let seeking = false, seekFrac = 0;
+  const seekOn = () => !!(state && state.end > state.start && inVoice);
+  function fracAt(x) {
+    const r = seekEl.getBoundingClientRect();
+    return r.width ? Math.max(0, Math.min(1, (x - r.left) / r.width)) : 0;
+  }
+  function showPreview(f) {
+    seekFrac = f;
+    const t = f * (state.end - state.start); // shown relative to start
+    $("seekghost").hidden = false;
+    $("seektip").hidden = false;
+    $("seekghost").style.left = f * 100 + "%";
+    $("seektip").style.left = f * 100 + "%";
+    $("seektip").textContent = fmt(t);
+    if (seeking) {
+      $("progfill").style.width = f * 100 + "%";
+      $("tcur").textContent = fmt(t);
+      seekEl.setAttribute("aria-valuenow", String(Math.floor(t)));
+      seekEl.setAttribute("aria-valuetext", fmt(t));
+    }
+  }
+  function hidePreview() { $("seekghost").hidden = true; $("seektip").hidden = true; }
+  function seekTo(pos) {
+    if (!seekOn()) return;
+    pos = Math.max(state.start, Math.min(pos, Math.max(state.start, state.end - 1)));
+    baseElapsed = pos;
+    anchor = performance.now();
+    if (dissolveTimer) endDissolve(); // the server cancels the overlap too
+    if (!pendingSeek && video.readyState >= 1) { try { video.currentTime = targetPos(); } catch (e) {} }
+    tick();
+    send("seek", { position: Math.round(pos * 10) / 10 });
+  }
+  seekEl.addEventListener("pointerdown", (e) => {
+    if (!seekOn() || seeking || (e.pointerType === "mouse" && e.button !== 0)) return;
+    seeking = true;
+    seekEl.classList.add("active");
+    try { seekEl.setPointerCapture(e.pointerId); } catch (x) {}
+    e.preventDefault();
+    showPreview(fracAt(e.clientX));
+  });
+  seekEl.addEventListener("pointermove", (e) => {
+    if (!seekOn()) return;
+    if (seeking || e.pointerType === "mouse") showPreview(fracAt(e.clientX));
+  });
+  const seekEnd = (commit) => {
+    if (!seeking) return;
+    seeking = false;
+    seekEl.classList.remove("active");
+    hidePreview();
+    if (commit) seekTo(state.start + seekFrac * (state.end - state.start));
+  };
+  seekEl.addEventListener("pointerup", (e) => { if (seeking) { showPreview(fracAt(e.clientX)); seekEnd(true); } });
+  seekEl.addEventListener("pointercancel", () => seekEnd(false));
+  seekEl.addEventListener("pointerleave", () => { if (!seeking) hidePreview(); });
+  seekEl.addEventListener("keydown", (e) => {
+    if (!seekOn() || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+    e.preventDefault();
+    seekTo(curElapsed() + (e.key === "ArrowLeft" ? -5 : 5));
+  });
+  setInterval(tick, 200);
+
+  // ---- themes
+  // The server sends the guild's default theme in every state. A viewer can
+  // override the preset locally (localStorage); a `?edit=<token>` link (sent
+  // by `!theme edit` in DMs) opens the editor, whose draft is previewed live.
+  const PRESETS = [
+    ["arcade", "Arcade"], ["minimal", "Minimal"], ["nuit", "Nuit"],
+    ["vinyle", "Vinyle"], ["club", "Club"], ["terminal", "Terminal"],
+  ];
+  const PRESET_IDS = PRESETS.map((p) => p[0]);
+  const SKIN_NAMES = Object.fromEntries(PRESETS.concat([["perso", "Perso"]]));
+  const SKIN_KEY = "djsnake.skin";
+  const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+  const LOGO_MAX = 512 * 1024;
+  const html = document.documentElement;
+  let viewerSkin = "server"; // "server" or a preset id
+  try { const v = localStorage.getItem(SKIN_KEY); if (PRESET_IDS.includes(v)) viewerSkin = v; } catch (e) {}
+  let serverTheme = null;   // last `theme` from the state
+  let serverSig = "";
+  let editToken = null;     // kept in memory only, never stored
+  let draft = null;         // editor draft (edit mode)
+
+  // Take the edit token out of the URL right away (history, screenshots).
+  (() => {
+    const params = new URLSearchParams(location.search);
+    const tok = params.get("edit");
+    if (tok === null) return;
+    if (/^[A-Za-z0-9_-]{16,128}$/.test(tok)) editToken = tok;
+    params.delete("edit");
+    const rest = params.toString();
+    try { history.replaceState(null, "", location.pathname + (rest ? "?" + rest : "") + location.hash); } catch (e) {}
+  })();
+
+  function sanitizeTheme(t) {
+    t = t || {};
+    const logo = typeof t.logo_url === "string" && /^\/theme-logo\/[A-Za-z0-9_-]+\?v=\d+$/.test(t.logo_url) ? t.logo_url : null;
+    return {
+      skin: Object.prototype.hasOwnProperty.call(SKIN_NAMES, t.skin) ? t.skin : "arcade",
+      base: PRESET_IDS.includes(t.base) ? t.base : "nuit",
+      bg: COLOR_RE.test(t.bg) ? t.bg : "#101820",
+      text: COLOR_RE.test(t.text) ? t.text : "#f2f2f2",
+      accent: COLOR_RE.test(t.accent) ? t.accent : "#ffb703",
+      name: typeof t.name === "string" ? t.name.slice(0, 32) : "",
+      logo_url: logo,
+    };
+  }
+  function onAccent(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    const c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2] > 0.35 ? "#101010" : "#ffffff";
+  }
+  // Put a theme's attributes (and perso colors) on an element.
+  function skinElement(el, t) {
+    el.dataset.skin = t.skin;
+    el.dataset.base = t.base;
+    for (const k of ["bg", "text", "accent"]) {
+      if (t.skin === "perso") el.style.setProperty("--c-" + k, t[k]);
+      else el.style.removeProperty("--c-" + k);
+    }
+    if (t.skin === "perso") el.style.setProperty("--c-on-accent", onAccent(t.accent));
+    else el.style.removeProperty("--c-on-accent");
+  }
+  function effectiveTheme() {
+    if (draft) return draft;
+    const t = serverTheme || sanitizeTheme(null);
+    return viewerSkin === "server" ? t : Object.assign({}, t, { skin: viewerSkin });
+  }
+  function brandName() {
+    const t = draft || serverTheme;
+    return (t && t.name.trim()) || "DJ Snake";
+  }
+  function applyTheme() {
+    const t = effectiveTheme();
+    skinElement(html, t);
+    html.dataset.shape = t.skin === "perso" ? t.base : t.skin;
+    const words = brandName().split(/\s+/), last = words.pop();
+    const wm = $("wordmark");
+    wm.textContent = words.length ? words.join(" ") + " " : "";
+    wm.appendChild(mk("span", null, last));
+    const img = $("logoimg");
+    img.hidden = !t.logo_url;
+    img.alt = t.logo_url ? "Logo " + brandName() : "";
+    if (t.logo_url) { if (img.getAttribute("src") !== t.logo_url) img.src = t.logo_url; }
+    else img.removeAttribute("src");
+    $("e-logoclear").hidden = !t.logo_url;
+    buildMenu();
+  }
+  function setServerTheme(raw) {
+    const t = sanitizeTheme(raw);
+    const sig = JSON.stringify(t);
+    if (sig === serverSig) return;
+    serverSig = sig;
+    serverTheme = t;
+    if (editToken && !draft) { draft = Object.assign({}, t); syncEditor(); openEditor(); }
+    applyTheme();
+  }
+
+  // viewer menu
+  const menu = $("thememenu"), palbtn = $("palbtn");
+  function dots(t) {
+    const s = mk("span", "dots");
+    s.setAttribute("aria-hidden", "true");
+    skinElement(s, t);
+    for (const v of ["--bg", "--accent", "--accent-2"]) {
+      const i = mk("i");
+      i.style.background = "var(" + v + ")";
+      s.appendChild(i);
+    }
+    return s;
+  }
+  function buildMenu() {
+    if (menu.hidden) return;
+    const focused = document.activeElement && menu.contains(document.activeElement) ? document.activeElement.dataset.choice : null;
+    menu.textContent = "";
+    const st = serverTheme || sanitizeTheme(null);
+    const item = (choice, label, t) => {
+      const b = mk("button");
+      b.type = "button";
+      b.dataset.choice = choice;
+      b.setAttribute("role", "menuitemradio");
+      b.setAttribute("aria-checked", String(viewerSkin === choice));
+      b.appendChild(mk("span", "tick", viewerSkin === choice ? "✓" : ""));
+      b.appendChild(mk("span", null, label));
+      b.appendChild(dots(t));
+      menu.appendChild(b);
+    };
+    item("server", "Thème du serveur (par défaut) · " + SKIN_NAMES[st.skin], st);
+    menu.appendChild(mk("hr"));
+    PRESETS.forEach(([id, name]) => item(id, name, Object.assign({}, st, { skin: id })));
+    if (focused) { const f = menu.querySelector('[data-choice="' + focused + '"]'); if (f) f.focus(); }
+  }
+  function openMenu() {
+    menu.hidden = false;
+    palbtn.setAttribute("aria-expanded", "true");
+    buildMenu();
+    (menu.querySelector('[aria-checked="true"]') || menu.querySelector("button")).focus();
+  }
+  function closeMenu() { menu.hidden = true; palbtn.setAttribute("aria-expanded", "false"); }
+  palbtn.addEventListener("click", () => (menu.hidden ? openMenu() : closeMenu()));
+  menu.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    viewerSkin = b.dataset.choice;
+    try { localStorage.setItem(SKIN_KEY, viewerSkin); } catch (x) {}
+    closeMenu();
+    applyTheme();
+    palbtn.focus();
+  });
+  document.addEventListener("click", (e) => {
+    if (!menu.hidden && !menu.contains(e.target) && !palbtn.contains(e.target)) closeMenu();
+  });
+  menu.addEventListener("keydown", (e) => {
+    const items = [...menu.querySelectorAll("button")], i = items.indexOf(document.activeElement);
+    if (e.key === "ArrowDown") { e.preventDefault(); items[(i + 1) % items.length].focus(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+    else if (e.key === "Escape") { closeMenu(); palbtn.focus(); }
+    else if (e.key === "Tab") closeMenu();
+  });
+
+  // editor (edit link only)
+  function editMsg(text, ok) {
+    $("e-msg").textContent = text || "";
+    $("e-msg").classList.toggle("ok", !!ok);
+  }
+  function openEditor() {
+    $("editor").hidden = false;
+    palbtn.hidden = true; // the preview shows the draft, not the viewer's pick
+  }
+  function syncEditor() {
+    if (!draft) return;
+    $("e-skin").value = draft.skin;
+    $("e-bg").value = draft.bg;
+    $("e-text").value = draft.text;
+    $("e-accent").value = draft.accent;
+    $("e-base").value = draft.base;
+    $("e-name").value = draft.name;
+    $("e-perso").hidden = draft.skin !== "perso";
+  }
+  const editField = (id, key) => $(id).addEventListener("input", (e) => {
+    if (!draft) return;
+    draft[key] = e.target.value;
+    $("e-perso").hidden = draft.skin !== "perso";
+    editMsg("");
+    applyTheme();
+  });
+  editField("e-skin", "skin"); editField("e-bg", "bg"); editField("e-text", "text");
+  editField("e-accent", "accent"); editField("e-base", "base"); editField("e-name", "name");
+  $("e-revert").addEventListener("click", () => {
+    if (!serverTheme) return;
+    draft = Object.assign({}, serverTheme);
+    syncEditor();
+    editMsg("");
+    applyTheme();
+  });
+
+  // POST/DELETE to a theme route with the edit token; returns the new theme or null.
+  async function themeRequest(path, method, body, type) {
+    const headers = { "X-Edit-Token": editToken };
+    if (type) headers["Content-Type"] = type;
+    try {
+      const r = await fetch("/api/" + encodeURIComponent(sid) + path, { method, headers, body });
+      let j = null;
+      try { j = await r.json(); } catch (e) {}
+      if (r.ok && j && j.ok) return j.theme;
+      editMsg((j && j.error) || "Enregistrement impossible (erreur " + r.status + ").");
+    } catch (e) {
+      editMsg("Réseau indisponible, réessaie.");
+    }
+    return null;
+  }
+  function adoptSaved(t, keepDraft) {
+    serverTheme = sanitizeTheme(t);
+    serverSig = JSON.stringify(serverTheme);
+    if (keepDraft) draft.logo_url = serverTheme.logo_url; // other edits stay pending
+    else { draft = Object.assign({}, serverTheme); syncEditor(); }
+    applyTheme();
+  }
+  $("e-save").addEventListener("click", async () => {
+    if (!draft || !editToken) return;
+    const name = draft.name.trim();
+    if (name.length > 32) { editMsg("Nom trop long (32 caractères maximum)."); return; }
+    const btn = $("e-save");
+    btn.disabled = true;
+    const body = JSON.stringify({ skin: draft.skin, base: draft.base, bg: draft.bg, text: draft.text, accent: draft.accent, name });
+    const t = await themeRequest("/theme", "POST", body, "application/json");
+    btn.disabled = false;
+    if (t) { adoptSaved(t, false); editMsg("Thème enregistré.", true); }
+  });
+  async function uploadLogo(file) {
+    editMsg("");
+    if (!file || !editToken || !draft) return;
+    if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) { editMsg("Format non pris en charge (PNG, JPEG, WebP ou GIF)."); return; }
+    if (file.size > LOGO_MAX) { editMsg("Image trop lourde (512 Ko maximum)."); return; }
+    editMsg("Envoi du logo…", true);
+    const t = await themeRequest("/theme/logo", "POST", file, file.type);
+    $("e-logo").value = "";
+    if (t) { adoptSaved(t, true); editMsg("Logo enregistré.", true); }
+  }
+  $("e-logo").addEventListener("change", (e) => uploadLogo(e.target.files[0]));
+  $("e-logoclear").addEventListener("click", async () => {
+    if (!editToken || !draft) return;
+    const t = await themeRequest("/theme/logo", "DELETE", null, null);
+    if (t) { adoptSaved(t, true); editMsg("Logo retiré.", true); }
+  });
+  for (const el of [$("drop"), $("header")]) {
+    el.addEventListener("dragover", (e) => { if (!draft) return; e.preventDefault(); el.classList.add("dragover"); });
+    el.addEventListener("dragleave", () => el.classList.remove("dragover"));
+    el.addEventListener("drop", (e) => {
+      if (!draft) return;
+      e.preventDefault();
+      el.classList.remove("dragover");
+      uploadLogo(e.dataTransfer.files[0]);
+    });
+  }
+  if (editToken) {
+    // Keep a missed drop from navigating away from the editor.
+    window.addEventListener("dragover", (e) => e.preventDefault());
+    window.addEventListener("drop", (e) => e.preventDefault());
+  }
+  applyTheme();
+
+  // ---- polling
+  function apply(d, latency) {
+    $("ended").hidden = true;
+    if (d.theme) setServerTheme(d.theme);
+    inVoice = d.in_voice !== false;
+    paused = !!d.paused && inVoice;
+    canPrev = !!d.can_previous;
+    if (!pending.has("crossfade")) xfade = !!d.crossfade;
+    $("pausebadge").hidden = !(paused && d.now_playing);
+    $("guild").textContent = d.guild || "—";
+    $("channel").textContent = d.channel ? " # " + d.channel : "";
+    renderQueue(d.queue || []);
+    const np = d.now_playing;
+    if (!inVoice) {
+      state = null; curId = null;
+      endDissolve();
+      clearVideo(video);
+      $("title").textContent = ""; $("title").dataset.sig = "";
+      $("progline").hidden = true;
+      overlay("En pause", "DJ Snake n'est dans aucune room. Lance !play dans Discord pour reprendre, ce lien reste valable.", true);
+      setLive(false, "EN PAUSE");
+      updateControls();
+      return;
+    }
+    if (!np) {
+      state = null; curId = null;
+      endDissolve();
+      clearVideo(video);
+      $("title").textContent = "";
+      $("progline").hidden = true;
+      overlay(d.loading ? "Le bot prépare le morceau…" : "En attente d'un morceau…");
+      setLive(false);
+      updateControls();
+      return;
+    }
+    const tl = $("title"), tsig = np.id + "|" + np.title + "|" + np.url;
+    if (tl.dataset.sig !== tsig) {
+      tl.dataset.sig = tsig;
+      tl.textContent = "";
+      tl.appendChild(document.createTextNode(np.title));
+      const yt = ytLink(np.url);
+      if (yt) tl.appendChild(yt);
+    }
+    document.title = np.title + " — " + brandName();
+    // Automix window in file time; older servers send neither field.
+    const start = np.start || 0, end = np.end || np.duration || 0;
+    state = { duration: np.duration, start: start, end: end };
+    $("tdur").textContent = fmt(end ? end - start : null);
+    $("progline").hidden = false;
+    baseElapsed = (np.elapsed || 0) + (paused ? 0 : latency);
+    anchor = performance.now();
+    if (np.id !== curId) loadTrack(np, !!d.crossfading);
+    updateControls();
+  }
+
+  // ---- controls
+  function updateControls() {
+    const dis = (id, v) => { $(id).disabled = !!v; };
+    dis("prev", !inVoice || !canPrev || pending.has("previous"));
+    dis("next", !inVoice || pending.has("next"));
+    dis("pp", !inVoice || !state || pending.has("pause") || pending.has("resume"));
+    dis("addurl", !inVoice);
+    dis("addbtn", !inVoice || pending.has("add"));
+    dis("xfade", !inVoice || pending.has("crossfade"));
+    $("xfade").setAttribute("aria-checked", String(xfade));
+    const pp = $("pp");
+    pp.setAttribute("aria-label", paused ? "Reprendre" : "Pause");
+    pp.title = paused ? "Reprendre" : "Pause";
+    $("ppicon").innerHTML = paused ? '<path d="M7 4.5v15l12-7.5z"/>' : '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>';
+  }
+
+  // POST a control action; returns true on success. Always refreshes the state afterwards.
+  async function send(action, extra) {
+    pending.add(action);
+    updateControls();
+    let ok = false;
+    try {
+      const r = await fetch("/api/" + encodeURIComponent(sid) + "/control", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.assign({ action }, extra || {})),
+      });
+      let j = null;
+      try { j = await r.json(); } catch (e) {}
+      if (r.ok && j && j.ok) {
+        ok = true;
+        if (action === "add") toast("Ajouté — téléchargement en cours…", "ok");
+      } else {
+        toast((j && j.error) || "Action impossible (erreur " + r.status + ").", "err");
+      }
+    } catch (e) {
+      toast("Réseau indisponible, réessaie.", "err");
+    } finally {
+      pending.delete(action);
+      updateControls();
+      pollNow();
+    }
+    return ok;
+  }
+  $("prev").addEventListener("click", () => send("previous"));
+  $("next").addEventListener("click", () => send("next"));
+  $("pp").addEventListener("click", () => send(paused ? "resume" : "pause"));
+  $("xfade").addEventListener("click", () => {
+    if (!inVoice || pending.has("crossfade")) return;
+    const want = !xfade;
+    xfade = want; // optimistic; the next poll confirms
+    send("crossfade", { enabled: want }).then((ok) => { if (!ok) xfade = !want; updateControls(); });
+  });
+  $("addform").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const inp = $("addurl");
+    const url = inp.value.trim();
+    if (!url || !inVoice || pending.has("add")) return;
+    if (await send("add", { url })) inp.value = "";
+  });
+
+  async function poll() {
+    if (polling) { again = true; return; }
+    polling = true;
+    again = false;
+    let next = POLL_MS;
+    const t0 = performance.now();
+    try {
+      const r = await fetch("/api/" + encodeURIComponent(sid) + "/state", { cache: "no-store" });
+      const rtt = (performance.now() - t0) / 1000;
+      if (r.status === 404) { failures = 0; $("net").hidden = true; showEnded(); next = ENDED_POLL_MS; return; }
+      if (!r.ok) throw new Error("http " + r.status);
+      const d = await r.json();
+      if (!d.active) { $("net").hidden = true; showEnded(); next = ENDED_POLL_MS; return; }
+      failures = 0;
+      $("net").hidden = true;
+      apply(d, rtt / 2);
+    } catch (e) {
+      failures++;
+      if (failures >= 2) $("net").hidden = false;
+    } finally {
+      polling = false;
+      clearTimeout(timer);
+      timer = setTimeout(poll, again ? 0 : next);
+    }
+  }
+  function pollNow() { clearTimeout(timer); poll(); }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      clearTimeout(timer);
+      poll();
+    }
+  });
+
+  poll();
+})();
+</script>
+
+<div class="demo-ribbon" role="note">
+  <span>Démo — données fictives</span>
+  <a href="?edit=demo">Éditeur de thème</a>
+  <a href="../">À propos</a>
+</div>
+</body>
+</html>
