@@ -4,7 +4,7 @@
 
 **A self-hosted Discord music bot that plays YouTube videos in your voice channel, with a live clip page that shows the video in sync.**
 
-[**Live demo**](https://theroxat.github.io/DJ_Snake/demo/) · [Project page](https://theroxat.github.io/DJ_Snake/) · [Demo video](#demo-video) · [Releases](https://github.com/Theroxat/DJ_Snake/releases) · [Changelog](CHANGELOG.md)
+[**Live demo**](https://theroxat.github.io/DJ_Snake/demo/) · [Project page](https://theroxat.github.io/DJ_Snake/) · [Releases](https://github.com/Theroxat/DJ_Snake/releases) · [Changelog](CHANGELOG.md)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/Theroxat/DJ_Snake/ci.yml?branch=main&label=CI&logo=githubactions&logoColor=white)](https://github.com/Theroxat/DJ_Snake/actions/workflows/ci.yml)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776ab?logo=python&logoColor=white)
@@ -16,7 +16,7 @@
 
 </div>
 
-<a href="https://theroxat.github.io/DJ_Snake/demo/"><img src="docs/screenshots/demo.webp" alt="The clip page: a synced video next to the queue, switching between themes" width="100%"></a>
+<a href="https://theroxat.github.io/DJ_Snake/demo/"><img src="docs/screenshots/demo.webp" alt="DJ Snake joins a Discord voice channel and posts the clip link, then the clip page plays a synced video next to the queue and switches themes" width="100%"></a>
 
 > **This is a self-hosted bot for your own server.** It is an independent project,
 > not affiliated with or endorsed by YouTube or Discord. It runs on your machine
@@ -35,10 +35,6 @@
 - One live status message per session, edited in place instead of spamming the channel.
 - Radio/mix links ask whether to play the single track or the whole playlist.
 - yt-dlp upgrades itself on start, and a PO token sidecar handles YouTube's bot check.
-
-## Demo video
-
-https://github.com/user-attachments/assets/a523ba8e-b93b-4d7e-98ad-c699fd47664a
 
 ## Quick start (Docker Compose)
 
