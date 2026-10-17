@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Spotify links: `!play` and the clip page's add action accept Spotify
+  playlists, albums and tracks (`open.spotify.com` links and `spotify:` URIs).
+  The track list is read from the public embed page (no configuration, 100
+  tracks max) or from the Web API when `SPOTIFY_CLIENT_ID` and
+  `SPOTIFY_CLIENT_SECRET` are set. Each track is searched on YouTube and the
+  best match (duration, title and artist, official video first) is queued;
+  tracks without a match are skipped and counted. Nothing is downloaded from
+  Spotify.
+
 ## [1.0.0] - 2026-10-17
 
 ### Added

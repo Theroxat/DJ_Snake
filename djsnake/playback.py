@@ -6,7 +6,7 @@ import time
 
 import discord
 
-from . import media, state
+from . import media, spotify, state
 from .config import CROSSFADE_SECONDS, FADE_OUT_SECONDS, FRAMES_PER_SECOND
 from .media import crossfade_eligible, playback_options
 from .mixer import CrossfadeMixer
@@ -206,7 +206,9 @@ async def queue_playlist(ctx, player, entries, from_web=False):
     epoch = player.epoch
     stopped = False
     loaded = 0
+    not_found = 0  # Spotify tracks with no YouTube match
     total = len(entries)
+    loop = asyncio.get_running_loop()
 
     def progress(text, final=False):
         player.load_line, player.load_final = text, final
@@ -220,15 +222,27 @@ async def queue_playlist(ctx, player, entries, from_web=False):
                 stopped = True
                 break
 
-            # Build video URL
-            video_id = entry.get("id") or entry.get("url") or entry.get("webpage_url")
-            if not video_id:
-                continue
-
-            if isinstance(video_id, str) and video_id.startswith("http"):
-                video_url = video_id
+            if "spotify" in entry:
+                # A Spotify track: search YouTube for it first.
+                video_url = await loop.run_in_executor(
+                    None, spotify.find_youtube_match, entry["spotify"]
+                )
+                if video_url is None:
+                    if not cancelled(player, epoch):
+                        not_found += 1
+                    continue
             else:
-                video_url = f"https://www.youtube.com/watch?v={video_id}"
+                # Build video URL
+                video_id = (
+                    entry.get("id") or entry.get("url") or entry.get("webpage_url")
+                )
+                if not video_id:
+                    continue
+
+                if isinstance(video_id, str) and video_id.startswith("http"):
+                    video_url = video_id
+                else:
+                    video_url = f"https://www.youtube.com/watch?v={video_id}"
 
             track = await download_and_queue_song(
                 ctx, player, video_url, skip_voice_check=True, quiet=True
@@ -243,13 +257,50 @@ async def queue_playlist(ctx, player, entries, from_web=False):
         progress(f"⏹️ Loading stopped ({loaded}/{total})", final=True)
         return
     text = f"✅ {loaded}/{total} tracks loaded"
-    if loaded < total:
-        text += f" ({total - loaded} unavailable)"
+    missing = []
+    if not_found:
+        missing.append(f"{not_found} not found on YouTube")
+    if total - loaded - not_found > 0:
+        missing.append(f"{total - loaded - not_found} unavailable")
+    if missing:
+        text += f" ({', '.join(missing)})"
     progress(text, final=True)
     # The last track may have finished while the queue was empty during
     # loading: start the queue again, or leave if there is nothing left.
     if not player.is_playing:
         await play_next(ctx)
+
+
+async def queue_spotify(ctx, player, kind, tracks, from_web=False):
+    """Queue the tracks read from a Spotify link: each one is searched on
+    YouTube, and the best match is downloaded like any other track. A list
+    loads in the background like a YouTube playlist."""
+    if kind != "track":
+        await queue_playlist(
+            ctx, player, [{"spotify": track} for track in tracks], from_web=from_web
+        )
+        return
+    epoch = player.epoch
+    track = tracks[0]
+    player.single_downloads += 1
+    refresh_panel(player)
+    try:
+        loop = asyncio.get_running_loop()
+        video_url = await loop.run_in_executor(None, spotify.find_youtube_match, track)
+    finally:
+        player.single_downloads = max(0, player.single_downloads - 1)
+        refresh_panel(player)
+    if cancelled(player, epoch):
+        return
+    if video_url is None:
+        await ctx.send(
+            f"❌ No YouTube match found for **{spotify.describe(track)}**.",
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+        return
+    await download_and_queue_song(
+        ctx, player, video_url, skip_voice_check=from_web, from_web=from_web
+    )
 
 
 async def play_next(ctx, gen=None, origin=None):

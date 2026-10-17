@@ -6,7 +6,7 @@ import math
 import discord
 from discord.ext import commands
 
-from . import media, state
+from . import media, spotify, state
 from .config import (
     COMMAND_PREFIX,
     MAX_PLAYLIST_SIZE,
@@ -22,10 +22,16 @@ from .controls import (
     control_pause,
     control_resume,
     control_seek,
+    read_spotify,
     seek_label,
 )
 from .media import get_video_id_from_url
-from .playback import download_and_queue_song, join_voice_channel, queue_playlist
+from .playback import (
+    download_and_queue_song,
+    join_voice_channel,
+    queue_playlist,
+    queue_spotify,
+)
 from .player import MusicPlayer, discard_tracks
 from .sessions import (
     ack,
@@ -84,7 +90,13 @@ async def record_command_activity(ctx):
 @bot.command(name="play")
 async def play(ctx, url: str = None):
     if url is None:
-        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}play <YouTube URL>`")
+        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}play <YouTube or Spotify link>`")
+        return
+
+    try:
+        spotify_ref = spotify.check_url(url)
+    except spotify.SpotifyError as e:
+        await ctx.send(f"❌ {ControlError(e.code).english}")
         return
 
     if not await join_voice_channel(ctx):
@@ -95,6 +107,10 @@ async def play(ctx, url: str = None):
 
     player = state.music_players[ctx.guild.id]
     player.should_stop = False
+
+    if spotify_ref is not None:
+        await _play_spotify(ctx, player, *spotify_ref)
+        return
 
     try:
         await ack(ctx)
@@ -151,6 +167,26 @@ async def play(ctx, url: str = None):
             if not player.should_stop:
                 await download_and_queue_song(ctx, player, url)
 
+    except Exception as e:
+        await ctx.send(f"❌ An error occurred: {str(e)}")
+
+
+async def _play_spotify(ctx, player, kind, spotify_id):
+    """!play with a Spotify link: read its track list, then queue the
+    YouTube match of each track."""
+    try:
+        await ack(ctx)
+        player.load_line, player.load_final = "🔎 Reading the Spotify link…", False
+        refresh_panel(player)
+        try:
+            tracks = await read_spotify(kind, spotify_id)
+        finally:
+            player.load_line = None
+            refresh_panel(player)
+        if not player.should_stop:
+            await queue_spotify(ctx, player, kind, tracks)
+    except ControlError as e:
+        await ctx.send(f"❌ {e.english}")
     except Exception as e:
         await ctx.send(f"❌ An error occurred: {str(e)}")
 

@@ -18,14 +18,15 @@
 <a href="https://theroxat.github.io/DJ_Snake/demo/"><img src="docs/screenshots/demo.webp" alt="DJ Snake joins a Discord voice channel and posts the clip link, then the clip page plays a synced video with a drag-and-drop queue, jump and seek controls" width="100%"></a>
 
 > **This is a self-hosted bot for your own server.** It is an independent project,
-> not affiliated with or endorsed by YouTube or Discord. It runs on your machine
+> not affiliated with or endorsed by YouTube, Spotify or Discord. It runs on your machine
 > with your own bot token, downloads only the links you give it, and is meant for
 > personal use. Respect YouTube's Terms of Service and the rights of the people
 > whose videos you play. The demo uses Creative Commons footage ([credits](docs/README.md#demo-footage-credits)).
 
 ## Features
 
-- YouTube URLs and playlists. There is no search. Tracks are fully downloaded before they play (no streaming).
+- YouTube URLs and playlists. Tracks are fully downloaded before they play (no streaming).
+- Spotify playlists, albums and tracks: each track is matched to a YouTube video (see [Spotify links](#spotify-links)).
 - Independent queue per server.
 - Live clip page: muted video synced with the audio, plus web controls (next, previous, pause, resume, seek, jump, remove, reorder, add).
 - Automix, always on: SponsorBlock `music_offtopic` segments are cut, loudness is normalised to -14 LUFS, leading and trailing silence is trimmed, and tracks fade in and out.
@@ -66,7 +67,7 @@ The prefix is `!` by default (`COMMAND_PREFIX`).
 
 | Command | Description |
 | --- | --- |
-| `!play <url>` | Join your voice channel and queue a YouTube video or playlist. |
+| `!play <YouTube or Spotify link>` | Join your voice channel and queue a YouTube video or playlist, or a Spotify playlist, album or track. |
 | `!list` | Show the current queue. |
 | `!next` | Skip to the next track. |
 | `!pause` / `!resume` | Pause or resume playback. |
@@ -76,9 +77,19 @@ The prefix is `!` by default (`COMMAND_PREFIX`).
 | `!reset` | Force a clean voice reconnect. |
 | `!theme [preset\|reset\|edit]` | Show or set the clip page's default theme for the server. `edit` DMs you a private editor link. Needs the Manage Server permission. |
 
+## Spotify links
+
+`!play` (and the clip page's add box) also take Spotify links: `https://open.spotify.com/playlist/...`, `/album/...`, `/track/...` or `spotify:playlist:...` URIs. Short `spotify.link` links are refused; open them and copy the `open.spotify.com` address.
+
+The bot never plays or downloads anything from Spotify. It reads the track list (title, artists, duration), searches YouTube for each track and queues the best match: the duration must be close, the title and artist must match, official music videos come first (the clip page shows the video), then official audio and "- Topic" uploads, and live, cover, remix, karaoke, nightcore or sped-up versions are avoided unless the Spotify title says so. It can still pick a wrong version. Tracks with no good match are skipped and counted in the status message ("✅ 8/10 tracks loaded (2 not found on YouTube)"). Lists load in the background like YouTube playlists, up to `MAX_PLAYLIST_SIZE`.
+
+By default no configuration is needed: the list comes from Spotify's public embed page, which shows at most 100 tracks of a playlist or album. To read longer lists, create an app in the [Spotify developer dashboard](https://developer.spotify.com/dashboard) and set `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET`; the bot then uses the Web API and falls back to the embed page if the API refuses a playlist (Spotify hides its own editorial playlists from new apps). Private playlists cannot be read either way.
+
+DJ Snake is not affiliated with or endorsed by Spotify.
+
 ## Clip page
 
-When the bot joins voice it posts a link such as `https://dj.example.com/<session>` and keeps a status message in that text channel. The page shows the video of the current track, the queue, and a progress bar, and lets you skip, go back, pause, resume, seek, play a queued track now, remove, reorder and add YouTube URLs.
+When the bot joins voice it posts a link such as `https://dj.example.com/<session>` and keeps a status message in that text channel. The page shows the video of the current track, the queue, and a progress bar, and lets you skip, go back, pause, resume, seek, play a queued track now, remove, reorder and add YouTube or Spotify links.
 
 A session belongs to the server and survives the bot leaving voice. It expires after `SESSION_IDLE_HOURS` (6 by default) without playback, voice presence, commands or web actions; its files are then deleted.
 
@@ -129,6 +140,7 @@ Set these in `.env` (see `.env.example`).
 | `SESSION_IDLE_HOURS` | `6` | Idle hours before a clip link expires. |
 | `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`) and logos. Compose mounts `./data` there. |
 | `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`. |
+| `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | empty | Optional Spotify Web API credentials, for playlists over 100 tracks. Without them, Spotify links are read from the public embed page. |
 | `YTDLP_AUTO_UPDATE` | `1` | Upgrade yt-dlp on container start (`0` to skip). |
 
 ## Running without Docker
@@ -167,7 +179,7 @@ YouTube breaks yt-dlp extractors every few weeks, usually showing up as `HTTP Er
 
 ## Limits and disclaimer
 
-- YouTube only, at most 720p, and playlists are capped at `MAX_PLAYLIST_SIZE`.
+- YouTube only (Spotify links are matched to YouTube videos), at most 720p, and playlists are capped at `MAX_PLAYLIST_SIZE`.
 - This project is for personal use. Respect YouTube's Terms of Service and the copyright of the content you play; you are responsible for how you use it.
 
 ## Demo site

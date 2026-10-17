@@ -123,6 +123,16 @@ CROSSFADE_MIN_TRACK = 15.0
 FRAMES_PER_SECOND = 50  # discord.py reads 20 ms PCM frames
 PCM_FRAME_SIZE = discord.opus.Encoder.FRAME_SIZE  # 3840 bytes, 48 kHz s16 stereo
 
+# Spotify links: the track list is read from the public embed page (no
+# configuration, at most 100 tracks), or from the Web API when both
+# credentials are set (client credentials flow, full lists). Each track is then
+# searched on YouTube; nothing is ever downloaded from Spotify.
+SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID", "").strip()
+SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", "").strip()
+SPOTIFY_TIMEOUT = 10  # Seconds per HTTP request
+SPOTIFY_MAX_BYTES = 4 * 1024 * 1024  # Larger responses are refused
+YOUTUBE_SEARCH_RESULTS = 5  # Candidates compared per Spotify track
+
 # Only create a temp directory if one wasn't provided. Using tempfile.mkdtemp()
 # directly as the default argument would create an orphan directory on every run
 # because default arguments are evaluated eagerly.

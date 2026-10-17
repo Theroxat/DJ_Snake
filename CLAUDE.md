@@ -91,7 +91,8 @@ which is no longer read), `TEMP_DIR`, `POT_BASE_URL`, `WEB_PORT` (47823),
 `http://localhost:WEB_PORT`), `SESSION_IDLE_HOURS` (6), `DATA_DIR`
 (`/app/data`, mounted from `./data` by Compose; the container's UID 1000 must
 be able to write it), `WEB_THEME` (`arcade`, the theme of guilds that never
-chose one), and `YTDLP_AUTO_UPDATE` (entrypoint only).
+chose one), `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` (optional, both
+needed to use the Spotify Web API), and `YTDLP_AUTO_UPDATE` (entrypoint only).
 
 ## Architecture (`djsnake/`)
 
@@ -111,10 +112,14 @@ Module map, lowest layer first (each imports only the ones above it):
 - `themes.py`: theme storage, logos and `!theme edit` tokens.
 - `media.py`: YouTube URL parsing, yt-dlp (`download_media()`,
   `get_playlist_info()`), the SponsorBlock cut, `analyse_media()`,
-  `playback_options()`, `crossfade_eligible()`.
+  `playback_options()`, `crossfade_eligible()`, and `search_youtube()` (flat
+  `ytsearchN:`).
+- `spotify.py`: Spotify links: `check_url()`, the embed parser and the
+  optional Web API (`get_tracks()`), and YouTube matching (`score_candidate()`,
+  `best_match()`, `find_youtube_match()`).
 - `mixer.py`: `CrossfadeMixer`.
 - `playback.py`: voice connection, `download_and_queue_song()`,
-  `queue_playlist()`, `play_next()` / `_advance()` / `_start_crossfade()`,
+  `queue_playlist()`, `queue_spotify()`, `play_next()` / `_advance()` / `_start_crossfade()`,
   `open_track_source()`.
 - `controls.py`: `ControlError`, the `control_*` functions, `WebContext`.
 - `web.py`: the aiohttp routes and `start_web_server()`.
@@ -176,7 +181,8 @@ Module map, lowest layer first (each imports only the ones above it):
   by Discord commands and the web page and raise `ControlError` (HTTP status,
   French web message, English Discord message). Previous restarts the track
   after 5 s of play or with empty history. Add accepts only YouTube hosts and
-  rebuilds a canonical URL (`parse_youtube_url()`, no SSRF via yt-dlp); `v=`
+  rebuilds a canonical URL (`parse_youtube_url()`, no SSRF via yt-dlp), or a
+  Spotify link (see Spotify links; `control_add()` is async); `v=`
   means one track, otherwise `list=` loads up to `MAX_PLAYLIST_SIZE` in the
   background with a `WebContext` (no author, so it can never join voice).
   Web actions are announced in the session's text channel.
@@ -191,6 +197,36 @@ Module map, lowest layer first (each imports only the ones above it):
   `play_next()` from disconnecting when the queue briefly runs empty during
   that loading. `!stop` sets `should_stop` and bumps `epoch`, which every
   download step checks, and deletes queue, current and history files.
+- **Spotify links** (`spotify.py`): `check_url()` accepts only
+  `open.spotify.com` (`play.spotify.com`) paths `[/intl-xx][/embed]/{playlist|album|track}/{id}`
+  and `spotify:{kind}:{id}` URIs, with a 22-char base62 id; anything else on
+  those hosts raises `bad_url`, and `spotify.link` short links are refused
+  (`spotify_short_link`: following them would mean an arbitrary redirect).
+  Requests are rebuilt from the id, sent by `_http()` (urllib, no redirects
+  followed, `SPOTIFY_TIMEOUT`, `SPOTIFY_MAX_BYTES`) and run in an executor.
+  `get_tracks()` returns `[{title, artists, duration}]` up to
+  `MAX_PLAYLIST_SIZE`: from the Web API (client credentials, paginated, token
+  only sent to `api.spotify.com`) when both credentials are set, else or on
+  failure from the embed page `open.spotify.com/embed/{kind}/{id}`, whose
+  `__NEXT_DATA__` JSON holds `props.pageProps.state.data.entity` (`trackList`
+  items: `title`, `subtitle` = artists joined by ",\u00a0", `duration` in ms;
+  a track has `artists`). The embed lists at most 100 tracks and cannot be
+  paginated; `pageProps.status == 404` means private or missing. Errors are
+  `SpotifyError(code)` with a `ControlError` code (`spotify_not_found` 404,
+  `spotify_empty` 400, `spotify_unreadable` 502: the page changed or Spotify is
+  unreachable). Matching: `search_youtube("{artist} - {title}")` (flat, 5
+  results), then `score_candidate()`: title words (>= half required),
+  artist in title or channel, duration (rejected beyond 2x or under half;
+  official videos up to 90 s longer count as close), official video > official
+  audio / Topic / artist channel, penalties for live, cover, remix, karaoke,
+  lyrics... unless the Spotify title has the word; `MIN_SCORE` 40. The web add
+  reads the list before answering (so its errors are HTTP errors), then loads
+  in the background. A list goes through `queue_playlist()` with `{"spotify":
+  track}` entries (searched one at a time; unmatched ones counted: `✅ k/N
+  tracks loaded (m not found on YouTube)`), a single track through
+  `queue_spotify()`. Queued items are ordinary YouTube tracks. Tests:
+  `tests/test_spotify.py`, fixtures in `tests/fixtures/spotify/`; patch
+  `spotify.get_tracks`, `spotify._http` or `media.search_youtube`.
 - **Gateway reconnects are routine**: discord.py drops and resumes the gateway
   session roughly every couple of hours. Don't do cleanup in `on_disconnect`.
   An earlier handler deleted `TEMP_DIR` there and broke long playlists in the
@@ -262,7 +298,7 @@ Module map, lowest layer first (each imports only the ones above it):
 - **Voice**: `safe_voice_connect()` cleans up any stale voice client, adds
   delays, and retries. It exists to avoid Discord close code 4006 (invalid
   session). `join_voice_channel()` wraps it. `!reset` forces a reconnect.
-- **Commands**: `!play`, `!list`, `!next`, `!pause`, `!resume`, `!seek`
+- **Commands**: `!play` (YouTube or Spotify link), `!list`, `!next`, `!pause`, `!resume`, `!seek`
   (position relative to the track's automix `start`, as the page shows it),
   `!crossfade on|off`, `!stop`, `!reset`, `!theme [preset|reset|edit]`
   (Manage Server permission via `commands.has_guild_permissions`).

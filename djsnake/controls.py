@@ -4,10 +4,16 @@ import asyncio
 import time
 import types
 
-from . import media, state
+from . import media, spotify, state
 from .config import MAX_PLAYLIST_SIZE, PREVIOUS_RESTART_SECONDS
 from .media import parse_youtube_url
-from .playback import cancelled, download_and_queue_song, play_next, queue_playlist
+from .playback import (
+    cancelled,
+    download_and_queue_song,
+    play_next,
+    queue_playlist,
+    queue_spotify,
+)
 from .player import discard_tracks
 from .sessions import refresh_panel
 
@@ -65,8 +71,34 @@ class ControlError(Exception):
         "bad_index": (400, "Position invalide.", "Invalid position."),
         "bad_url": (
             400,
-            "Seuls les liens YouTube (vidéo ou playlist) sont acceptés.",
-            "Only YouTube video or playlist links are accepted.",
+            "Seuls les liens YouTube (vidéo ou playlist) et Spotify (titre, album "
+            "ou playlist) sont acceptés.",
+            "Only YouTube (video or playlist) and Spotify (track, album or "
+            "playlist) links are accepted.",
+        ),
+        "spotify_short_link": (
+            400,
+            "Les liens courts spotify.link ne sont pas pris en charge : ouvre-le "
+            "et copie le lien open.spotify.com.",
+            "Short spotify.link links are not supported: open it and copy the "
+            "open.spotify.com link.",
+        ),
+        "spotify_not_found": (
+            404,
+            "Playlist, album ou titre Spotify introuvable (privé ou supprimé ?).",
+            "That Spotify playlist, album or track was not found (private or "
+            "deleted?).",
+        ),
+        "spotify_empty": (
+            400,
+            "Ce lien Spotify ne contient aucun titre.",
+            "That Spotify link has no tracks.",
+        ),
+        "spotify_unreadable": (
+            502,
+            "Impossible de lire ce lien Spotify pour le moment.",
+            "Could not read that Spotify link right now (Spotify may have "
+            "changed its page).",
         ),
     }
 
@@ -225,19 +257,59 @@ async def control_move(player, track_id, index):
     return track
 
 
-def control_add(player, guild_id, url):
-    """Validate a link and download it in the background."""
+async def control_add(player, guild_id, url):
+    """Validate a link and download it in the background. A Spotify link's
+    track list is read first, so its errors reach the caller."""
+    try:
+        spotify_ref = spotify.check_url(url)
+    except spotify.SpotifyError as e:
+        raise ControlError(e.code)
+    if spotify_ref is not None:
+        if not player.in_voice():
+            raise ControlError("not_in_voice")
+        tracks = await read_spotify(*spotify_ref)
+        _background(_add_spotify_from_web(player, guild_id, spotify_ref[0], tracks))
+        return
     parsed = parse_youtube_url(url)
     if parsed is None:
         raise ControlError("bad_url")
     if not player.in_voice():
         raise ControlError("not_in_voice")
     kind, clean_url = parsed
-    task = asyncio.get_running_loop().create_task(
-        _add_from_web(player, guild_id, kind, clean_url)
-    )
+    _background(_add_from_web(player, guild_id, kind, clean_url))
+
+
+async def read_spotify(kind, spotify_id):
+    """Track list of a Spotify link (up to MAX_PLAYLIST_SIZE). Raises
+    ControlError with the reason it cannot be read."""
+    loop = asyncio.get_running_loop()
+    try:
+        return await loop.run_in_executor(
+            None, spotify.get_tracks, kind, spotify_id, MAX_PLAYLIST_SIZE
+        )
+    except spotify.SpotifyError as e:
+        print(f"Spotify {kind} {spotify_id}: {e}")
+        raise ControlError(e.code)
+
+
+def _background(coro):
+    task = asyncio.get_running_loop().create_task(coro)
     state.background_tasks.add(task)
     task.add_done_callback(state.background_tasks.discard)
+
+
+async def _add_spotify_from_web(player, guild_id, kind, tracks):
+    ctx = WebContext(guild_id, player)
+    epoch = player.epoch
+    player.loading_jobs += 1  # Keeps the bot in voice, as in _add_from_web
+    try:
+        await queue_spotify(ctx, player, kind, tracks, from_web=True)
+    except Exception as e:
+        print(f"Web Spotify add failed: {e}")
+    finally:
+        player.loading_jobs = max(0, player.loading_jobs - 1)
+    if not player.is_playing and not cancelled(player, epoch):
+        await play_next(ctx)
 
 
 async def _add_from_web(player, guild_id, kind, url):
