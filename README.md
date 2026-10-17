@@ -3,7 +3,7 @@
 <p align="center">
   <a href="https://theroxat.github.io/DJ_Snake/demo/"><img src="docs/screenshots/demo.webp" alt="The clip page: a synced video next to the queue, switching between themes" width="860"></a>
   <br>
-  <sub><a href="docs/screenshots/clip-page.png">Static screenshot</a> · <a href="https://theroxat.github.io/DJ_Snake/demo/"><b>Try the live demo</b></a> (fictional data) · <a href="https://theroxat.github.io/DJ_Snake/">Project page</a></sub>
+  <sub><a href="docs/screenshots/clip-page.png">Static screenshot</a> · <a href="https://theroxat.github.io/DJ_Snake/demo/"><b>Try the live demo</b></a> (real CC-BY footage) · <a href="https://theroxat.github.io/DJ_Snake/">Project page</a></sub>
 </p>
 
 A self-hosted Discord music bot that downloads YouTube audio and video, plays it in voice channels with an independent queue per server, and serves a live "clip page" with a synced muted video and web controls. It is meant to run on your own machine for your own server.
@@ -164,6 +164,8 @@ YouTube breaks yt-dlp extractors every few weeks, usually showing up as `HTTP Er
 ## Demo site
 
 `docs/` is a GitHub Pages site: a landing page and a live demo of the real clip page running on fake data. See [docs/README.md](docs/README.md).
+
+Demo footage: excerpts of Caminandes 3, Cosmos Laundromat, Big Buck Bunny, Tears of Steel and Sintel, (c) Blender Foundation / Blender Institute, [CC BY](https://creativecommons.org/licenses/by/3.0/); full credits in [docs/README.md](docs/README.md#demo-footage-credits).
 
 ## Contributing
 

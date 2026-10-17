@@ -25,7 +25,8 @@ body { padding-bottom: 56px; }
 
 RIBBON_HTML = """
 <div class="demo-ribbon" role="note">
-  <span>Démo — données fictives</span>
+  <span title="Extraits de Caminandes 3, Cosmos Laundromat, Big Buck Bunny, Tears of Steel et Sintel (Blender Foundation / Blender Studio, licence CC BY).">Démo — extraits de films CC BY (Blender)</span>
+  <a href="../#credits">Crédits</a>
   <a href="?edit=demo">Éditeur de thème</a>
   <a href="../">À propos</a>
 </div>

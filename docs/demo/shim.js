@@ -1,5 +1,5 @@
 /* DJ Snake demo shim. Fakes the bot's web API in the browser so the real clip
- * page (web/index.html) runs on static hosting. All data is fictional.
+ * page (web/index.html) runs on static hosting. Footage: CC-BY Blender Foundation / Blender Studio films (see docs/README.md).
  * Intercepted: GET /api/{sid}/state, POST /api/{sid}/control,
  * POST /api/{sid}/theme, POST|DELETE /api/{sid}/theme/logo. */
 (() => {
@@ -15,36 +15,40 @@
   } catch (e) {}
 
   const now = () => performance.now() / 1000;
-  const thumb = (a, b) =>
-    "data:image/svg+xml," +
-    encodeURIComponent(
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 9"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' +
-        a + '"/><stop offset="1" stop-color="' + b + '"/></linearGradient></defs><rect width="16" height="9" fill="url(#g)"/></svg>'
-    );
   const media = (n) => new URL("media/clip" + n + ".webm", document.baseURI).href;
+  const thumb = (n) => new URL("media/thumb" + n + ".jpg", document.baseURI).href;
 
+  // Real Creative Commons Attribution films (credits: docs/README.md). Each
+  // clip is a 25 s excerpt of the YouTube video at `url`; titles are the
+  // YouTube titles. The page shows the excerpt length as the duration.
   const CATALOG = [
-    ["Midnight Circuit", "#ff2e63", "#252a34"],
-    ["Velvet Static", "#6a11cb", "#2575fc"],
-    ["Paper Lanterns", "#f6d365", "#fda085"],
-    ["Low Tide Radio", "#00f5a0", "#00d9f5"],
-    ["Electric Garden", "#ff512f", "#dd2476"],
-    ["Glass Highway", "#08d9d6", "#252a34"],
+    ["Caminandes 3: Llamigos", "SkVqJ1SGeL0"],
+    ["Cosmos Laundromat - First Cycle. Official Blender Foundation release.", "Y-rmzh0PI3c"],
+    ["Big Buck Bunny 60fps 4K - Official Blender Foundation Short Film", "aqz-KE-bpKQ"],
+    ["Tears of Steel - Blender VFX Open Movie", "R6MlUcmOul8"],
+    ["Sintel - Open Movie by Blender Foundation", "eRsGyueVLvQ"],
   ];
-  const DURATION = 60, START = 2, END = 58;
+  const DURATION = 25, START = 1, END = 24;
   let seq = 0;
   const mkTrack = (i) => {
-    const c = CATALOG[i % CATALOG.length];
+    const k = i % CATALOG.length;
+    const c = CATALOG[k];
     seq++;
     return {
       id: "demo" + seq,
-      title: c[0] + " (demo)",
+      title: c[0],
       duration: DURATION,
-      thumbnail: thumb(c[1], c[2]),
-      url: "https://www.youtube.com/watch?v=demo" + String(seq).padStart(7, "0"),
-      video_url: media((i % 5) + 1),
+      thumbnail: thumb(k + 1),
+      url: "https://www.youtube.com/watch?v=" + c[1],
+      video_url: media(k + 1),
     };
   };
+
+  // Real YouTube link as example in the add field.
+  document.addEventListener("DOMContentLoaded", () => {
+    const f = document.getElementById("addurl");
+    if (f) f.placeholder = "https://www.youtube.com/watch?v=" + CATALOG[0][1];
+  });
 
   const S = {
     queue: [], history: [], current: null,
@@ -123,9 +127,7 @@
     } else if (a === "add") {
       if (!/^https?:\/\/(www\.|m\.|music\.)?(youtube\.com|youtu\.be)\//i.test(String(d.url || "")))
         return err("Seuls les liens YouTube sont acceptés.", 400);
-      const t = take();
-      t.title = "Piste ajoutée " + seq + " (demo)";
-      S.queue.push(t);
+      S.queue.push(take());
       return json({ ok: true }, 202);
     } else return err("Action inconnue.", 400);
     return json({ ok: true });
