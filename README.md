@@ -11,7 +11,6 @@
 ![Tests](https://img.shields.io/badge/tests-159%20passing-2ea44f)
 [![Release](https://img.shields.io/github/v/release/Theroxat/DJ_Snake?color=ff2c41)](https://github.com/Theroxat/DJ_Snake/releases)
 [![Docker](https://img.shields.io/badge/ghcr.io-amd64%20%7C%20arm64-2496ed?logo=docker&logoColor=white)](https://github.com/Theroxat/DJ_Snake/pkgs/container/dj_snake)
-![Themes](https://img.shields.io/badge/themes-7-ff2c41?labelColor=222)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 </div>
@@ -31,7 +30,7 @@
 - Live clip page: muted video synced with the audio, plus web controls (next, previous, pause, resume, seek, jump, remove, reorder, add).
 - Automix, always on: SponsorBlock `music_offtopic` segments are cut, loudness is normalised to -14 LUFS, leading and trailing silence is trimmed, and tracks fade in and out.
 - Optional crossfade between tracks.
-- Seven clip page themes (Arcade, Minimal, Nuit, Vinyle, Club, Terminal and a custom one with your colors, community name and logo). Server admins set the default, and each viewer can pick their own.
+- Themable clip page: seven looks, including a custom one with your colors, name and logo (see [Themes](#themes) below).
 - One live status message per session, edited in place instead of spamming the channel.
 - Radio/mix links ask whether to play the single track or the whole playlist.
 - yt-dlp upgrades itself on start, and a PO token sidecar handles YouTube's bot check.

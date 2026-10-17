@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DJ Snake — a self-hosted Discord music bot</title>
-<meta name="description" content="A self-hosted Discord music bot with a live clip page: the video of the current track, synced with the audio, plus web controls, automix and seven themes.">
+<meta name="description" content="A self-hosted Discord music bot with a live clip page: the video of the current track, synced with the audio, plus web controls and automix.">
 <meta name="theme-color" content="#0a0a0a">
 <meta property="og:type" content="website">
 <meta property="og:title" content="DJ Snake — a self-hosted Discord music bot">
-<meta property="og:description" content="Live, synced clip page, automix and seven themes. Self-host it with Docker.">
+<meta property="og:description" content="Live, synced clip page, web controls and automix. Self-host it with Docker.">
 <meta property="og:image" content="https://theroxat.github.io/DJ_Snake/social-preview.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -56,8 +56,7 @@ section { padding: 40px 0; }
 .card p { margin: 0; color: var(--muted); font-size: 15px; }
 .card:nth-child(3n+2) { --c: var(--cyan); }
 .card:nth-child(3n+3) { --c: var(--red); }
-.themes { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
-.themes figcaption, .note { color: var(--muted); font-size: 14px; margin-top: 10px; }
+.note { color: var(--muted); font-size: 14px; margin-top: 10px; }
 pre {
   margin: 0; padding: 20px; overflow-x: auto; background: #000; border: 2px solid var(--text);
   box-shadow: 6px 6px 0 var(--cyan); font: 400 15px/1.7 var(--body); color: var(--text);
@@ -95,7 +94,7 @@ footer p { margin: 0 0 10px; }
           <a class="btn alt" href="https://github.com/Theroxat/DJ_Snake">View on GitHub</a>
         </div>
       </div>
-      <img class="shot" src="screenshots/demo.webp" width="1280" height="800" alt="Animation of the clip page: a video plays next to the queue, then the palette menu switches between the Minimal, Club and Terminal themes.">
+      <img class="shot" src="screenshots/demo.webp" width="1280" height="800" alt="Animation: the bot joins a Discord voice channel and posts the clip link, then the clip page plays the video in sync with a drag-and-drop queue and a seek bar.">
     </div>
 
     <section aria-labelledby="features">
@@ -103,19 +102,11 @@ footer p { margin: 0 0 10px; }
       <ul class="grid">
         <li class="card"><h3>Live clip page</h3><p>Every server gets a link with the muted video of the current track, synced with the voice audio, and a queue anyone with the link can control.</p></li>
         <li class="card"><h3>Automix</h3><p>Off-topic segments cut with SponsorBlock, loudness normalised to -14 LUFS, silences trimmed, smooth fades. Optional crossfade between tracks.</p></li>
-        <li class="card"><h3>Seven themes</h3><p>Arcade, Minimal, Nuit, Vinyle, Club, Terminal and a custom one with your colors, name and logo. Admins pick the default, viewers pick their own.</p></li>
+        <li class="card"><h3>Web controls</h3><p>Pause, seek, jump to a track, drag to reorder, remove, or paste a YouTube link to add it, right from the clip page.</p></li>
         <li class="card"><h3>One queue per server</h3><p>Independent queues, playlists and radio links, with previous, seek, jump, reorder and remove from Discord or from the page.</p></li>
         <li class="card"><h3>One live status message</h3><p>A single panel edited in place instead of a channel full of announcements. Commands answer with a reaction.</p></li>
-        <li class="card"><h3>Self-hosted, low upkeep</h3><p>Docker Compose with a PO token sidecar. yt-dlp upgrades itself on start, and it keeps working when YouTube changes.</p></li>
+        <li class="card"><h3>Self-hosted, low upkeep</h3><p>Docker Compose with a PO token sidecar. yt-dlp upgrades itself on start, and it keeps working when YouTube changes. The page is themable, too.</p></li>
       </ul>
-    </section>
-
-    <section aria-labelledby="themes">
-      <h2 id="themes">Make it yours</h2>
-      <figure class="themes" style="margin:0">
-        <img class="shot" style="box-shadow:10px 10px 0 var(--cyan)" src="screenshots/themes.png" width="1212" height="508" alt="The clip page in its six preset themes: Arcade, Minimal, Nuit, Vinyle, Club and Terminal.">
-        <figcaption>Six presets plus a custom theme. <a href="demo/">Switch them yourself in the demo</a>, or open <a href="demo/?edit=demo">the theme editor</a>.</figcaption>
-      </figure>
     </section>
 
     <section id="install" aria-labelledby="install-h">
