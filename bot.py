@@ -2558,18 +2558,25 @@ async def web_theme(request):
         return _control_error(
             400, f"Nom invalide ({THEME_NAME_MAX} caractères maximum)."
         )
-    record = guild_themes.setdefault(guild_id, {})
-    record.update(
-        skin=data["skin"],
-        base=data["base"],
-        bg=data["bg"].lower(),
-        text=data["text"].lower(),
-        accent=data["accent"].lower(),
-        name=name,
-    )
+    previous = guild_themes.get(guild_id)
+    guild_themes[guild_id] = {
+        **(previous or {}),
+        "skin": data["skin"],
+        "base": data["base"],
+        "bg": data["bg"].lower(),
+        "text": data["text"].lower(),
+        "accent": data["accent"].lower(),
+        "name": name,
+    }
     try:
         save_themes()
     except OSError as e:
+        # Keep memory and disk in step: the page would otherwise show a theme
+        # that is lost at the next restart.
+        if previous is None:
+            guild_themes.pop(guild_id, None)
+        else:
+            guild_themes[guild_id] = previous
         print(f"Could not save theme: {e}")
         return _control_error(500, _SAVE_FAILED)
     return _theme_saved(request, player, guild_id)
