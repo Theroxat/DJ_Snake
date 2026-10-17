@@ -1,18 +1,28 @@
+<div align="center">
+
 # DJ Snake
 
-<p align="center">
-  <a href="https://theroxat.github.io/DJ_Snake/demo/"><img src="docs/screenshots/demo.webp" alt="The clip page: a synced video next to the queue, switching between themes" width="860"></a>
-  <br>
-  <sub><a href="#demo-video">Demo video</a> · <a href="docs/screenshots/clip-page.png">Static screenshot</a> · <a href="https://theroxat.github.io/DJ_Snake/demo/"><b>Try the live demo</b></a> (real CC-BY footage) · <a href="https://theroxat.github.io/DJ_Snake/">Project page</a></sub>
-</p>
+**A self-hosted Discord music bot that plays YouTube videos in your voice channel, with a live clip page that shows the video in sync.**
 
-A self-hosted Discord music bot that downloads YouTube audio and video, plays it in voice channels with an independent queue per server, and serves a live "clip page" with a synced muted video and web controls. It is meant to run on your own machine for your own server.
+[**Live demo**](https://theroxat.github.io/DJ_Snake/demo/) · [Project page](https://theroxat.github.io/DJ_Snake/) · [Demo video](#demo-video) · [Releases](https://github.com/Theroxat/DJ_Snake/releases) · [Changelog](CHANGELOG.md)
 
-[![CI](https://github.com/Theroxat/DJ_Snake/actions/workflows/ci.yml/badge.svg)](https://github.com/Theroxat/DJ_Snake/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/Theroxat/DJ_Snake)](https://github.com/Theroxat/DJ_Snake/releases)
-[![Docker image](https://img.shields.io/badge/ghcr.io-theroxat%2Fdj__snake-blue?logo=docker&logoColor=white)](https://github.com/Theroxat/DJ_Snake/pkgs/container/dj_snake)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)
+[![CI](https://img.shields.io/github/actions/workflow/status/Theroxat/DJ_Snake/ci.yml?branch=main&label=CI&logo=githubactions&logoColor=white)](https://github.com/Theroxat/DJ_Snake/actions/workflows/ci.yml)
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776ab?logo=python&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-159%20passing-2ea44f)
+[![Release](https://img.shields.io/github/v/release/Theroxat/DJ_Snake?color=ff2c41)](https://github.com/Theroxat/DJ_Snake/releases)
+[![Docker](https://img.shields.io/badge/ghcr.io-amd64%20%7C%20arm64-2496ed?logo=docker&logoColor=white)](https://github.com/Theroxat/DJ_Snake/pkgs/container/dj_snake)
+![Themes](https://img.shields.io/badge/themes-7-ff2c41?labelColor=222)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+</div>
+
+<a href="https://theroxat.github.io/DJ_Snake/demo/"><img src="docs/screenshots/demo.webp" alt="The clip page: a synced video next to the queue, switching between themes" width="100%"></a>
+
+> **This is a self-hosted bot for your own server.** It is an independent project,
+> not affiliated with or endorsed by YouTube or Discord. It runs on your machine
+> with your own bot token, downloads only the links you give it, and is meant for
+> personal use. Respect YouTube's Terms of Service and the rights of the people
+> whose videos you play. The demo uses Creative Commons footage ([credits](docs/README.md#demo-footage-credits)).
 
 ## Features
 
