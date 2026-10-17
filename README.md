@@ -1,9 +1,9 @@
 # DJ Snake
 
+https://github.com/user-attachments/assets/a523ba8e-b93b-4d7e-98ad-c699fd47664a
+
 <p align="center">
-  <a href="https://theroxat.github.io/DJ_Snake/demo/"><img src="docs/screenshots/demo.webp" alt="The clip page: a synced video next to the queue, switching between themes" width="860"></a>
-  <br>
-  <sub><a href="docs/screenshots/clip-page.png">Static screenshot</a> · <a href="https://theroxat.github.io/DJ_Snake/demo/"><b>Try the live demo</b></a> (real CC-BY footage) · <a href="https://theroxat.github.io/DJ_Snake/">Project page</a></sub>
+  <sub><a href="docs/screenshots/demo.webp">Animated preview</a> · <a href="docs/screenshots/clip-page.png">Static screenshot</a> · <a href="https://theroxat.github.io/DJ_Snake/demo/"><b>Try the live demo</b></a> (real CC-BY footage) · <a href="https://theroxat.github.io/DJ_Snake/">Project page</a></sub>
 </p>
 
 A self-hosted Discord music bot that downloads YouTube audio and video, plays it in voice channels with an independent queue per server, and serves a live "clip page" with a synced muted video and web controls. It is meant to run on your own machine for your own server.
