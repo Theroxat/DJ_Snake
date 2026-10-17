@@ -3,6 +3,7 @@
 
 Run from anywhere: python3 docs/demo/build.py
 """
+
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]

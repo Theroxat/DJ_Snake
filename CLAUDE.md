@@ -64,6 +64,20 @@ the real `ffmpeg` binary are marked `ffmpeg` and skipped without it. Patch
 `sessions.PANEL_MIN_INTERVAL` on their module: callers look them up there.
 Playback in Discord is still tested by hand, e.g. `!play <youtube url>`.
 
+## Release
+
+Production still runs `docker compose up -d --build` (builds from this
+checkout). Users pull the prebuilt image instead: `docker compose pull && docker
+compose up -d`, with `DJ_SNAKE_TAG` (default `latest`) to pin a version such as
+`1.0.0`. To release: move the `[Unreleased]` notes in `CHANGELOG.md` under a new
+version, commit, then tag `vX.Y.Z` and push the tag. `.github/workflows/release.yml`
+builds and pushes the multi-arch `ghcr.io/theroxat/dj_snake` image and creates
+the GitHub Release. The ghcr package must be set to public once, or users cannot
+pull it.
+
+After changing `web/index.html` (or `docs/demo/shim.js`), run
+`python3 docs/demo/build.py` and commit the regenerated `docs/demo/index.html`.
+
 ## Configuration
 
 Read from the environment (`.env`, loaded via python-dotenv, and passed to the

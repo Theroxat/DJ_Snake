@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Retries with backoff for transient download failures.
 - Sessions expire after `SESSION_IDLE_HOURS` without activity and clean up
   their files.
+- Automated test suite (pytest) run in CI, with the code split into the
+  `djsnake/` package.
 - Prebuilt multi-architecture (amd64, arm64) Docker images on GitHub Container
   Registry.
 
