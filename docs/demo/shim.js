@@ -23,10 +23,10 @@
   // YouTube titles. The page shows the excerpt length as the duration.
   const CATALOG = [
     ["Caminandes 3: Llamigos", "SkVqJ1SGeL0"],
-    ["Cosmos Laundromat - First Cycle. Official Blender Foundation release.", "Y-rmzh0PI3c"],
-    ["Big Buck Bunny 60fps 4K - Official Blender Foundation Short Film", "aqz-KE-bpKQ"],
-    ["Tears of Steel - Blender VFX Open Movie", "R6MlUcmOul8"],
-    ["Sintel - Open Movie by Blender Foundation", "eRsGyueVLvQ"],
+    ["Cosmos Laundromat – First Cycle", "Y-rmzh0PI3c"],
+    ["Big Buck Bunny", "aqz-KE-bpKQ"],
+    ["Tears of Steel", "R6MlUcmOul8"],
+    ["Sintel", "eRsGyueVLvQ"],
   ];
   const DURATION = 25, START = 1, END = 24;
   let seq = 0;
