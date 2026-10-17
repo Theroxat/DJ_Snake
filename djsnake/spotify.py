@@ -116,6 +116,23 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 _opener = urllib.request.build_opener(_NoRedirect)
 
 
+def _read_capped(response):
+    """Body of a response, read in chunks under one overall deadline: the
+    socket timeout alone lets a server trickle bytes forever. Stops one byte
+    past the size cap, which the caller then refuses."""
+    deadline = time.monotonic() + SPOTIFY_TIMEOUT
+    chunks, size = [], 0
+    while size <= SPOTIFY_MAX_BYTES:
+        if time.monotonic() > deadline:
+            raise TimeoutError("response too slow")
+        chunk = response.read(min(65536, SPOTIFY_MAX_BYTES + 1 - size))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        size += len(chunk)
+    return b"".join(chunks)
+
+
 def _http(url, headers=None, data=None):
     """(status, body bytes). Raises SpotifyError("spotify_unreadable") on a
     network failure or an oversized response."""
@@ -130,7 +147,7 @@ def _http(url, headers=None, data=None):
     )
     try:
         with _opener.open(request, timeout=SPOTIFY_TIMEOUT) as response:
-            status, body = response.status, response.read(SPOTIFY_MAX_BYTES + 1)
+            status, body = response.status, _read_capped(response)
     except urllib.error.HTTPError as e:
         status, body = e.code, b""
     except Exception as e:

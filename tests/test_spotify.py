@@ -617,3 +617,21 @@ async def test_single_track_without_match_says_so(player, ctx, channel, monkeypa
 
     await queue_spotify(ctx, player, "track", [song("Halo", ["Beyoncé"], 261.0)])
     assert "No YouTube match found for **Halo — Beyoncé**" in channel.log[-1]
+
+
+def test_read_capped_refuses_oversized_chunked_body(monkeypatch):
+    import io
+
+    monkeypatch.setattr(spotify, "SPOTIFY_MAX_BYTES", 100)
+    body = spotify._read_capped(io.BytesIO(b"x" * 1000))
+    assert len(body) == 101
+
+
+def test_read_capped_enforces_overall_deadline(monkeypatch):
+    class Trickle:
+        def read(self, n):
+            return b"x"
+
+    monkeypatch.setattr(spotify, "SPOTIFY_TIMEOUT", -1)
+    with pytest.raises(TimeoutError):
+        spotify._read_capped(Trickle())

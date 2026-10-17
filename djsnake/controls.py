@@ -267,7 +267,10 @@ async def control_add(player, guild_id, url):
     if spotify_ref is not None:
         if not player.in_voice():
             raise ControlError("not_in_voice")
+        epoch = player.epoch
         tracks = await read_spotify(*spotify_ref)
+        if player.epoch != epoch:
+            return  # Stopped or reset while the link was being read
         _background(_add_spotify_from_web(player, guild_id, spotify_ref[0], tracks))
         return
     parsed = parse_youtube_url(url)
