@@ -22,6 +22,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Application code.
 COPY bot.py .
+COPY djsnake/ djsnake/
 COPY web/ web/
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 

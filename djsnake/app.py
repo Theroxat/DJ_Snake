@@ -1,0 +1,84 @@
+"""Bot events, startup and the entry point."""
+
+import asyncio
+import os
+
+import discord
+
+from . import commands  # noqa: F401  (registers the commands)
+from . import state
+from .config import COMMAND_PREFIX
+from .sessions import refresh_panel, session_cleanup_loop
+from .web import start_web_server
+
+bot = state.bot
+
+
+@bot.event
+async def on_ready():
+    print(f"{bot.user} is connected and ready!")
+    print(f"Bot ID: {bot.user.id}")
+    print(f"Connected to {len(bot.guilds)} guilds")
+    await bot.change_presence(
+        activity=discord.Activity(
+            type=discord.ActivityType.listening,
+            name=f"{COMMAND_PREFIX}help for command list",
+        )
+    )
+
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    """Handle voice state changes for cleanup"""
+    if member == bot.user and before.channel and not after.channel:
+        print(f"Bot was disconnected from voice channel: {before.channel.name}")
+
+        guild = before.channel.guild
+        # The client's own handler runs in a separate task, so give it time to
+        # settle. A stale event from an old disconnect (!stop then !play) then
+        # sees a live client and is ignored; a real kick sees it disconnected.
+        await asyncio.sleep(1.5)
+        if guild.voice_client and guild.voice_client.is_connected():
+            return
+        if guild.id in state.music_players:
+            player = state.music_players[guild.id]
+            player.voice_client = None
+            player.is_playing = False
+            refresh_panel(player)
+            # The web session stays; it expires after SESSION_IDLE_HOURS.
+
+
+async def setup_hook():
+    await start_web_server()
+    task = asyncio.get_running_loop().create_task(session_cleanup_loop())
+    state.background_tasks.add(task)
+
+
+bot.setup_hook = setup_hook
+
+
+def get_discord_token():
+    """Get Discord token from environment variables or token file (fallback)"""
+    TOKEN = os.getenv("DISCORD_TOKEN")
+    if not TOKEN:
+        try:
+            with open("token", "r") as f:
+                TOKEN = f.read().strip()
+            print(
+                "⚠️  Warning: Using token file. Consider using DISCORD_TOKEN environment variable for better security."
+            )
+        except FileNotFoundError:
+            print("❌ Error: No Discord token found!")
+            print(
+                "Please set DISCORD_TOKEN environment variable or create a 'token' file."
+            )
+            print("Get your token from: https://discord.com/developers/applications")
+            exit(1)
+    return TOKEN
+
+
+def main():
+    print("Starting Discord Music Bot (fixed version)")
+    print("-" * 50)
+    TOKEN = get_discord_token()
+    bot.run(TOKEN)
