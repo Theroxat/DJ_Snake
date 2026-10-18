@@ -62,6 +62,9 @@ between tests. The web API runs through aiohttp's `TestClient`. Tests that need
 the real `ffmpeg` binary are marked `ffmpeg` and skipped without it. Patch
 `media.download_media`, `media.get_playlist_info`, `state.clock` or
 `sessions.PANEL_MIN_INTERVAL` on their module: callers look them up there.
+`conftest.py` also points `stats.DB_PATH` at the test's own directory and
+calls `stats.flush()` at teardown; call `stats.flush()` before reading the
+database in a test.
 Playback in Discord is still tested by hand, e.g. `!play <youtube url>`.
 
 ## Release
@@ -104,11 +107,15 @@ Module map, lowest layer first (each imports only the ones above it):
 - `config.py`: environment variables and constants, read once at import
   (`WEB_INDEX` resolves `web/index.html` from the repository root).
 - `state.py`: shared mutable state: the `bot` instance, `music_players`,
-  `sessions`, `guild_themes`, `edit_tokens`, `background_tasks` and `clock()`.
+  `sessions`, `guild_themes`, `edit_tokens`, `viewers`, `background_tasks` and
+  `clock()`.
   Always use it as `state.music_players` (never `from .state import ...`), so
   every module and test sees the same objects.
+- `stats.py`: listening stats in SQLite (`record_play()`,
+  `record_session()`, `record_listeners()`, `summary()`, `guess_artist()`),
+  written by one background thread. Imports only `config`.
 - `player.py`: `MusicPlayer`, `discard_tracks()`, `file_in_use()`,
-  `push_history()`.
+  `push_history()`, `retire_play()`, `guild_of()`.
 - `sessions.py`: session expiry (`touch()`, `session_player()`,
   `session_cleanup_loop()`, `open_session()`) and the status panel
   (`refresh_panel()`, `set_action()`, `ack()`, `short()`).
@@ -248,12 +255,19 @@ Module map, lowest layer first (each imports only the ones above it):
   `0.0.0.0:WEB_PORT`. Routes, the contract `web/index.html` relies on:
   `GET /` landing text; `GET /{sid}` serves `web/index.html`;
   `GET /api/{sid}/state` returns `{active, in_voice, guild, channel, loading,
-  paused, can_previous, crossfade, crossfading, server_time, now_playing: {id,
+  paused, can_previous, crossfade, crossfading, server_time, viewers, now_playing: {id,
   title, duration, thumbnail, url, video_url, elapsed, start, end} | null, queue: [{id, title, duration,
   thumbnail, url}], theme: {skin, base, bg, text, accent, name, logo_url}}`
   (404 `{"active": false}` when the sid is unknown or
   expired; out of voice, `now_playing` is null and `queue` empty; `elapsed`
-  freezes while paused). `POST /api/{sid}/control` takes `{action:
+  freezes while paused; `viewers` counts the tabs that polled with an
+  `X-Viewer` header, a random id `[A-Za-z0-9_-]{8,40}` each tab keeps in
+  sessionStorage, within `VIEWER_WINDOW_SECONDS` (30): `state.viewers[sid]` is
+  `{id: last seen}` in poll order, pruned from the front, capped at
+  `MAX_VIEWERS_PER_SESSION`, and dropped when the session expires).
+  `GET /api/{sid}/stats?range=week|month|all` (default week, 400 otherwise,
+  404 for an unknown sid) returns `stats.summary()` for the session's guild,
+  cached `STATS_CACHE_SECONDS` (15) per guild and range (see Stats). `POST /api/{sid}/control` takes `{action:
   next|previous|pause|resume|remove|move|add|seek|jump|crossfade, id?, index?,
   url?, position?, enabled?}` (body <= 4 KB; crossfade takes a boolean
   `enabled`; seek restarts the track at `position` seconds (file time),
@@ -289,6 +303,34 @@ Module map, lowest layer first (each imports only the ones above it):
   `logo_url` carries `?v=` for cache busting. The page strips the token from
   the URL at load and keeps it in memory only; a viewer's own preset choice is
   in localStorage, and the custom theme is admin-only.
+- **Stats** (`stats.py`, `{DATA_DIR}/stats.db`, WAL, schema version in
+  `PRAGMA user_version`): tables `plays` (guild_id, video_id, title, artist,
+  duration, requester, started_at, played_seconds, skipped), `sessions`
+  (guild_id, started_at) and `listener_peaks` (guild_id, UTC day, listeners,
+  at; one row per day keeps the max). Writes are queued to one daemon thread
+  (`_submit()`; `flush()` waits for them) and best effort: errors are printed,
+  never raised. `summary()` opens its own connection and runs in an executor.
+  Hook points: `_advance()` calls `retire_play(player, guild, action)` before
+  it resets `started_at` (a "restart"/"seek" instead adds the segment to
+  `play_accum`: same play), `_start_crossfade()` retires the old track when it
+  promotes the next, and `!stop` retires it under the lock before
+  `stop_and_clear()`. Play time is `played_seconds()`: `elapsed()` minus the
+  segment's start offset, plus `play_accum`, so pauses and seeks do not count.
+  Skipped = left by next/jump (a "next"), previous or stop before
+  `SKIP_SECONDS` (30). Requester: `download_and_queue_song()` stores
+  `ctx.author.display_name` (None from a `WebContext`, shown as "page web");
+  playlist and Spotify items inherit the `!play` author. Artist:
+  the Spotify artist (`extra={"artist"}`) or `guess_artist(channel, title)`
+  (`download_media()` stores `video_id` and `channel`; " - Topic" and "VEVO"
+  are cleaned, else the "Artist - Title" split). A session is counted on each
+  fresh voice join in `join_voice_channel()`, which also samples listeners;
+  `on_voice_state_update` samples them when a human joins the bot's channel.
+  `summary()` returns `top_tracks` (10, skips excluded), `top_artists` (10),
+  `top_djs` (5, null name = web), `dj_of_week` (last 7 days whatever the
+  range), `most_skipped`, `totals {hours, tracks, sessions}`, `heatmap` (168
+  UTC hour-of-week counts, Monday 00:00 = 0; the page shifts them to the
+  browser's zone) and `peak_listeners {count, at}`. The page renders it all
+  with `textContent`.
 - **Status panel**: each web session has one message in its text channel
   (`player.panel_message`), edited in place instead of announcing events:
   clip link, now playing / paused / idle, up next, loading progress and the
