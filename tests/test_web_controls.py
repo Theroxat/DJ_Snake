@@ -125,6 +125,17 @@ async def test_previous_early_goes_back_to_the_last_track(api, client, player, t
     assert r.status == 200
 
 
+async def test_media_is_never_cached_by_a_shared_cache(client, player, tracks):
+    url = f"/media/{player.sid}/{tracks['A']['id']}"
+    r = await client.get(url, headers={"Range": "bytes=0-1"})
+    assert r.status == 206
+    assert r.headers["Cache-Control"] == "private, no-cache"
+    # The page's retry adds a cache-busting query string: same file.
+    r = await client.get(url + "?r=1")
+    assert r.status == 200
+    assert r.headers["Cache-Control"] == "private, no-cache"
+
+
 async def test_previous_after_five_seconds_restarts_the_track(api, player, tracks):
     await api.control(action="next")
     await settle()
