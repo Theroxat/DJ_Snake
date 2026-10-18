@@ -477,6 +477,86 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
 .editor .msg.ok { color: var(--ok); }
 .editor .note { font-size: 12px; color: var(--muted); margin: 0; }
 
+/* Live viewers (header) */
+.viewers { color: var(--muted); border-color: var(--hair); cursor: default; }
+.viewers b { font-weight: 400; color: var(--text); }
+
+/* Stats panel: a dialog over the page, in the theme's tokens */
+.statsdlg {
+  position: fixed; inset: 0; z-index: 110; display: flex; align-items: flex-start; justify-content: center;
+  padding: 24px 16px; overflow-y: auto; background: color-mix(in srgb, var(--bg) 78%, transparent);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+}
+.statscard {
+  position: relative; width: min(980px, 100%); margin: auto 0; background: var(--surface); color: var(--text);
+  border: var(--bw) solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-frame);
+  padding: 20px 22px 24px; display: flex; flex-direction: column; gap: 18px; min-width: 0;
+}
+.stathead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.stathead h2 { margin: 0; font-size: 24px; flex: 1 1 auto; }
+.rangetabs { display: inline-flex; gap: 0; border: var(--bw) solid var(--hair); border-radius: var(--radius-btn); overflow: hidden; }
+.rangetabs button {
+  box-shadow: none; border: 0; border-radius: 0; background: transparent; color: var(--muted); min-height: 40px; padding: 4px 14px;
+  font: 400 var(--hud-size) var(--font-mono); letter-spacing: var(--hud-ls); text-transform: var(--hud-case);
+}
+.rangetabs button + button { border-left: var(--bw) solid var(--hair); }
+.rangetabs button:hover { box-shadow: none; transform: none; color: var(--accent-3); }
+.rangetabs button:active { box-shadow: none; transform: none; }
+.rangetabs button[aria-selected="true"] { background: var(--accent); color: var(--on-accent); }
+button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-height: 1; }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tile { border: var(--bw) solid var(--hair); border-radius: var(--radius-sm); padding: 10px 14px; min-width: 0; }
+.tile .k { color: var(--muted); font-size: 13px; }
+.tile .v { font-family: var(--font-mono); font-size: calc(var(--hud-size) * 1.6); line-height: 1.1; color: var(--accent); overflow-wrap: anywhere; }
+.tile .s { color: var(--muted); font-size: 12px; }
+.djweek {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border: var(--bw) solid var(--accent-2);
+  border-radius: var(--radius-sm); padding: 10px 14px;
+}
+[data-shape="arcade"] .djweek { box-shadow: 4px 4px 0 var(--accent-2); }
+.djweek .crown { font-size: 22px; }
+.djweek b { font-family: var(--font-display); text-transform: var(--display-case); font-weight: var(--display-weight); font-size: 18px; overflow-wrap: anywhere; }
+.djweek .s { color: var(--muted); font-size: 13px; }
+.statgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 24px; }
+.statsec h3 { margin: 0 0 8px; font-size: 16px; display: flex; gap: 8px; align-items: baseline; }
+.statsec h3 .hud { color: var(--accent); }
+.rank { list-style: none; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; max-height: none; overflow: visible; display: flex; flex-direction: column; gap: 6px; }
+.rank li { display: grid; grid-template-columns: 2.2ch minmax(0, 1fr) auto; gap: 2px 10px; align-items: baseline; padding: 0; min-height: 0; border: 0; cursor: default; }
+.rank li:hover, .rank li:active { background: none; color: inherit; }
+.rank .r { font-family: var(--font-mono); color: var(--accent); text-align: right; }
+.rank .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.rank .t small { color: var(--muted); font-size: 12px; }
+.rank .c { font-family: var(--font-mono); color: var(--muted); white-space: nowrap; }
+.rank .meter { grid-column: 2 / 4; height: 3px; background: var(--hair); border-radius: var(--bar-radius); overflow: hidden; }
+.rank .meter i { display: block; height: 100%; background: var(--accent-3); border-radius: var(--bar-radius); }
+.rank .web { font-style: italic; color: var(--muted); }
+.statnone { color: var(--muted); font-size: 14px; margin: 0; }
+.skipcard { border: var(--bw) dashed var(--hair); border-radius: var(--radius-sm); padding: 10px 14px; }
+.skipcard .t { font-size: 15px; overflow-wrap: anywhere; }
+.skipcard .s { color: var(--muted); font-size: 13px; }
+.heat { display: grid; grid-template-columns: 3.2ch repeat(24, minmax(0, 1fr)); gap: 2px; font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+.heat .cell { aspect-ratio: 5 / 3; min-height: 8px; border-radius: calc(var(--radius-sm) / 2); background: var(--hair); }
+.heat .cell.on { background: color-mix(in srgb, var(--accent) var(--p), var(--hair)); }
+.heat .dl { align-self: center; line-height: 1; }
+.heat .hl { grid-row: 1; text-align: left; line-height: 1; white-space: nowrap; }
+.heatnote { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+.statempty { text-align: center; padding: 28px 12px; border: var(--bw) dashed var(--hair); border-radius: var(--radius); }
+.statempty .big { font-size: 22px; color: var(--accent-2); margin: 6px 0; }
+.statempty p { color: var(--muted); margin: 6px auto; max-width: 46ch; }
+.statmsg { color: var(--muted); margin: 0; }
+@media (max-width: 700px) {
+  .statsdlg { padding: 0; }
+  .statscard { min-height: 100%; border-width: 0; border-radius: 0; box-shadow: none; padding: 16px; margin: 0; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .statgrid { grid-template-columns: minmax(0, 1fr); }
+  .stathead h2 { font-size: 20px; }
+  .rangetabs { order: 3; flex: 1 1 100%; }
+  .rangetabs button { flex: 1; min-height: 44px; }
+  button.statclose { min-height: 44px; min-width: 44px; }
+  .heat { font-size: 11px; gap: 1px; }
+  .heat .cell { aspect-ratio: 1; }
+}
+
 #toast {
   position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 120; max-width: min(92vw, 560px);
   background: var(--surface); color: var(--text); border: var(--bw) solid var(--accent-3); border-radius: var(--radius-sm); box-shadow: var(--shadow-pop);
@@ -515,6 +595,9 @@ ol.sorting { user-select: none; -webkit-user-select: none; }
   .transport { gap: 12px; }
   .addform { flex-basis: 100%; }
   .credits, [data-shape="arcade"] .credits { display: none; }
+  header { column-gap: 8px; }
+  header .badge { padding: 2px 8px; }
+  header button.palette, header a.ghub { padding: 4px 9px; }
   .bar button, .offset button { min-height: 44px; min-width: 44px; }
   button.synctoggle, button.ghost { min-height: 44px; }
   .offset input[type=range] { min-height: 40px; }
@@ -543,6 +626,10 @@ html.demo-embedded .demo-ribbon { display: none; }
   <span id="net" class="badge net hud" hidden>Reconnexion…</span>
   <span id="live" class="badge live off hud"><i>●</i> <span id="livetxt">HORS SYNC</span></span>
   <span class="hud credits">CREDITS: ∞</span>
+  <span id="viewers" class="badge hud viewers" title="personnes sur la page" hidden><span aria-hidden="true">👁</span> <b id="viewcount">1</b></span>
+  <button id="statsbtn" class="ghost palette" type="button" aria-haspopup="dialog" aria-controls="stats" aria-label="Statistiques" title="Statistiques">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16v2H4zM5 11h3v7H5zM10.5 4h3v14h-3zM16 8h3v10h-3z"/></svg>
+  </button>
   <button id="palbtn" class="ghost palette" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="thememenu" aria-label="Changer de thème" title="Changer de thème">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0 0 18c1.4 0 2-.9 2-1.8 0-.5-.2-.9-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.4 17 3 12 3zM7.5 12a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>
   </button>
@@ -654,6 +741,21 @@ html.demo-embedded .demo-ribbon { display: none; }
 </main>
 
 <div id="toast" role="status" aria-live="polite" hidden></div>
+
+<div id="stats" class="statsdlg" role="dialog" aria-modal="true" aria-labelledby="stath" hidden>
+  <div class="statscard" id="statscard">
+    <div class="stathead">
+      <h2 class="display" id="stath">Statistiques</h2>
+      <div class="rangetabs" role="tablist" aria-label="Période">
+        <button type="button" role="tab" data-range="week" aria-selected="true">Semaine</button>
+        <button type="button" role="tab" data-range="month" aria-selected="false">Mois</button>
+        <button type="button" role="tab" data-range="all" aria-selected="false">Tout</button>
+      </div>
+      <button type="button" class="ghost statclose" id="statsclose" aria-label="Fermer les statistiques" title="Fermer (Échap)">×</button>
+    </div>
+    <div id="statsbody" aria-live="polite"></div>
+  </div>
+</div>
 
 <div id="ended" hidden>
   <div class="card">
@@ -1421,6 +1523,10 @@ html.demo-embedded .demo-ribbon { display: none; }
     $("pausebadge").hidden = !(paused && d.now_playing);
     $("guild").textContent = d.guild || "—";
     $("channel").textContent = d.channel ? " # " + d.channel : "";
+    const nv = Number.isInteger(d.viewers) && d.viewers > 0 ? d.viewers : 0;
+    $("viewers").hidden = !nv;
+    $("viewcount").textContent = String(nv);
+    $("viewers").title = nv > 1 ? nv + " personnes sur la page" : "1 personne sur la page";
     renderQueue(d.queue || []);
     const np = d.now_playing;
     if (!inVoice) {
@@ -1527,6 +1633,203 @@ html.demo-embedded .demo-ribbon { display: none; }
     if (await send("add", { url })) inp.value = "";
   });
 
+  // ---- live viewers: a random id per tab, kept for the tab's lifetime
+  const VIEWER_RE = /^[A-Za-z0-9_-]{8,40}$/;
+  let viewerId = "";
+  try { viewerId = sessionStorage.getItem("djsnake.viewer") || ""; } catch (e) {}
+  if (!VIEWER_RE.test(viewerId)) {
+    const abc = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    const bytes = new Uint8Array(16);
+    try { crypto.getRandomValues(bytes); } catch (e) { for (let i = 0; i < 16; i++) bytes[i] = Math.random() * 256; }
+    viewerId = Array.from(bytes, (b) => abc[b & 63]).join("");
+    try { sessionStorage.setItem("djsnake.viewer", viewerId); } catch (e) {}
+  }
+
+  // ---- stats panel. Titles and names come from users: textContent only.
+  const statsDlg = $("stats"), statsBtn = $("statsbtn"), statsBody = $("statsbody");
+  const DAYS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+  const RANGE_LABEL = { week: "7 derniers jours", month: "30 derniers jours", all: "depuis le début" };
+  let statsRange = "week", statsSeq = 0;
+  const nf = (n) => Number(n || 0).toLocaleString("fr-FR");
+  function rankList(items, label) {
+    const ol = mk("ol", "rank");
+    const max = Math.max(1, ...items.map((i) => i.plays || 0));
+    items.forEach((it, i) => {
+      const li = mk("li");
+      li.appendChild(mk("span", "r", String(i + 1)));
+      const t = mk("span", "t");
+      if (it.name === null) t.appendChild(mk("span", "web", "page web"));
+      else t.appendChild(document.createTextNode(it.title != null ? it.title : it.name));
+      if (it.artist) { t.appendChild(document.createTextNode(" ")); t.appendChild(mk("small", null, "· " + it.artist)); }
+      t.title = (it.title != null ? it.title : it.name || "page web") + (it.artist ? " · " + it.artist : "");
+      li.appendChild(t);
+      li.appendChild(mk("span", "c", "×" + nf(it.plays)));
+      const bar = mk("span", "meter"), fill = mk("i");
+      fill.style.width = Math.round((100 * (it.plays || 0)) / max) + "%";
+      bar.appendChild(fill);
+      li.appendChild(bar);
+      li.setAttribute("aria-label", (i + 1) + ". " + t.title + ", " + label + " " + (it.plays || 0));
+      ol.appendChild(li);
+    });
+    return ol;
+  }
+  function section(title, hud, content) {
+    const s = mk("section", "statsec");
+    const h = mk("h3", "display");
+    if (hud) h.appendChild(mk("span", "hud", hud));
+    h.appendChild(document.createTextNode(title));
+    s.appendChild(h);
+    s.appendChild(content);
+    return s;
+  }
+  function tile(k, v, sub) {
+    const t = mk("div", "tile");
+    t.appendChild(mk("div", "k", k));
+    t.appendChild(mk("div", "v", v));
+    if (sub) t.appendChild(mk("div", "s", sub));
+    return t;
+  }
+  function heatmap(utc) {
+    // UTC hour-of-week buckets (Monday 00:00 = 0) shifted to this browser's zone.
+    const shift = Math.round(-new Date().getTimezoneOffset() / 60);
+    const local = new Array(168).fill(0);
+    (Array.isArray(utc) ? utc : []).forEach((n, u) => { if (u < 168) local[(((u + shift) % 168) + 168) % 168] += Number(n) || 0; });
+    const max = Math.max(...local);
+    const g = mk("div", "heat");
+    g.setAttribute("role", "img");
+    g.appendChild(mk("span"));
+    for (let h = 0; h < 24; h++) {
+      const l = mk("span", "hl", h % 6 === 0 ? h + "h" : "");
+      l.style.gridColumn = String(h + 2);
+      g.appendChild(l);
+    }
+    let busiest = null;
+    for (let d = 0; d < 7; d++) {
+      g.appendChild(mk("span", "dl", DAYS[d]));
+      for (let h = 0; h < 24; h++) {
+        const n = local[d * 24 + h], c = mk("span", "cell");
+        if (n > 0) {
+          c.classList.add("on");
+          c.style.setProperty("--p", Math.round(25 + (75 * n) / max) + "%");
+          if (!busiest || n > busiest[2]) busiest = [d, h, n];
+        }
+        c.title = DAYS[d] + " " + h + "h : " + n + (n > 1 ? " écoutes" : " écoute");
+        g.appendChild(c);
+      }
+    }
+    g.setAttribute("aria-label", busiest
+      ? "Écoutes par jour et par heure. Créneau le plus chargé : " + DAYS[busiest[0]] + " " + busiest[1] + "h (" + busiest[2] + ")."
+      : "Écoutes par jour et par heure : aucune.");
+    return g;
+  }
+  function renderStats(d) {
+    statsBody.textContent = "";
+    const totals = d.totals || {};
+    if (!totals.tracks) {
+      const e = mk("div", "statempty");
+      e.appendChild(mk("div", "hud", "NO DATA"));
+      e.appendChild(mk("div", "big display", "Pas encore de statistiques"));
+      e.appendChild(mk("p", null, statsRange === "all"
+        ? "Lance quelques morceaux avec !play : chaque écoute sera comptée ici, avec les DJ, les artistes et les heures de pointe."
+        : "Aucune écoute " + (statsRange === "week" ? "ces 7 derniers jours" : "ces 30 derniers jours") + ". Essaie la période « Tout »."));
+      statsBody.appendChild(e);
+      return;
+    }
+    const wrap = mk("div");
+    wrap.style.cssText = "display:flex;flex-direction:column;gap:18px";
+    const tiles = mk("div", "tiles");
+    const hours = Number(totals.hours) || 0;
+    tiles.appendChild(tile("Heures d'écoute", hours.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " h", RANGE_LABEL[statsRange]));
+    tiles.appendChild(tile("Morceaux joués", nf(totals.tracks)));
+    tiles.appendChild(tile("Sessions", nf(totals.sessions), "connexions au vocal"));
+    const pk = d.peak_listeners;
+    tiles.appendChild(tile("Pic d'auditeurs", pk ? nf(pk.count) : "—",
+      pk && pk.at ? "le " + new Date(pk.at * 1000).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) : null));
+    wrap.appendChild(tiles);
+    if (d.dj_of_week && d.dj_of_week.name) {
+      const dj = mk("div", "djweek");
+      dj.appendChild(mk("span", "crown", "👑"));
+      const t = mk("div");
+      t.appendChild(mk("div", "s", "DJ de la semaine"));
+      t.appendChild(mk("b", null, d.dj_of_week.name));
+      dj.appendChild(t);
+      dj.appendChild(mk("span", "s", nf(d.dj_of_week.plays) + " morceaux lancés"));
+      wrap.appendChild(dj);
+    }
+    const grid = mk("div", "statgrid");
+    const none = (txt) => mk("p", "statnone", txt);
+    const tt = d.top_tracks || [], ta = d.top_artists || [], td = d.top_djs || [];
+    grid.appendChild(section("Top morceaux", "10", tt.length ? rankList(tt, "écoutes") : none("Aucun morceau écouté jusqu'au bout.")));
+    grid.appendChild(section("Top artistes", "10", ta.length ? rankList(ta, "écoutes") : none("Aucun artiste reconnu.")));
+    grid.appendChild(section("Top DJ", "5", td.length ? rankList(td, "morceaux") : none("Personne pour l'instant.")));
+    const ms = d.most_skipped;
+    let skip;
+    if (ms) {
+      skip = mk("div", "skipcard");
+      const t = mk("div", "t", ms.title);
+      if (ms.artist) { t.appendChild(document.createTextNode(" ")); t.appendChild(mk("small", null, "· " + ms.artist)); }
+      skip.appendChild(t);
+      skip.appendChild(mk("div", "s", "zappé " + nf(ms.skips) + " fois avant 30 s"));
+    } else skip = none("Rien n'a été zappé. Belle sélection.");
+    grid.appendChild(section("Le plus zappé", "⏭", skip));
+    wrap.appendChild(grid);
+    const hm = section("Heures de pointe", null, heatmap(d.heatmap));
+    hm.appendChild(mk("p", "heatnote", "Écoutes par jour et par heure, à l'heure de ton navigateur."));
+    wrap.appendChild(hm);
+    statsBody.appendChild(wrap);
+  }
+  async function loadStats() {
+    const seq = ++statsSeq;
+    statsDlg.querySelectorAll("[data-range]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.range === statsRange)));
+    if (!statsBody.firstChild || statsBody.querySelector(".statmsg")) {
+      statsBody.textContent = "";
+      statsBody.appendChild(mk("p", "statmsg hud", "Chargement…"));
+    }
+    try {
+      const r = await fetch("/api/" + encodeURIComponent(sid) + "/stats?range=" + statsRange, { cache: "no-store" });
+      const d = await r.json();
+      if (seq !== statsSeq) return;
+      if (!r.ok) throw new Error((d && d.error) || "http " + r.status);
+      renderStats(d);
+    } catch (e) {
+      if (seq !== statsSeq) return;
+      statsBody.textContent = "";
+      statsBody.appendChild(mk("p", "statmsg", "Statistiques indisponibles pour le moment."));
+    }
+  }
+  function openStats() {
+    if (!menu.hidden) closeMenu();
+    statsDlg.hidden = false;
+    statsBtn.setAttribute("aria-expanded", "true");
+    document.body.style.overflow = "hidden";
+    $("statsclose").focus();
+    loadStats();
+  }
+  function closeStats() {
+    if (statsDlg.hidden) return;
+    statsDlg.hidden = true;
+    statsBtn.setAttribute("aria-expanded", "false");
+    document.body.style.overflow = "";
+    statsBtn.focus();
+  }
+  statsBtn.addEventListener("click", openStats);
+  $("statsclose").addEventListener("click", closeStats);
+  statsDlg.addEventListener("click", (e) => { if (e.target === statsDlg) closeStats(); });
+  statsDlg.querySelectorAll("[data-range]").forEach((b) => b.addEventListener("click", () => {
+    if (statsRange === b.dataset.range) return;
+    statsRange = b.dataset.range;
+    loadStats();
+  }));
+  statsDlg.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); closeStats(); return; }
+    if (e.key === "Tab") { // keep focus inside the dialog
+      const f = [...statsDlg.querySelectorAll("button")].filter((b) => !b.disabled);
+      if (!f.length) return;
+      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+    }
+  });
+
   async function poll() {
     if (polling) { again = true; return; }
     polling = true;
@@ -1534,7 +1837,9 @@ html.demo-embedded .demo-ribbon { display: none; }
     let next = POLL_MS;
     const t0 = performance.now();
     try {
-      const r = await fetch("/api/" + encodeURIComponent(sid) + "/state", { cache: "no-store" });
+      const r = await fetch("/api/" + encodeURIComponent(sid) + "/state", {
+        cache: "no-store", headers: viewerId ? { "X-Viewer": viewerId } : {},
+      });
       const rtt = (performance.now() - t0) / 1000;
       if (r.status === 404) { failures = 0; $("net").hidden = true; showEnded(); next = ENDED_POLL_MS; return; }
       if (!r.ok) throw new Error("http " + r.status);

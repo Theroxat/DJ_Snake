@@ -1,6 +1,6 @@
 /* DJ Snake demo shim. Replaces window.fetch for the bot's web API so the real
  * clip page (web/index.html, built into player.html) runs on static hosting.
- * Intercepted: GET /api/{sid}/state, POST /api/{sid}/control,
+ * Intercepted: GET /api/{sid}/state, GET /api/{sid}/stats, POST /api/{sid}/control,
  * POST /api/{sid}/theme, POST|DELETE /api/{sid}/theme/logo.
  * Embedded in the Discord demo (index.html), it talks to the wrapper's fake
  * bot (window.parent.DJDemoBackend.shared), so both sides share one session;
@@ -36,11 +36,14 @@
   const realFetch = window.fetch.bind(window);
   window.fetch = async (input, init) => {
     const url = typeof input === "string" ? input : input.url;
-    const m = /\/api\/[^/]+\/(state|control|theme(?:\/logo)?)(?:\?|$)/.exec(url);
+    const m = /\/api\/[^/]+\/(state|stats|control|theme(?:\/logo)?)(?:\?|$)/.exec(url);
     if (!m) return realFetch(input, init);
     const method = ((init && init.method) || "GET").toUpperCase();
     let body = null;
     try { body = init && typeof init.body === "string" ? JSON.parse(init.body) : null; } catch (e) {}
+    if (m[1] === "stats") {
+      try { body = { range: new URL(url, location.href).searchParams.get("range") || "week" }; } catch (e) {}
+    }
     await new Promise((r) => setTimeout(r, 40));
     // JSON round trip: the answer comes from the parent window's realm.
     const res = backend.http(m[1], method, body);
