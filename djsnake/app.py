@@ -101,4 +101,7 @@ def main():
     print("Starting Discord Music Bot (fixed version)")
     print("-" * 50)
     TOKEN = get_discord_token()
-    bot.run(TOKEN)
+    try:
+        bot.run(TOKEN)
+    finally:
+        stats.flush(timeout=5)  # Best effort: keep queued stats on shutdown

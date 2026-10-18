@@ -10,6 +10,7 @@ dropped, it never reaches playback. Reads (the web route) run in an executor
 on their own connection; WAL mode lets them run while the writer works.
 """
 
+import asyncio
 import datetime
 import os
 import queue
@@ -103,7 +104,9 @@ def _write_loop():
         try:
             conn = _conn_for_writer()
             with conn:  # One transaction per record
-                fn(conn, *args)
+                after = fn(conn, *args)
+            if callable(after):  # Runs once the record is committed
+                after()
         except Exception as e:
             print(f"Stats write failed: {e}")
             if _writer_conn is not None:
@@ -131,10 +134,17 @@ def _submit(fn, *args):
         print(f"Stats record dropped: {e}")
 
 
-def flush():
-    """Wait until every queued record is written (tests, shutdown)."""
-    if _writer is not None:
+def flush(timeout=None):
+    """Wait until every queued record is written (tests, shutdown). With a
+    `timeout` in seconds, give up after that long."""
+    if _writer is None:
+        return
+    if timeout is None:
         _jobs.join()
+        return
+    deadline = time.monotonic() + timeout
+    while _jobs.unfinished_tasks and time.monotonic() < deadline:
+        time.sleep(0.05)
 
 
 # --- Recording ------------------------------------------------------------------
@@ -192,8 +202,14 @@ def record_play(guild_id, track, started_at, played, action):
     was left (None: it ended by itself, or "next", "previous", "stop")."""
     try:
         played = max(0.0, float(played or 0.0))
-        skipped = action in SKIP_ACTIONS and played < SKIP_SECONDS
         duration = track.get("duration")
+        window = duration
+        if track.get("end"):  # Automix window: what can actually be heard
+            window = float(track["end"]) - float(track.get("start") or 0)
+        limit = SKIP_SECONDS
+        if window:
+            limit = min(limit, float(window) - 2)  # Played to the end: no skip
+        skipped = action in SKIP_ACTIONS and played < limit
         row = (
             int(guild_id),
             _text(track.get("video_id")),
@@ -233,7 +249,13 @@ def _day(at):
     )
 
 
-def _upsert_peak(conn, guild_id, day, count, at):
+def _set_peak(guild_id, day, count):
+    known = _peaks.get(guild_id)
+    if not known or known[0] != day or known[1] < count:
+        _peaks[guild_id] = (day, count)
+
+
+def _upsert_peak(conn, guild_id, day, count, at, loop=None):
     conn.execute(
         "INSERT INTO listener_peaks (guild_id, day, listeners, at)"
         " VALUES (?, ?, ?, ?) ON CONFLICT (guild_id, day) DO UPDATE SET"
@@ -241,6 +263,10 @@ def _upsert_peak(conn, guild_id, day, count, at):
         " WHERE excluded.listeners > listener_peaks.listeners",
         (guild_id, day, count, at),
     )
+    # _peaks belongs to the event loop: update it there, after the commit
+    if loop is None:
+        return lambda: _set_peak(guild_id, day, count)
+    return lambda: loop.call_soon_threadsafe(_set_peak, guild_id, day, count)
 
 
 def record_listeners(guild_id, count, at=None):
@@ -252,8 +278,11 @@ def record_listeners(guild_id, count, at=None):
         known = _peaks.get(guild_id)
         if count <= 0 or (known and known[0] == day and known[1] >= count):
             return
-        _peaks[guild_id] = (day, count)
-        _submit(_upsert_peak, int(guild_id), day, int(count), at)
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        _submit(_upsert_peak, int(guild_id), day, int(count), at, loop)
     except Exception as e:
         print(f"Stats listeners skipped: {e}")
 

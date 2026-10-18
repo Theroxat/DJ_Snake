@@ -2,6 +2,7 @@
 cleanup, the summary's ranges and guild scoping, the stats route, and the
 live viewer count."""
 
+import asyncio
 import time
 import types
 
@@ -357,3 +358,37 @@ async def test_viewers_are_dropped_with_the_session(client, player, fake_clock):
     assert sid in state.viewers
     expire_session(player)
     assert sid not in state.viewers
+
+
+# --- Review fixes -----------------------------------------------------------------
+
+
+def test_short_track_played_to_the_end_is_not_a_skip():
+    track = {"title": "Jingle", "duration": 20}
+    stats.record_play(1, track, time.time(), 19, "next")
+    stats.record_play(1, track, time.time(), 5, "next")
+    stats.record_play(1, track, time.time(), 19, None)
+    stats.flush()
+    assert [r["skipped"] for r in plays()] == [0, 1, 0]
+
+
+async def test_peak_is_remembered_only_after_the_write(monkeypatch):
+    stats._peaks.clear()
+    monkeypatch.setattr(stats, "_upsert_peak", _boom)
+    stats.record_listeners(7, 3)
+    stats.flush()
+    await asyncio.sleep(0.05)
+    assert 7 not in stats._peaks
+    monkeypatch.undo()
+    stats.record_listeners(7, 3)
+    stats.flush()
+    await asyncio.sleep(0.05)
+    assert stats._peaks[7][1] == 3
+
+
+def _boom(*args):
+    raise RuntimeError("disk full")
+
+
+def test_flush_with_a_timeout_returns():
+    stats.flush(timeout=0.1)
