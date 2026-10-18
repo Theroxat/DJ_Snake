@@ -190,7 +190,11 @@ async def web_media(request):
         if track.get("id") == track_id:
             filepath = track["filepath"]
             if os.path.isfile(filepath):
-                return web.FileResponse(filepath)
+                # Never stored by a proxy or tunnel in front (private), and
+                # revalidated by the browser (no-cache): a clip URL must
+                # always serve the file of that track.
+                headers = {"Cache-Control": "private, no-cache"}
+                return web.FileResponse(filepath, headers=headers)
             break
     raise web.HTTPNotFound()
 

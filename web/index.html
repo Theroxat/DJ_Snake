@@ -783,6 +783,11 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
   const XFADE_S = 6;
 
   const POLL_MS = 2000, ENDED_POLL_MS = 10000;
+  // A state request that never settles (mobile network switch, a tab resumed
+  // from the background, a dead tunnel connection) must not freeze the page on
+  // the old track: it is aborted after POLL_TIMEOUT_MS. A clip that has not
+  // shown its metadata after MEDIA_TIMEOUT_MS (more on each retry) is reloaded.
+  const POLL_TIMEOUT_MS = 8000, MEDIA_TIMEOUT_MS = 8000, MEDIA_RETRY_MS = 3000;
   const HARD_SEEK = 1.0, NUDGE_MIN = 0.15, NUDGE_STOP = 0.1;
   const OFFSET_KEY = "djsnake.offset";
 
@@ -798,6 +803,9 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
   let failures = 0;
   let timer = null;
   let polling = false;
+  let pollCtl = null;     // AbortController of the state request in flight
+  let curNp = null;       // now_playing of the clip loaded in `video`
+  let loadAt = 0, loadTries = 0, errAt = 0;
   let lastQueueSig = "";
   let inVoice = true, paused = false, canPrev = false, xfade = false;
   let dissolveTimer = null;
@@ -1092,7 +1100,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     setLive(false);
     endDissolve();
     video.pause();
-    state = null; curId = null; // a revived session reloads the video from scratch
+    state = null; curId = null; curNp = null; // a revived session reloads the video from scratch
   }
 
   // ---- sync
@@ -1118,13 +1126,17 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     clearVideo(back);
   }
 
-  function loadTrack(np, crossfading) {
+  function loadTrack(np, crossfading, retry) {
     // Crossfade (the server says the audio overlaps): the clip on screen stays
     // and keeps playing underneath while the new one loads in the other
     // element, then fades in over it. A skip or a jump stays an instant swap.
     const dissolve = crossfading && !!curId && !!video.getAttribute("src") && video.readyState >= 2 && !paused;
     endDissolve();
     curId = np.id;
+    curNp = np;
+    loadTries = retry ? loadTries + 1 : 0;
+    loadAt = performance.now();
+    errAt = 0;
     pendingSeek = true;
     if (dissolve) {
       [video, back] = [back, video];
@@ -1140,7 +1152,8 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
       delete video.dataset.dissolve;
       overlay("Chargement de la vidéo…");
     }
-    video.src = np.video_url;
+    // A retry gets a fresh URL, so nothing reuses the stalled request.
+    video.src = np.video_url + (loadTries ? (np.video_url.includes("?") ? "&" : "?") + "r=" + loadTries : "");
     video.muted = true;
     video.load();
   }
@@ -1164,7 +1177,18 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
   function onErr(e) {
     if (e.target !== video) return;
     if (curId) overlay("Vidéo indisponible…");
+    if (!errAt) errAt = performance.now();
     setLive(false);
+  }
+  // The page must always end up showing the state's clip: reload it when its
+  // metadata never came (stalled request; mid-crossfade, the old clip would
+  // stay on screen) or the request failed.
+  function watchdog() {
+    if (!curNp || curNp.id !== curId) return;
+    const now = performance.now(), n = Math.min(loadTries, 3);
+    const stalled = pendingSeek && now - loadAt > MEDIA_TIMEOUT_MS * (n + 1);
+    const failed = errAt && now - errAt > MEDIA_RETRY_MS * (n + 1);
+    if (stalled || failed) loadTrack(curNp, false, true);
   }
   for (const v of [video, back]) {
     v.addEventListener("loadedmetadata", onMeta);
@@ -1197,6 +1221,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
   }
 
   function tick() {
+    watchdog();
     correct();
     if (state) {
       const e = curElapsed() - state.start; // bar spans start..end (file time)
@@ -1561,7 +1586,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     renderDownloading(d.downloading, d.downloading_total);
     const np = d.now_playing;
     if (!inVoice) {
-      state = null; curId = null;
+      state = null; curId = null; curNp = null;
       endDissolve();
       clearVideo(video);
       $("title").textContent = ""; $("title").dataset.sig = "";
@@ -1572,7 +1597,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
       return;
     }
     if (!np) {
-      state = null; curId = null;
+      state = null; curId = null; curNp = null;
       endDissolve();
       clearVideo(video);
       $("title").textContent = "";
@@ -1600,6 +1625,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     baseElapsed = (np.elapsed || 0) + (paused ? 0 : latency);
     anchor = performance.now();
     if (np.id !== curId) loadTrack(np, !!d.crossfading);
+    else curNp = np;
     updateControls();
   }
 
@@ -1624,11 +1650,15 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     pending.add(action);
     updateControls();
     let ok = false;
+    // Never leave a button disabled for good on a request that hangs.
+    const ctl = typeof AbortController === "function" ? new AbortController() : null;
+    const kill = ctl ? setTimeout(() => ctl.abort(), 30000) : null;
     try {
       const r = await fetch("/api/" + encodeURIComponent(sid) + "/control", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(Object.assign({ action }, extra || {})),
+        signal: ctl ? ctl.signal : undefined,
       });
       let j = null;
       try { j = await r.json(); } catch (e) {}
@@ -1641,6 +1671,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     } catch (e) {
       toast("Réseau indisponible, réessaie.", "err");
     } finally {
+      clearTimeout(kill);
       pending.delete(action);
       updateControls();
       pollNow();
@@ -1867,9 +1898,13 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     again = false;
     let next = POLL_MS;
     const t0 = performance.now();
+    const ctl = typeof AbortController === "function" ? new AbortController() : null;
+    pollCtl = ctl;
+    const kill = ctl ? setTimeout(() => ctl.abort(), POLL_TIMEOUT_MS) : null;
     try {
       const r = await fetch("/api/" + encodeURIComponent(sid) + "/state", {
         cache: "no-store", headers: viewerId ? { "X-Viewer": viewerId } : {},
+        signal: ctl ? ctl.signal : undefined,
       });
       const rtt = (performance.now() - t0) / 1000;
       if (r.status === 404) { failures = 0; $("net").hidden = true; showEnded(); next = ENDED_POLL_MS; return; }
@@ -1883,6 +1918,8 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
       failures++;
       if (failures >= 2) $("net").hidden = false;
     } finally {
+      clearTimeout(kill);
+      pollCtl = null;
       polling = false;
       clearTimeout(timer);
       timer = setTimeout(poll, again ? 0 : next);
@@ -1893,7 +1930,8 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
       clearTimeout(timer);
-      poll();
+      // A request left over from the background may never settle: drop it.
+      if (pollCtl) { again = true; pollCtl.abort(); } else poll();
     }
   });
 
