@@ -27,6 +27,8 @@ STATE_KEYS = {
     "viewers",
     "now_playing",
     "queue",
+    "downloading",
+    "downloading_total",
     "theme",
 }
 NOW_PLAYING_KEYS = {
@@ -323,7 +325,7 @@ def downloads(monkeypatch, media_dir):
     """Fake media.download_media: records URLs, fails for ccccccccccc."""
     calls = []
 
-    def fake_download(url):
+    def fake_download(url, **kwargs):
         calls.append(url)
         if "ccccccccccc" in url:
             raise RuntimeError("Video unavailable")
@@ -377,7 +379,7 @@ async def test_playlist_stopped_midway_says_so_in_the_panel(
     async def quiet_send(content=None, **kwargs):
         sent.append(content)
 
-    def stopping_download(url):
+    def stopping_download(url, **kwargs):
         player.epoch += 1  # Like !stop during the first download
         return make_track(media_dir, "S")
 

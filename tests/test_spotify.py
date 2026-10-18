@@ -514,7 +514,7 @@ def spotify_env(monkeypatch, media_dir):
             }
         ]
 
-    def fake_download(url):
+    def fake_download(url, **kwargs):
         downloads.append(url)
         track = make_track(media_dir, f"T{len(downloads)}")
         track["url"] = url

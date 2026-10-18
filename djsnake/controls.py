@@ -328,7 +328,11 @@ async def _add_from_web(player, guild_id, kind, url):
             )
         else:
             loop = asyncio.get_running_loop()
-            entries = await loop.run_in_executor(None, media.get_playlist_info, url)
+            key = player.add_pending(None)  # The link, until its list is read
+            try:
+                entries = await loop.run_in_executor(None, media.get_playlist_info, url)
+            finally:
+                player.drop_pending(key)
             if cancelled(player, epoch):
                 pass
             elif not entries:

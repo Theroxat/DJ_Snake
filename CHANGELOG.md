@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Live viewer count ("👁 N") in the clip page header: each tab sends a random
   id with its state poll and counts while it polled in the last 30 s. The
   state JSON gains `viewers`.
+- "En téléchargement" section on the clip page, under "À suivre": every track
+  asked for but not queued yet (single links, playlist and Spotify entries, web
+  adds), with a spinner, until it is queued, fails or is not found on YouTube.
+  A link shows "Lien en cours…" until yt-dlp reads its title. The state JSON
+  gains `downloading` (first 50) and `downloading_total`; the status panel
+  says "📥 Downloading N tracks…".
 
 ### Changed
 

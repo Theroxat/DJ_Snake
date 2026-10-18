@@ -58,7 +58,9 @@ from .themes import (
 #   GET /{sid}                 the page (it handles unknown/ended sessions)
 #   GET /api/{sid}/state       session state JSON, 404 {"active": false} if none;
 #                              an X-Viewer header (the tab's random id) counts
-#                              the tab in `viewers`
+#                              the tab in `viewers`; `downloading` lists the
+#                              first MAX_DOWNLOADING tracks asked for but not
+#                              queued yet, `downloading_total` counts them all
 #   GET /api/{sid}/stats       ?range=week|month|all, the guild's listening stats
 #   POST /api/{sid}/control    {"action", "id"?, "index"?, "url"?, "position"?,
 #                              "enabled"?} -> {"ok": ...}; actions: next,
@@ -94,6 +96,9 @@ async def web_page(request):
     headers = {"Cache-Control": "no-cache", "Referrer-Policy": "same-origin"}
     return web.FileResponse(WEB_INDEX, headers=headers)
 
+
+# Pending downloads listed in the state (the rest is only counted).
+MAX_DOWNLOADING = 50
 
 _VIEWER_RE = re.compile(r"^[A-Za-z0-9_-]{8,40}$")
 
@@ -131,6 +136,7 @@ async def web_state(request):
     channel = None
     now_playing = None
     queue = []
+    downloading = []
     if in_voice:
         if player.voice_client.channel:
             channel = player.voice_client.channel.name
@@ -143,6 +149,7 @@ async def web_state(request):
             now_playing["start"] = track.get("start") or 0.0
             now_playing["end"] = track.get("end") or track.get("duration")
         queue = [_track_summary(t) for t in player.queue]
+        downloading = list(player.pending_downloads)
 
     return web.json_response(
         {
@@ -162,6 +169,9 @@ async def web_state(request):
             "viewers": viewers,
             "now_playing": now_playing,
             "queue": queue,
+            # Asked for, not queued yet (title None: link not read yet).
+            "downloading": [dict(item) for item in downloading[:MAX_DOWNLOADING]],
+            "downloading_total": len(downloading),
             "theme": theme_state(sid, state.sessions[sid]),
         },
         headers=headers,

@@ -50,7 +50,7 @@ async def test_playlist_progress_edits_the_panel_in_place(
     player, ctx, channel, panel, media_dir, monkeypatch
 ):
     monkeypatch.setattr(
-        media, "download_media", lambda url: make_track(media_dir, "T" + url[-1])
+        media, "download_media", lambda url, **kw: make_track(media_dir, "T" + url[-1])
     )
     entries = [{"id": f"aaaaaaaaaa{i}"} for i in range(5)]
     await queue_playlist(ctx, player, entries)
