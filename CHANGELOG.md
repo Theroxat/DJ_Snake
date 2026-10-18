@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Clip page: a discreet "En cours" row above "À suivre" shows the playing
+  track (thumbnail, title, mini equalizer, time left); hidden when idle.
 - Listening stats: a chart button in the clip page header opens the server's
   stats for the last week, month or all time: top tracks, artists and DJs, DJ
   of the week, most skipped track, hours played, tracks, sessions, peak
