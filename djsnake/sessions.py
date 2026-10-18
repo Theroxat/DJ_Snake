@@ -28,6 +28,7 @@ def expire_session(player):
     """End the session for good: its links stop working and its files go."""
     if player.sid:
         state.sessions.pop(player.sid, None)
+        state.viewers.pop(player.sid, None)
         print(f"Web session expired: {player.sid}")
         player.sid = None
         player.expired = True
@@ -57,6 +58,7 @@ def session_player(sid):
     player = state.music_players.get(guild_id)
     if not player or player.sid != sid:
         state.sessions.pop(sid, None)
+        state.viewers.pop(sid, None)
         return None
     if player.in_voice():
         player.last_active = state.clock()

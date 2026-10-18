@@ -6,7 +6,7 @@ import os
 import discord
 
 from . import commands  # noqa: F401  (registers the commands)
-from . import state
+from . import state, stats
 from .config import COMMAND_PREFIX
 from .sessions import refresh_panel, session_cleanup_loop
 from .web import start_web_server
@@ -30,6 +30,7 @@ async def on_ready():
 @bot.event
 async def on_voice_state_update(member, before, after):
     """Handle voice state changes for cleanup"""
+    _record_listeners(member, after)
     if member == bot.user and before.channel and not after.channel:
         print(f"Bot was disconnected from voice channel: {before.channel.name}")
 
@@ -46,6 +47,25 @@ async def on_voice_state_update(member, before, after):
             player.is_playing = False
             refresh_panel(player)
             # The web session stays; it expires after SESSION_IDLE_HOURS.
+
+
+def _record_listeners(member, after):
+    """Someone joined the bot's voice channel: maybe a new listener peak."""
+    try:
+        voice_client = member.guild.voice_client
+        if (
+            member.bot
+            or after.channel is None
+            or not voice_client
+            or not voice_client.is_connected()
+            or after.channel != voice_client.channel
+        ):
+            return
+        stats.record_listeners(
+            member.guild.id, stats.count_listeners(voice_client.channel)
+        )
+    except Exception as e:
+        print(f"Listener count failed: {e}")
 
 
 async def setup_hook():

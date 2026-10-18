@@ -24,6 +24,7 @@ STATE_KEYS = {
     "crossfade",
     "crossfading",
     "server_time",
+    "viewers",
     "now_playing",
     "queue",
     "theme",
