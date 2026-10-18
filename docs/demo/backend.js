@@ -20,6 +20,9 @@
     ["Tears of Steel", "R6MlUcmOul8"],
     ["Sintel", "eRsGyueVLvQ"],
   ];
+  // Directors of the films, as the "artist" in the fake stats.
+  const ARTISTS = ["Pablo Vazquez", "Mathieu Auvray", "Sacha Goedegebure", "Ian Hubert", "Colin Levy"];
+  const DJS = ["Maya", "Theo", "Jun", "you"]; // The Discord demo's members
   const DURATION = 25, START = 1, END = 24;
   const BASE_URL = "https://dj.example.com"; // PUBLIC_BASE_URL (fictional)
   const PREFIX = "!";
@@ -329,12 +332,58 @@
           active: true, in_voice: S.inVoice, guild: "Friday Night", channel: "Lounge",
           loading: S.jobs > 0, paused: !!c && paused(), can_previous: !!c,
           crossfade: S.crossfade, crossfading: false, server_time: Date.now() / 1000,
+          viewers: viewers(),
           theme: S.theme,
           now_playing: c ? Object.assign(pub(c), { video_url: c.video_url, elapsed: elapsed(), start: START, end: END }) : null,
           queue: S.inVoice ? S.queue.map(pub) : [],
         },
       };
     }
+    // A few people on the page, slowly coming and going.
+    const viewers = () => 3 + Math.round(1.5 + 1.5 * Math.sin(Date.now() / 47000));
+
+    // ---- fake listening stats (stats.summary), built from the catalog with a
+    // fixed seed so every visit shows the same numbers.
+    function fakeStats(range) {
+      const days = range === "week" ? 7 : range === "month" ? 30 : 120;
+      let seed = 1337;
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      const tracks = new Map(), artists = new Map(), djs = new Map(), skips = new Map();
+      const heatmap = new Array(168).fill(0);
+      const nowSec = Date.now() / 1000;
+      let seconds = 0, count = 0;
+      const bump = (m, k, n) => m.set(k, (m.get(k) || 0) + (n || 1));
+      const plays = days * 9;
+      for (let i = 0; i < plays; i++) {
+        // Evenings and weekends are busier (UTC hour-of-week buckets).
+        const day = Math.floor(rnd() * 7), weekend = day >= 4;
+        const hour = rnd() < 0.75 ? 18 + Math.floor(rnd() * 6) : (weekend ? 13 : 12) + Math.floor(rnd() * 6);
+        const k = Math.min(CATALOG.length - 1, Math.floor(Math.pow(rnd(), 1.6) * CATALOG.length));
+        const skipped = rnd() < (k === 3 ? 0.35 : 0.08);
+        heatmap[day * 24 + (hour % 24)]++;
+        count++;
+        seconds += skipped ? 12 : 200;
+        bump(djs, rnd() < 0.15 ? null : DJS[Math.min(3, Math.floor(Math.pow(rnd(), 1.3) * 4))]);
+        if (skipped) { bump(skips, k); continue; }
+        bump(tracks, k);
+        bump(artists, ARTISTS[k]);
+      }
+      const top = (m, n) => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, n);
+      const worst = top(skips, 1)[0];
+      const weekDj = top(new Map([...djs].filter(([k]) => k !== null)), 1)[0];
+      return {
+        range,
+        top_tracks: top(tracks, 10).map(([k, n]) => ({ title: CATALOG[k][0], artist: ARTISTS[k], video_id: CATALOG[k][1], plays: n })),
+        top_artists: top(artists, 10).map(([a, n]) => ({ name: a, plays: n })),
+        top_djs: top(djs, 5).map(([a, n]) => ({ name: a, plays: n })),
+        dj_of_week: weekDj ? { name: weekDj[0], plays: Math.round(weekDj[1] * 7 / days) } : null,
+        most_skipped: worst ? { title: CATALOG[worst[0]][0], artist: ARTISTS[worst[0]], skips: worst[1] } : null,
+        totals: { hours: Math.round(seconds / 360) / 10, tracks: count, sessions: Math.round(days * 0.8) },
+        heatmap,
+        peak_listeners: { count: days > 7 ? 9 : 6, at: nowSec - (days > 7 ? 12 : 2) * 86400 - 3 * 3600 },
+      };
+    }
+
     const fail = (status, error) => ({ status, body: { ok: false, error } });
     function control(d) {
       d = d || {};
@@ -383,9 +432,15 @@
       setAction("🎨 Clip page theme updated via the web page");
       return { status: 200, body: { ok: true, theme: S.theme } };
     }
-    /** Fake HTTP: `route` is state | control | theme | theme/logo. */
+    /** Fake HTTP: `route` is state | stats | control | theme | theme/logo. */
     function http(route, method, body) {
       if (route === "state") return state();
+      if (route === "stats") {
+        if (!S.sid) return { status: 404, body: { active: false } };
+        const range = body && body.range;
+        if (!["week", "month", "all"].includes(range)) return fail(400, "Période inconnue.");
+        return { status: 200, body: fakeStats(range) };
+      }
       if (route === "control") return control(body);
       if (!S.sid) return fail(404, "Session inconnue ou expirée.");
       if (route === "theme") return setTheme(body);

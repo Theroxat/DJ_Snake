@@ -32,6 +32,8 @@
 - Live clip page: muted video synced with the audio, plus web controls (next, previous, pause, resume, seek, jump, remove, reorder, add).
 - Automix, always on: SponsorBlock `music_offtopic` segments are cut, loudness is normalised to -14 LUFS, leading and trailing silence is trimmed, and tracks fade in and out.
 - Optional crossfade between tracks.
+- Listening stats per server on the clip page: top tracks, artists and DJs, the most skipped track, hours played, sessions, peak listeners and a day-by-hour heatmap, for the last week, month or all time.
+- Live viewer count in the clip page header.
 - Themable clip page: seven looks, including a custom one with your colors, name and logo (see [Themes](#themes) below).
 - One live status message per session, edited in place instead of spamming the channel.
 - Radio/mix links ask whether to play the single track or the whole playlist.
@@ -108,6 +110,8 @@ DJ Snake is not affiliated with or endorsed by Spotify.
 
 When the bot joins voice it posts a link such as `https://dj.example.com/<session>` and keeps a status message in that text channel. The page shows the video of the current track, the queue, and a progress bar, and lets you skip, go back, pause, resume, seek, play a queued track now, remove, reorder and add YouTube or Spotify links.
 
+The header shows how many people have the page open (👁) and a chart button that opens the server's listening stats (week, month or all time). Stats are kept in `DATA_DIR/stats.db`: each played track with who asked for it (the Discord display name, or "page web" for links added on the page), how long it played and whether it was skipped (left before 30 s of play), plus voice sessions and the peak number of listeners.
+
 A session belongs to the server and survives the bot leaving voice. It expires after `SESSION_IDLE_HOURS` (6 by default) without playback, voice presence, commands or web actions; its files are then deleted.
 
 **Exposing it.** The container listens on `WEB_PORT`. Compose publishes it on `WEB_BIND`, which defaults to `127.0.0.1` (this machine only). To reach it from elsewhere, put a reverse proxy or a tunnel in front, and set `PUBLIC_BASE_URL` to the public address so the posted link is correct.
@@ -155,7 +159,7 @@ Set these in `.env` (see `.env.example`).
 | `WEB_BIND` | `127.0.0.1` | Host IP the port is published on (Compose only). |
 | `PUBLIC_BASE_URL` | empty (`http://localhost:WEB_PORT`) | Public address used in the posted clip link. |
 | `SESSION_IDLE_HOURS` | `6` | Idle hours before a clip link expires. |
-| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`) and logos. Compose mounts `./data` there. |
+| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), logos and listening stats (`stats.db`). Compose mounts `./data` there. |
 | `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`. |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | empty | Optional Spotify Web API credentials, for playlists over 100 tracks. Without them, Spotify links are read from the public embed page. |
 | `YTDLP_AUTO_UPDATE` | `1` | Upgrade yt-dlp on container start (`0` to skip). |

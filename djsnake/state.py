@@ -36,5 +36,9 @@ guild_themes = {}
 # `!theme edit` links: token -> (guild id, expiry on clock()). In memory only.
 edit_tokens = {}
 
+# Web session id -> {viewer id: last seen on clock()}, in poll order (see
+# web.py). Dropped with the session.
+viewers = {}
+
 # Strong references to fire-and-forget tasks, so they are not collected.
 background_tasks = set()

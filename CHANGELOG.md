@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Listening stats: a chart button in the clip page header opens the server's
+  stats for the last week, month or all time: top tracks, artists and DJs, DJ
+  of the week, most skipped track, hours played, tracks, sessions, peak
+  listeners and a day-by-hour heatmap in the viewer's timezone. Every played
+  track is recorded in `DATA_DIR/stats.db` (SQLite) with who asked for it, how
+  long it really played (pauses excluded) and whether it was skipped (left
+  before 30 s). Recording never blocks or breaks playback. New route
+  `GET /api/{sid}/stats?range=week|month|all`.
+- Live viewer count ("👁 N") in the clip page header: each tab sends a random
+  id with its state poll and counts while it polled in the last 30 s. The
+  state JSON gains `viewers`.
+
 ### Changed
 
 - The live demo opens on a simulated Discord channel: send `!play` with a

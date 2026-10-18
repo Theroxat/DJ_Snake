@@ -32,7 +32,7 @@ from .playback import (
     queue_playlist,
     queue_spotify,
 )
-from .player import MusicPlayer, discard_tracks
+from .player import MusicPlayer, discard_tracks, retire_play
 from .sessions import (
     ack,
     open_session,
@@ -199,6 +199,7 @@ async def stop(ctx):
         return
 
     async with player.lock:
+        retire_play(player, ctx.guild.id, "stop")
         player.stop_and_clear()
     await player.disconnect_voice_client()
     # The web session stays (same link on the next !play) until it expires.

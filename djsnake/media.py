@@ -330,6 +330,9 @@ def _download_once(url):
         "loudnorm": analysis["loudnorm"],  # Measured values, or None
         "thumbnail": info.get("thumbnail"),
         "url": info.get("webpage_url") or url,
+        # For the stats (stats.artist_of cleans the channel name).
+        "video_id": info.get("id"),
+        "channel": info.get("channel") or info.get("uploader"),
     }
 
 

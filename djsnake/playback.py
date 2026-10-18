@@ -6,11 +6,11 @@ import time
 
 import discord
 
-from . import media, spotify, state
+from . import media, spotify, state, stats
 from .config import CROSSFADE_SECONDS, FADE_OUT_SECONDS, FRAMES_PER_SECOND
 from .media import crossfade_eligible, playback_options
 from .mixer import CrossfadeMixer
-from .player import MusicPlayer, discard_tracks, push_history
+from .player import MusicPlayer, discard_tracks, guild_of, push_history, retire_play
 from .sessions import open_session, refresh_panel, set_action, short, touch
 
 
@@ -117,6 +117,9 @@ async def join_voice_channel(ctx):
 
     if voice_client:
         player.voice_client = voice_client
+        if not already_here:
+            stats.record_session(ctx.guild.id)
+            stats.record_listeners(ctx.guild.id, stats.count_listeners(voice_channel))
         # A fresh join (re)posts the session link; a later !play does not.
         await open_session(ctx, player, announce=not already_here)
         return True
@@ -149,11 +152,18 @@ def cancelled(player, epoch):
     return player.should_stop or player.epoch != epoch
 
 
+def spotify_fields(spotify_track):
+    """What a Spotify link tells about the YouTube track found for it."""
+    artists = spotify_track.get("artists") or []
+    return {"artist": artists[0]} if artists and artists[0] else {}
+
+
 async def download_and_queue_song(
-    ctx, player, url, skip_voice_check=False, from_web=False, quiet=False
+    ctx, player, url, skip_voice_check=False, from_web=False, quiet=False, extra=None
 ):
     """Download one track and queue it. Returns the track, or None.
-    `quiet` (playlist items) posts no message, not even on failure."""
+    `quiet` (playlist items) posts no message, not even on failure. `extra`
+    adds fields to the track (the Spotify artist)."""
     epoch = player.epoch
     try:
         if cancelled(player, epoch):
@@ -180,6 +190,10 @@ async def download_and_queue_song(
             refresh_panel(player)
             return None
 
+        # For the stats: who asked (None from the web page, which has no author).
+        track["requester"] = getattr(getattr(ctx, "author", None), "display_name", None)
+        if extra:
+            track.update(extra)
         player.add_to_queue(track)
         if quiet:
             refresh_panel(player)
@@ -222,8 +236,10 @@ async def queue_playlist(ctx, player, entries, from_web=False):
                 stopped = True
                 break
 
+            extra = None
             if "spotify" in entry:
                 # A Spotify track: search YouTube for it first.
+                extra = spotify_fields(entry["spotify"])
                 video_url = await loop.run_in_executor(
                     None, spotify.find_youtube_match, entry["spotify"]
                 )
@@ -245,7 +261,7 @@ async def queue_playlist(ctx, player, entries, from_web=False):
                     video_url = f"https://www.youtube.com/watch?v={video_id}"
 
             track = await download_and_queue_song(
-                ctx, player, video_url, skip_voice_check=True, quiet=True
+                ctx, player, video_url, skip_voice_check=True, quiet=True, extra=extra
             )
             if track is not None and not cancelled(player, epoch):
                 loaded += 1
@@ -299,7 +315,12 @@ async def queue_spotify(ctx, player, kind, tracks, from_web=False):
         )
         return
     await download_and_queue_song(
-        ctx, player, video_url, skip_voice_check=from_web, from_web=from_web
+        ctx,
+        player,
+        video_url,
+        skip_voice_check=from_web,
+        from_web=from_web,
+        extra=spotify_fields(track),
     )
 
 
@@ -330,6 +351,10 @@ async def _advance(ctx, player):
     action, player.pending_action = player.pending_action, None
     if action is None:
         player.last_action = None  # The track ended by itself
+    if action in ("restart", "seek"):
+        player.play_accum = player.played_seconds()  # Same track, same play
+    else:
+        retire_play(player, ctx.guild.id, action)
     finished = player.now_playing
     player.now_playing = None
     player.started_at = None
@@ -416,6 +441,7 @@ async def _advance(ctx, player):
         raise
     now = time.monotonic()
     player.started_at = now - offset
+    player.mark_started(offset, same_track=next_track is finished)
     if keep_paused:
         player.voice_client.pause()
         player.paused_at = now
@@ -474,11 +500,13 @@ async def _start_crossfade(player, mixer, gen):
                 return
             player.play_gen += 1
             player.queue.remove(upcoming)
+            retire_play(player, guild_of(player), None)
             push_history(player, current)
             player.now_playing = upcoming
             player.started_at = time.monotonic() - offset
             player.paused_at = None
             player.paused_total = 0.0
+            player.mark_started(offset, same_track=False)
             player.last_action = None
             player.last_active = state.clock()
             refresh_panel(player)

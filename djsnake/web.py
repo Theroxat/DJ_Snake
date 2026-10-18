@@ -1,21 +1,26 @@
 """Web server for the synced clip page (aiohttp, on the bot's loop)."""
 
+import asyncio
 import json
 import math
 import os
+import re
 import time
 
 from aiohttp import web
 
-from . import state
+from . import state, stats
 from .config import (
     LOGO_TYPES,
     MAX_CONTROL_BODY,
     MAX_LOGO_BYTES,
+    MAX_VIEWERS_PER_SESSION,
     PUBLIC_BASE_URL,
+    STATS_CACHE_SECONDS,
     THEME_NAME_MAX,
     THEME_PRESETS,
     THEME_SKINS,
+    VIEWER_WINDOW_SECONDS,
     WEB_INDEX,
     WEB_PORT,
 )
@@ -51,7 +56,10 @@ from .themes import (
 # Contract relied on by web/index.html:
 #   GET /                      landing text
 #   GET /{sid}                 the page (it handles unknown/ended sessions)
-#   GET /api/{sid}/state       session state JSON, 404 {"active": false} if none
+#   GET /api/{sid}/state       session state JSON, 404 {"active": false} if none;
+#                              an X-Viewer header (the tab's random id) counts
+#                              the tab in `viewers`
+#   GET /api/{sid}/stats       ?range=week|month|all, the guild's listening stats
 #   POST /api/{sid}/control    {"action", "id"?, "index"?, "url"?, "position"?,
 #                              "enabled"?} -> {"ok": ...}; actions: next,
 #                              previous, pause, resume, remove, move, add,
@@ -87,12 +95,36 @@ async def web_page(request):
     return web.FileResponse(WEB_INDEX, headers=headers)
 
 
+_VIEWER_RE = re.compile(r"^[A-Za-z0-9_-]{8,40}$")
+
+
+def count_viewer(sid, viewer):
+    """Note that tab `viewer` (None: not given) polls `sid`; returns how
+    many tabs polled within VIEWER_WINDOW_SECONDS. The map keeps poll order
+    (a tab moves to the end each time), so pruning stops at the first fresh
+    entry, and it holds at most MAX_VIEWERS_PER_SESSION ids."""
+    now = state.clock()
+    seen = state.viewers.setdefault(sid, {})
+    if viewer is not None and _VIEWER_RE.match(viewer):
+        seen.pop(viewer, None)
+        seen[viewer] = now
+    cutoff = now - VIEWER_WINDOW_SECONDS
+    for key in list(seen):
+        if seen[key] >= cutoff:
+            break
+        del seen[key]
+    while len(seen) > MAX_VIEWERS_PER_SESSION:
+        del seen[next(iter(seen))]
+    return len(seen)
+
+
 async def web_state(request):
     sid = request.match_info["sid"]
     headers = {"Cache-Control": "no-store"}
     player = session_player(sid)
     if player is None:
         return web.json_response({"active": False}, status=404, headers=headers)
+    viewers = count_viewer(sid, request.headers.get("X-Viewer"))
 
     guild = state.bot.get_guild(state.sessions[sid])
     in_voice = player.in_voice()
@@ -127,6 +159,7 @@ async def web_state(request):
             and player.mixer is not None
             and player.mixer.outgoing is not None,
             "server_time": time.time(),
+            "viewers": viewers,
             "now_playing": now_playing,
             "queue": queue,
             "theme": theme_state(sid, state.sessions[sid]),
@@ -150,6 +183,37 @@ async def web_media(request):
                 return web.FileResponse(filepath)
             break
     raise web.HTTPNotFound()
+
+
+# (guild id, range) -> (time.monotonic() expiry, summary): bounds the work a
+# page (or anyone with the link) can cause.
+_stats_cache = {}
+
+
+async def web_stats(request):
+    sid = request.match_info["sid"]
+    headers = {"Cache-Control": "no-store"}
+    if session_player(sid) is None:
+        return web.json_response({"active": False}, status=404, headers=headers)
+    range_name = request.query.get("range", "week")
+    if range_name not in stats.RANGES:
+        return _control_error(400, "Période inconnue.")
+    guild_id = state.sessions[sid]
+    key = (guild_id, range_name)
+    now = time.monotonic()
+    cached = _stats_cache.get(key)
+    if cached is not None and cached[0] > now:
+        return web.json_response(cached[1], headers=headers)
+    loop = asyncio.get_running_loop()
+    try:
+        result = await loop.run_in_executor(None, stats.summary, guild_id, range_name)
+    except Exception as e:
+        print(f"Stats read failed: {e}")
+        return _control_error(500, "Statistiques indisponibles pour le moment.")
+    for stale in [k for k, v in _stats_cache.items() if v[0] <= now]:
+        del _stats_cache[stale]
+    _stats_cache[key] = (now + STATS_CACHE_SECONDS, result)
+    return web.json_response(result, headers=headers)
 
 
 def _control_error(status, message):
@@ -400,6 +464,7 @@ def build_web_app():
     app.router.add_get("/", web_landing)
     app.router.add_get("/api/{sid}/state", web_state)
     app.router.add_post("/api/{sid}/control", web_control)
+    app.router.add_get("/api/{sid}/stats", web_stats)
     app.router.add_post("/api/{sid}/theme", web_theme)
     app.router.add_post("/api/{sid}/theme/logo", web_theme_logo)
     app.router.add_delete("/api/{sid}/theme/logo", web_theme_logo)

@@ -41,6 +41,17 @@ SESSION_CLEANUP_SECONDS = 600
 DATA_DIR = os.getenv("DATA_DIR") or "/app/data"
 THEMES_FILE = os.path.join(DATA_DIR, "themes.json")
 LOGO_DIR = os.path.join(DATA_DIR, "logos")
+# Listening statistics (stats.py): SQLite, written by one background thread.
+STATS_DB = os.path.join(DATA_DIR, "stats.db")
+# A track left (next, jump, previous, !stop) before this much actual play
+# counts as skipped.
+SKIP_SECONDS = 30.0
+STATS_CACHE_SECONDS = 15  # The stats route serves a guild's answer this long
+# Live viewer count: a page tab counts while it polled within this window.
+# The page polls every 2 s; browsers throttle background tabs to about one
+# timer per second (one per minute after several minutes hidden).
+VIEWER_WINDOW_SECONDS = 30
+MAX_VIEWERS_PER_SESSION = 500
 # Clip page themes. "perso" is a custom palette on top of a preset's shapes.
 THEME_PRESETS = ("arcade", "minimal", "nuit", "vinyle", "club", "terminal")
 THEME_SKINS = THEME_PRESETS + ("perso",)

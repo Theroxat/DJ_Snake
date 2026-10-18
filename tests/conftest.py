@@ -21,7 +21,7 @@ import discord  # noqa: E402
 import pytest  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 
-from djsnake import media, state, themes  # noqa: E402
+from djsnake import media, state, stats, themes, web  # noqa: E402
 from djsnake.player import MusicPlayer  # noqa: E402
 from djsnake.sessions import open_session  # noqa: E402
 from djsnake.web import build_web_app  # noqa: E402
@@ -42,9 +42,13 @@ def fresh_state(tmp_path, monkeypatch):
         state.sessions,
         state.guild_themes,
         state.edit_tokens,
+        state.viewers,
+        stats._peaks,
+        web._stats_cache,
     ):
         registry.clear()
     data_dir = tmp_path / "data"
+    monkeypatch.setattr(stats, "DB_PATH", str(data_dir / "stats.db"))
     monkeypatch.setattr(themes, "THEMES_FILE", str(data_dir / "themes.json"))
     monkeypatch.setattr(themes, "LOGO_DIR", str(data_dir / "logos"))
     media_dir = tmp_path / "media"
@@ -57,6 +61,7 @@ def fresh_state(tmp_path, monkeypatch):
                 player.panel_task.cancel()
             except RuntimeError:
                 pass  # Its loop is already closed
+    stats.flush()  # Records of this test go to its own database
     state.music_players.clear()
     state.sessions.clear()
 
