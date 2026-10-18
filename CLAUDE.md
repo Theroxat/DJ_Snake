@@ -76,7 +76,10 @@ the GitHub Release. The ghcr package must be set to public once, or users cannot
 pull it.
 
 After changing `web/index.html` (or `docs/demo/shim.js`), run
-`python3 docs/demo/build.py` and commit the regenerated `docs/demo/index.html`.
+`python3 docs/demo/build.py` and commit the regenerated `docs/demo/player.html`.
+The demo's entry page, `docs/demo/index.html` (a mock Discord client, with
+`discord.js` and the fake bot in `backend.js`), is hand-written and loads
+`player.html` in an iframe.
 
 ## Configuration
 

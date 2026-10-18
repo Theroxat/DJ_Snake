@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Regenerate docs/demo/index.html from web/index.html plus the demo shim.
+"""Regenerate docs/demo/player.html from web/index.html plus the demo shim.
+
+player.html is the real clip page running on the fake bot in backend.js. The
+demo's entry page, index.html (a mock Discord client, hand-written), loads it
+in an iframe; opened on its own it plays a standalone session.
 
 Run from anywhere: python3 docs/demo/build.py
 """
@@ -8,11 +12,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "web" / "index.html"
-OUT = ROOT / "docs" / "demo" / "index.html"
+OUT = ROOT / "docs" / "demo" / "player.html"
 
 RIBBON_CSS = """
 <style>
-body { padding-bottom: 56px; }
+html:not(.demo-embedded) body { padding-bottom: 56px; }
+html.demo-embedded .demo-ribbon { display: none; }
 .demo-ribbon { position: fixed; z-index: 99999; left: 50%; bottom: 10px; transform: translateX(-50%);
   display: flex; gap: 10px; align-items: center; padding: 6px 14px; border-radius: 999px;
   background: rgba(16,16,16,.88); color: #fff; font: 600 12px/1.2 system-ui, sans-serif;
@@ -25,10 +30,10 @@ body { padding-bottom: 56px; }
 
 RIBBON_HTML = """
 <div class="demo-ribbon" role="note">
-  <span title="Extraits de Caminandes 3, Cosmos Laundromat, Big Buck Bunny, Tears of Steel et Sintel (Blender Foundation / Blender Studio, licence CC BY).">Démo — extraits de films CC BY (Blender)</span>
-  <a href="../#credits">Crédits</a>
-  <a href="?edit=demo">Éditeur de thème</a>
-  <a href="../">À propos</a>
+  <span title="Excerpts of Caminandes 3, Cosmos Laundromat, Big Buck Bunny, Tears of Steel and Sintel (Blender Foundation / Blender Studio, CC BY licence).">Demo: CC BY film excerpts (Blender)</span>
+  <a href="./">Discord demo</a>
+  <a href="?edit=demo">Theme editor</a>
+  <a href="../#credits">Credits</a>
 </div>
 """
 
@@ -36,7 +41,7 @@ RIBBON_HTML = """
 def main():
     html = SRC.read_text(encoding="utf-8")
     # The shim must run before the page's own scripts: put it first in <head>.
-    head = '<script src="shim.js"></script>\n'
+    head = '<script src="backend.js"></script>\n<script src="shim.js"></script>\n'
     assert "<head>" in html and "</body>" in html
     html = html.replace("<head>", "<head>\n" + head, 1)
     html = html.replace("</head>", RIBBON_CSS + "</head>", 1)

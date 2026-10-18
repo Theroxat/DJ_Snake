@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The live demo opens on a simulated Discord channel: send `!play` with a
+  Spotify playlist, watch the bot join voice and edit its status panel, then
+  open the clip link. Web controls and Discord commands drive one shared fake
+  session, so each side follows the other. The clip page alone is still at
+  `demo/player.html`.
+
 ## [1.1.0] - 2026-10-17
 
 ### Added

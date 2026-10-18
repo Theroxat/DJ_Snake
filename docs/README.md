@@ -4,12 +4,27 @@ GitHub Pages site, served from `/docs` on `main` at
 <https://theroxat.github.io/DJ_Snake/>.
 
 - `index.html`: landing page.
-- `demo/`: the real clip page (`web/index.html`) running against a fake API.
-  - `shim.js` replaces `window.fetch` for `/api/{sid}/state`, `/control` and
-    `/theme`, with fictional tracks and in-memory state. `?edit=demo` opens the
-    theme editor (saving only updates the in-memory theme; logos are refused).
-  - `index.html` is generated, do not edit it. After changing `web/index.html`
-    (or `shim.js`), regenerate it with `python3 docs/demo/build.py` and commit.
+- `demo/`: an interactive demo, run entirely in the browser.
+  - `index.html` + `discord.js`: a simulated Discord channel (hand-written).
+    The visitor sends `!play` with a Spotify playlist, the bot reacts, joins
+    the voice channel and posts its status panel, edited in place like the
+    real one; its clip link opens the clip page in the right-hand panel (a
+    separate view on phones). A short guided tour can be skipped. Commands:
+    `!play`, `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!list`,
+    `!stop`, `!reset`, `!theme`, `!help`, with the bot's English messages.
+  - `backend.js`: the fake bot (one guild, one session): playback, queue,
+    loading progress, the panel text and the web API, mirroring `djsnake/`.
+    The wrapper creates it as `DJDemoBackend.shared`; the iframe uses it
+    through `window.parent`, so web actions update the Discord panel and
+    Discord commands update the page (the wrapper fires `visibilitychange` in
+    the iframe so the page polls at once).
+  - `player.html`: the real clip page (`web/index.html`) with `backend.js` and
+    `shim.js`, which replaces `window.fetch` for `/api/{sid}/state`,
+    `/control` and `/theme`. Opened on its own it runs a standalone session
+    that is always playing. `?edit=demo` opens the theme editor (saving only
+    updates the in-memory theme; logos are refused). It is generated, do not
+    edit it: after changing `web/index.html` (or `shim.js`), run
+    `python3 docs/demo/build.py` and commit.
   - `media/*.webm` are 25 s excerpts of real CC-BY films (with `thumb*.jpg`), rebuilt by
     `make-media.sh` (needs the source videos, ffmpeg or the `dj-snake` image).
 - `screenshots/`: images used by the README and the landing page

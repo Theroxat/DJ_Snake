@@ -201,7 +201,7 @@ YouTube breaks yt-dlp extractors every few weeks, usually showing up as `HTTP Er
 
 ## Demo site
 
-`docs/` is a GitHub Pages site: a landing page and a live demo of the real clip page running on fake data. See [docs/README.md](docs/README.md).
+`docs/` is a GitHub Pages site: a landing page and a live demo where you send commands to the bot in a simulated Discord channel and control the real clip page, both running on a fake session in the browser. See [docs/README.md](docs/README.md).
 
 Demo footage: excerpts of Caminandes 3, Cosmos Laundromat, Big Buck Bunny, Tears of Steel and Sintel, (c) Blender Foundation / Blender Institute, [CC BY](https://creativecommons.org/licenses/by/3.0/); full credits in [docs/README.md](docs/README.md#demo-footage-credits).
 
