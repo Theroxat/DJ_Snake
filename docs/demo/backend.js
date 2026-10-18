@@ -108,6 +108,7 @@
       sid: null, inVoice: false, current: null, queue: [], history: [],
       startedAt: 0, pausedAt: null, pausedTotal: 0,
       crossfade: false, epoch: 0, jobs: 0, single: 0,
+      pending: [], // pending_downloads: {key, title (null: link not read), source}
       loadLine: null, loadFinal: false, lastAction: null,
       theme: { skin: "arcade", base: "nuit", bg: "#101820", text: "#f2f2f2", accent: "#ffb703", name: "", logo_url: null },
     };
@@ -187,22 +188,45 @@
     // ---- loading (fake downloads with realistic delays)
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const cancelled = (epoch) => epoch !== S.epoch || !S.inVoice;
+    // The "En téléchargement" list (player.pending_downloads).
+    let pkey = 0;
+    function pend(title, source) {
+      const key = "dl" + ++pkey;
+      S.pending.push({ key, title, source: source || "youtube" });
+      return key;
+    }
+    function unpend(key) { S.pending = S.pending.filter((p) => p.key !== key); }
+    function namePending(key, title) { S.pending.forEach((p) => { if (p.key === key) p.title = title; }); }
+    const label = (k, source) => {
+      k = ((k % CATALOG.length) + CATALOG.length) % CATALOG.length;
+      return source === "spotify" ? `${ARTISTS[k]} – ${CATALOG[k][0]}` : CATALOG[k][0];
+    };
     /** Load a list of catalog indexes one by one, like queue_playlist(). */
-    async function loadList(ks, readLine) {
+    async function loadList(ks, readLine, source, step) {
       const epoch = S.epoch, total = ks.length;
       let loaded = 0;
+      const keys = [];
       S.jobs++;
-      if (readLine) { progress(readLine); await wait(1100); }
-      progress(`📥 Loading 0/${total}…`);
       try {
-        for (const k of ks) {
-          await wait(loaded === 0 ? 900 : 1400);
+        if (readLine) {
+          const link = pend(null, source);
+          progress(readLine);
+          try { await wait(1100); } finally { unpend(link); }
+        }
+        if (!cancelled(epoch)) ks.forEach((k) => keys.push(pend(label(k, source), source)));
+        progress(`📥 Loading 0/${total}…`);
+        for (let i = 0; i < ks.length; i++) {
+          await wait(step || (loaded === 0 ? 900 : 1400));
           if (cancelled(epoch)) break;
           loaded++;
-          addToQueue(mkTrack(k));
+          unpend(keys[i]);
+          addToQueue(mkTrack(ks[i]));
           progress(`📥 Loading ${loaded}/${total}…`);
         }
-      } finally { S.jobs = Math.max(0, S.jobs - 1); }
+      } finally {
+        S.jobs = Math.max(0, S.jobs - 1);
+        keys.forEach(unpend);
+      }
       if (cancelled(epoch)) {
         progress(`⏹️ Loading stopped (${loaded}/${total})`, true);
         return;
@@ -210,11 +234,19 @@
       progress(`✅ ${loaded}/${total} tracks loaded`, true);
       if (!S.current && !S.queue.length && S.jobs === 0) leaveVoice();
     }
-    async function loadOne(k, readLine) {
+    async function loadOne(k, readLine, source) {
       const epoch = S.epoch;
-      if (readLine) { progress(readLine); await wait(900); S.loadLine = null; }
-      S.single++; changed();
-      try { await wait(1300); } finally { S.single = Math.max(0, S.single - 1); }
+      // A YouTube link has no title until yt-dlp reads it; a Spotify one does.
+      const key = pend(source === "spotify" ? label(k, source) : null, source);
+      try {
+        if (readLine) { progress(readLine); await wait(900); S.loadLine = null; }
+        S.single++; changed();
+        try {
+          await wait(500);
+          if (source !== "spotify") namePending(key, label(k, source));
+          await wait(800);
+        } finally { S.single = Math.max(0, S.single - 1); }
+      } finally { unpend(key); }
       if (cancelled(epoch)) { changed(); return; }
       const t = mkTrack(k);
       S.queue.push(t);
@@ -224,15 +256,15 @@
     /** Queue whatever a link points to (after parseLink). */
     function queueLink(link) {
       if (link.kind === "spotify") {
-        if (link.type === "track") return loadOne(rot++, "🔎 Reading the Spotify link…");
+        if (link.type === "track") return loadOne(rot++, "🔎 Reading the Spotify link…", "spotify");
         const n = link.type === "playlist" ? 5 : 3;
         const ks = [];
         for (let i = 0; i < n; i++) ks.push(link.type === "playlist" ? i : rot++);
-        return loadList(ks, "🔎 Reading the Spotify link…");
+        return loadList(ks, "🔎 Reading the Spotify link…", "spotify");
       }
-      if (link.video) return loadOne(trackFor(link.video), null);
+      if (link.video) return loadOne(trackFor(link.video), null, "youtube");
       const ks = [rot++, rot++, rot++];
-      return loadList(ks, "🔎 Analyzing the link…");
+      return loadList(ks, "🔎 Analyzing the link…", "youtube");
     }
 
     // ---- controls (controls.py), shared by Discord commands and the web page
@@ -291,7 +323,7 @@
       },
       stop() {
         S.epoch++;
-        S.queue = []; S.history = [];
+        S.queue = []; S.history = []; S.pending = [];
         leaveVoice();
         if (!S.jobs) { S.loadLine = null; S.loadFinal = false; }
         setAction("⏹️ Stopped");
@@ -316,7 +348,8 @@
       }
       if (S.crossfade) lines.push("🔀 Crossfade on");
       if (S.loadLine) lines.push(S.loadLine);
-      else if (S.single) lines.push("📥 Downloading…");
+      else if (S.pending.length > 1) lines.push(`📥 Downloading ${S.pending.length} tracks…`);
+      else if (S.single || S.pending.length) lines.push("📥 Downloading…");
       if (S.lastAction) lines.push(S.lastAction);
       return lines.join("\n");
     }
@@ -336,6 +369,8 @@
           theme: S.theme,
           now_playing: c ? Object.assign(pub(c), { video_url: c.video_url, elapsed: elapsed(), start: START, end: END }) : null,
           queue: S.inVoice ? S.queue.map(pub) : [],
+          downloading: S.inVoice ? S.pending.slice(0, 50).map((p) => Object.assign({}, p)) : [],
+          downloading_total: S.inVoice ? S.pending.length : 0,
         },
       };
     }
@@ -456,6 +491,14 @@
     }
 
     return {
+      /** Standalone demo: a fake playlist that loads slowly, so the page's
+       * "En téléchargement" list has something to show. */
+      demoLoad(n) {
+        if (S.jobs || !S.inVoice || S.queue.length > 6) return null;
+        const ks = [];
+        for (let i = 0; i < (n || 4); i++) ks.push(rot++);
+        return loadList(ks, null, ks[0] % 2 ? "spotify" : "youtube", 2600);
+      },
       on, http, parseLink, queueLink, join, openSession, renderPanel, seekLabel, C, ControlError,
       catalog: CATALOG, start: START, prefix: PREFIX, presets: PRESETS, skins: SKINS, baseUrl: BASE_URL,
       get sid() { return S.sid; },

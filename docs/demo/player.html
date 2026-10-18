@@ -445,6 +445,22 @@ li.dragging .d { color: var(--hover-text); }
 ol.sorting li:not(.dragging) { transition: transform .12s; }
 ol.sorting { user-select: none; -webkit-user-select: none; }
 
+/* Downloading: requested tracks not queued yet (read-only, muted) */
+.dl { background: color-mix(in srgb, var(--surface) 55%, transparent); box-shadow: none; border-style: dashed; border-color: var(--hair); max-height: 40vh; }
+.dl li { min-height: 48px; padding: 8px 14px; cursor: default; color: var(--muted); }
+.dl li:hover, .dl li:active:not(.dragging) { background: none; color: var(--muted); }
+.dl li .n { font-size: 13px; }
+.dl li .n.unknown { font-style: italic; }
+.dl .spin {
+  flex: none; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--hair);
+  border-top-color: var(--accent); animation: spin .9s linear infinite;
+}
+[data-shape="arcade"] .dl .spin { border-radius: 0; animation-timing-function: steps(8); }
+.dl .src { flex: none; font-family: var(--font-mono); font-size: var(--hud-size); letter-spacing: var(--hud-ls); text-transform: var(--hud-case); color: var(--muted); opacity: .8; }
+.dl li.more { min-height: 36px; justify-content: center; font-family: var(--font-mono); font-size: var(--hud-size); }
+#dlwrap h2 .hud { color: var(--muted); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 .addform { display: flex; gap: 12px; flex: 1 1 260px; min-width: 0; }
 .addform input {
   flex: 1 1 auto; min-width: 0; min-height: 48px; background: var(--surface); color: var(--text);
@@ -602,7 +618,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
   button.synctoggle, button.ghost { min-height: 44px; }
   .offset input[type=range] { min-height: 40px; }
 }
-@media (prefers-reduced-motion: reduce) { .live i, .blink, .pausebadge i { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .live i, .blink, .pausebadge i, .dl .spin { animation: none !important; } }
 </style>
 
 <style>
@@ -736,6 +752,10 @@ html.demo-embedded .demo-ribbon { display: none; }
       <h2 class="display"><span class="hud" id="qcount">00</span> À suivre</h2>
       <ol id="queue" aria-label="File d'attente"></ol>
       <div id="queueempty" class="empty">La file est vide.</div>
+    </div>
+    <div id="dlwrap" hidden>
+      <h2 class="display"><span class="hud" id="dlcount">00</span> En téléchargement</h2>
+      <ol id="dl" class="dl" aria-label="Morceaux en cours de téléchargement"></ol>
     </div>
   </aside>
 </main>
@@ -942,6 +962,31 @@ html.demo-embedded .demo-ribbon { display: none; }
       focusAfterRender = null;
       if (g) g.focus();
     }
+  }
+
+  let lastDlSig = "";
+  function renderDownloading(list, total) {
+    const items = Array.isArray(list) ? list : [];
+    total = Math.max(Number.isInteger(total) ? total : 0, items.length);
+    const sig = JSON.stringify([total, items.map((t) => [t.key, t.title, t.source])]);
+    if (sig === lastDlSig) return;
+    lastDlSig = sig;
+    const ol = $("dl");
+    ol.textContent = "";
+    items.forEach((t) => {
+      const li = mk("li");
+      li.appendChild(mk("span", "spin"));
+      const known = typeof t.title === "string" && t.title !== "";
+      li.appendChild(mk("span", known ? "n" : "n unknown", known ? t.title : "Lien en cours…"));
+      li.appendChild(mk("span", "src", t.source === "spotify" ? "Spotify" : "YouTube"));
+      ol.appendChild(li);
+    });
+    if (total > items.length) {
+      const rest = total - items.length;
+      ol.appendChild(mk("li", "more", "+ " + rest + (rest > 1 ? " autres" : " autre")));
+    }
+    $("dlcount").textContent = String(total).padStart(2, "0");
+    $("dlwrap").hidden = total === 0;
   }
 
   // ---- queue actions (optimistic)
@@ -1528,6 +1573,7 @@ html.demo-embedded .demo-ribbon { display: none; }
     $("viewcount").textContent = String(nv);
     $("viewers").title = nv > 1 ? nv + " personnes sur la page" : "1 personne sur la page";
     renderQueue(d.queue || []);
+    renderDownloading(d.downloading, d.downloading_total);
     const np = d.now_playing;
     if (!inVoice) {
       state = null; curId = null;
