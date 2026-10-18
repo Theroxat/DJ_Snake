@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import secrets
 import time
 
 from . import state, stats
@@ -50,6 +51,9 @@ class MusicPlayer:
         self.load_line = None  # Playlist progress / final result
         self.load_final = False  # load_line is a result, not progress
         self.single_downloads = 0  # Single-track downloads in progress
+        # Tracks asked for but not queued yet, in request order, for the web
+        # page: {key, title (None: not known yet), source: youtube|spotify}.
+        self.pending_downloads = []
         # Stats of now_playing: actual play time, pauses and seeks excluded.
         self.play_offset = 0.0  # File time where the current segment began
         self.play_accum = 0.0  # Seconds played before the last seek/restart
@@ -91,9 +95,28 @@ class MusicPlayer:
             return self.queue.pop(0)
         return None
 
+    def add_pending(self, title, source="youtube"):
+        """List a requested track until it is queued. Returns its key, which
+        the caller must hand to drop_pending() (in a finally)."""
+        key = secrets.token_hex(6)
+        self.pending_downloads.append({"key": key, "title": title, "source": source})
+        return key
+
+    def drop_pending(self, key):
+        self.pending_downloads = [
+            item for item in self.pending_downloads if item["key"] != key
+        ]
+
+    def name_pending(self, key, title):
+        """Fill in the title once yt-dlp knows it."""
+        for item in self.pending_downloads:
+            if item["key"] == key and title:
+                item["title"] = str(title)
+
     def stop_and_clear(self):
         self.should_stop = True
         self.epoch += 1
+        self.pending_downloads = []  # Their jobs give up with the epoch
         self.play_gen += 1  # The stopped track's callback must not advance
         self.pending_action = None
         self.mixer = None

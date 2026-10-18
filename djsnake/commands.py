@@ -119,11 +119,13 @@ async def play(ctx, url: str = None):
 
         # Try to extract as playlist
         loop = asyncio.get_running_loop()
+        key = player.add_pending(None)  # Shown on the page as a pending link
         try:
             playlist_entries = await loop.run_in_executor(
                 None, media.get_playlist_info, url
             )
         finally:
+            player.drop_pending(key)
             player.load_line = None
             refresh_panel(player)
 

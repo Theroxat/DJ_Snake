@@ -40,6 +40,7 @@ def expire_session(player):
         player.queue.clear()
         player.history.clear()
         player.now_playing = None
+        player.pending_downloads = []
         discard_tracks(tracks)
 
 
@@ -131,7 +132,9 @@ def render_panel(player):
         lines.append("🔀 Crossfade on")
     if player.load_line:
         lines.append(player.load_line)
-    elif player.single_downloads:
+    elif len(player.pending_downloads) > 1:
+        lines.append(f"📥 Downloading {len(player.pending_downloads)} tracks…")
+    elif player.single_downloads or player.pending_downloads:
         lines.append("📥 Downloading…")
     if player.last_action:
         lines.append(player.last_action)

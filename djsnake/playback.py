@@ -1,6 +1,7 @@
 """Voice connection, downloads into the queue and the playback chain."""
 
 import asyncio
+import functools
 import os
 import time
 
@@ -158,13 +159,65 @@ def spotify_fields(spotify_track):
     return {"artist": artists[0]} if artists and artists[0] else {}
 
 
+def pending_label(entry):
+    """(title, source) listing a playlist entry in pending_downloads."""
+    if "spotify" in entry:
+        track = entry["spotify"]
+        artists = ", ".join(a for a in track.get("artists") or [] if a)
+        title = track.get("title") or None
+        if artists and title:
+            title = f"{artists} – {title}"
+        return title, "spotify"
+    return entry.get("title") or None, "youtube"
+
+
 async def download_and_queue_song(
-    ctx, player, url, skip_voice_check=False, from_web=False, quiet=False, extra=None
+    ctx,
+    player,
+    url,
+    skip_voice_check=False,
+    from_web=False,
+    quiet=False,
+    extra=None,
+    pending_key=None,
 ):
     """Download one track and queue it. Returns the track, or None.
     `quiet` (playlist items) posts no message, not even on failure. `extra`
-    adds fields to the track (the Spotify artist)."""
+    adds fields to the track (the Spotify artist). `pending_key` is the
+    caller's entry in player.pending_downloads; without one the link is
+    listed here, title unknown. Either way the entry goes when this returns."""
     epoch = player.epoch
+    if pending_key is None and not cancelled(player, epoch):
+        pending_key = player.add_pending(None)
+    try:
+        return await _download_and_queue(
+            ctx, player, url, epoch, skip_voice_check, quiet, extra, pending_key
+        )
+    finally:
+        if pending_key is not None:
+            player.drop_pending(pending_key)
+
+
+def _title_reporter(player, key):
+    """yt-dlp progress hook (download thread) naming the pending entry."""
+    loop = asyncio.get_running_loop()
+    named = False
+
+    def hook(title):
+        nonlocal named
+        if not named and title:
+            named = True
+            try:
+                loop.call_soon_threadsafe(player.name_pending, key, title)
+            except RuntimeError:
+                pass  # Loop closed: nobody is watching any more
+
+    return hook
+
+
+async def _download_and_queue(
+    ctx, player, url, epoch, skip_voice_check, quiet, extra, pending_key
+):
     try:
         if cancelled(player, epoch):
             return None
@@ -180,7 +233,15 @@ async def download_and_queue_song(
             player.single_downloads += 1
             refresh_panel(player)
         try:
-            track = await loop.run_in_executor(None, media.download_media, url)
+            download = media.download_media
+            if any(
+                item["key"] == pending_key and item["title"] is None
+                for item in player.pending_downloads
+            ):
+                download = functools.partial(
+                    download, on_title=_title_reporter(player, pending_key)
+                )
+            track = await loop.run_in_executor(None, download, url)
         finally:
             if not quiet:
                 player.single_downloads = max(0, player.single_downloads - 1)
@@ -195,6 +256,7 @@ async def download_and_queue_song(
         if extra:
             track.update(extra)
         player.add_to_queue(track)
+        player.drop_pending(pending_key)  # Never listed twice on the page
         if quiet:
             refresh_panel(player)
         else:
@@ -229,9 +291,19 @@ async def queue_playlist(ctx, player, entries, from_web=False):
         refresh_panel(player)
 
     progress(f"📥 Loading 0/{total}…")
+    # Every entry is listed now and leaves as it is queued, fails or is
+    # skipped; the finally drops what a stop or an error left behind.
+    keys = [
+        (
+            player.add_pending(*pending_label(entry))
+            if not cancelled(player, epoch)
+            else None
+        )
+        for entry in entries
+    ]
     player.loading_jobs += 1
     try:
-        for entry in entries:
+        for entry, key in zip(entries, keys):
             if cancelled(player, epoch):
                 stopped = True
                 break
@@ -244,6 +316,7 @@ async def queue_playlist(ctx, player, entries, from_web=False):
                     None, spotify.find_youtube_match, entry["spotify"]
                 )
                 if video_url is None:
+                    player.drop_pending(key)
                     if not cancelled(player, epoch):
                         not_found += 1
                     continue
@@ -253,6 +326,7 @@ async def queue_playlist(ctx, player, entries, from_web=False):
                     entry.get("id") or entry.get("url") or entry.get("webpage_url")
                 )
                 if not video_id:
+                    player.drop_pending(key)
                     continue
 
                 if isinstance(video_id, str) and video_id.startswith("http"):
@@ -261,13 +335,22 @@ async def queue_playlist(ctx, player, entries, from_web=False):
                     video_url = f"https://www.youtube.com/watch?v={video_id}"
 
             track = await download_and_queue_song(
-                ctx, player, video_url, skip_voice_check=True, quiet=True, extra=extra
+                ctx,
+                player,
+                video_url,
+                skip_voice_check=True,
+                quiet=True,
+                extra=extra,
+                pending_key=key,
             )
             if track is not None and not cancelled(player, epoch):
                 loaded += 1
                 progress(f"📥 Loading {loaded}/{total}…")
     finally:
         player.loading_jobs = max(0, player.loading_jobs - 1)
+        for key in keys:
+            if key is not None:
+                player.drop_pending(key)
 
     if stopped or cancelled(player, epoch):
         progress(f"⏹️ Loading stopped ({loaded}/{total})", final=True)
@@ -298,30 +381,40 @@ async def queue_spotify(ctx, player, kind, tracks, from_web=False):
         return
     epoch = player.epoch
     track = tracks[0]
-    player.single_downloads += 1
-    refresh_panel(player)
-    try:
-        loop = asyncio.get_running_loop()
-        video_url = await loop.run_in_executor(None, spotify.find_youtube_match, track)
-    finally:
-        player.single_downloads = max(0, player.single_downloads - 1)
-        refresh_panel(player)
     if cancelled(player, epoch):
         return
-    if video_url is None:
-        await ctx.send(
-            f"❌ No YouTube match found for **{spotify.describe(track)}**.",
-            allowed_mentions=discord.AllowedMentions.none(),
+    key = player.add_pending(*pending_label({"spotify": track}))
+    try:
+        player.single_downloads += 1
+        refresh_panel(player)
+        try:
+            loop = asyncio.get_running_loop()
+            video_url = await loop.run_in_executor(
+                None, spotify.find_youtube_match, track
+            )
+        finally:
+            player.single_downloads = max(0, player.single_downloads - 1)
+            refresh_panel(player)
+        if cancelled(player, epoch):
+            return
+        if video_url is None:
+            player.drop_pending(key)
+            await ctx.send(
+                f"❌ No YouTube match found for **{spotify.describe(track)}**.",
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return
+        await download_and_queue_song(
+            ctx,
+            player,
+            video_url,
+            skip_voice_check=from_web,
+            from_web=from_web,
+            extra=spotify_fields(track),
+            pending_key=key,
         )
-        return
-    await download_and_queue_song(
-        ctx,
-        player,
-        video_url,
-        skip_voice_check=from_web,
-        from_web=from_web,
-        extra=spotify_fields(track),
-    )
+    finally:
+        player.drop_pending(key)
 
 
 async def play_next(ctx, gen=None, origin=None):

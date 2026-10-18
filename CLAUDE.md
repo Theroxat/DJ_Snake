@@ -237,6 +237,20 @@ Module map, lowest layer first (each imports only the ones above it):
   `queue_spotify()`. Queued items are ordinary YouTube tracks. Tests:
   `tests/test_spotify.py`, fixtures in `tests/fixtures/spotify/`; patch
   `spotify.get_tracks`, `spotify._http` or `media.search_youtube`.
+- **Pending downloads** (`player.pending_downloads`, the page's "En
+  téléchargement"): an ordered list of `{key, title, source}` (`source`
+  `youtube` or `spotify`; `title` None until known, the page then shows "Lien
+  en cours…") for every track asked for but not queued yet. `add_pending()`
+  returns a key that the caller drops in a `finally` (`drop_pending()`).
+  `download_and_queue_song()` lists a link itself unless given `pending_key`,
+  and names it from yt-dlp's progress hook (`download_media(url, on_title=)`;
+  fakes of `download_media` must accept `**kwargs`). `queue_playlist()` lists
+  every entry up front (flat title, or "Artists – Title" for Spotify) and
+  drops each as it is queued, fails or is not found; `queue_spotify()` lists
+  a single track; `!play` and the web add list the link while
+  `get_playlist_info()` reads it. `stop_and_clear()` (so `!stop`) and session
+  expiry empty the list; `!reset` replaces the player. Adding or dropping an
+  entry never calls `refresh_panel()` by itself.
 - **Gateway reconnects are routine**: discord.py drops and resumes the gateway
   session roughly every couple of hours. Don't do cleanup in `on_disconnect`.
   An earlier handler deleted `TEMP_DIR` there and broke long playlists in the
@@ -257,10 +271,13 @@ Module map, lowest layer first (each imports only the ones above it):
   `GET /api/{sid}/state` returns `{active, in_voice, guild, channel, loading,
   paused, can_previous, crossfade, crossfading, server_time, viewers, now_playing: {id,
   title, duration, thumbnail, url, video_url, elapsed, start, end} | null, queue: [{id, title, duration,
-  thumbnail, url}], theme: {skin, base, bg, text, accent, name, logo_url}}`
+  thumbnail, url}], downloading: [{key, title, source}], downloading_total,
+  theme: {skin, base, bg, text, accent, name, logo_url}}`
   (404 `{"active": false}` when the sid is unknown or
-  expired; out of voice, `now_playing` is null and `queue` empty; `elapsed`
-  freezes while paused; `viewers` counts the tabs that polled with an
+  expired; out of voice, `now_playing` is null and `queue` and `downloading`
+  empty; `elapsed` freezes while paused; `downloading` is the first
+  `MAX_DOWNLOADING` (50) entries of `player.pending_downloads`, see Pending
+  downloads, and `downloading_total` counts them all; `viewers` counts the tabs that polled with an
   `X-Viewer` header, a random id `[A-Za-z0-9_-]{8,40}` each tab keeps in
   sessionStorage, within `VIEWER_WINDOW_SECONDS` (30): `state.viewers[sid]` is
   `{id: last seen}` in poll order, pruned from the front, capped at

@@ -160,7 +160,7 @@ async def test_crossfade_promotion_records_the_old_track(player, ctx, media_dir)
 async def test_requester_and_spotify_artist(player, ctx, media_dir, monkeypatch):
     from djsnake import media, spotify
 
-    def fake_download(url):
+    def fake_download(url, **kwargs):
         return make_track(media_dir, url[-1], channel="Label Records")
 
     monkeypatch.setattr(media, "download_media", fake_download)
@@ -181,7 +181,9 @@ async def test_web_adds_have_no_requester(player, ctx, media_dir, monkeypatch):
     from djsnake.controls import WebContext
     from djsnake.playback import download_and_queue_song
 
-    monkeypatch.setattr(media, "download_media", lambda url: make_track(media_dir, "W"))
+    monkeypatch.setattr(
+        media, "download_media", lambda url, **kw: make_track(media_dir, "W")
+    )
     web_ctx = WebContext(GUILD_ID, player)
     track = await download_and_queue_song(web_ctx, player, "u", skip_voice_check=True)
     assert track["requester"] is None

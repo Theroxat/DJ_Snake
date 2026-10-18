@@ -288,8 +288,9 @@ def analyse_media(filepath):
         return _parse_analysis("")
 
 
-def _download_once(url):
-    """Single download attempt. Raises on any failure."""
+def _download_once(url, on_title=None):
+    """Single download attempt. Raises on any failure. `on_title` is called
+    (from this thread) with the title as soon as yt-dlp knows it."""
     # Ensure temp directory exists
     os.makedirs(TEMP_DIR, exist_ok=True)
 
@@ -305,6 +306,10 @@ def _download_once(url):
         "remote_components": REMOTE_COMPONENTS,
         "extractor_args": EXTRACTOR_ARGS,
     }
+    if on_title is not None:
+        ydl_opts["progress_hooks"] = [
+            lambda d: on_title((d.get("info_dict") or {}).get("title"))
+        ]
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         print(f"Downloading: {url}")
@@ -427,7 +432,7 @@ def _is_permanent_failure(message):
     return any(marker in lowered for marker in PERMANENT_ERROR_MARKERS)
 
 
-def download_media(url):
+def download_media(url, on_title=None):
     """Download one track (video+audio mp4), retrying transient YouTube refusals.
 
     Runs in an executor thread (see download_and_queue_song), so the blocking
@@ -437,7 +442,7 @@ def download_media(url):
 
     for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
         try:
-            return _download_once(url)
+            return _download_once(url, on_title)
         except Exception as e:
             last_error = str(e)
             print(
