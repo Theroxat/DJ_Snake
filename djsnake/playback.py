@@ -8,6 +8,7 @@ import time
 import discord
 
 from . import media, spotify, state, stats
+from . import config
 from .config import CROSSFADE_SECONDS, FADE_OUT_SECONDS, FRAMES_PER_SECOND
 from .media import crossfade_eligible, playback_options
 from .mixer import CrossfadeMixer
@@ -480,8 +481,10 @@ async def _advance(ctx, player):
         # trigger play_next() again once it finishes downloading.
         if player.loading:
             return
-        if player.voice_client and player.voice_client.is_connected():
-            await player.voice_client.disconnect()
+        if player.in_voice():
+            # Linger in voice for a while: a track added meanwhile plays at
+            # once, without leaving and rejoining.
+            schedule_idle_disconnect(ctx, player)
         # The web session survives: it expires after SESSION_IDLE_HOURS.
         refresh_panel(player)
         return
@@ -516,6 +519,7 @@ async def _advance(ctx, player):
                 _start_crossfade(player, source_mixer, tail_gen), loop
             )
 
+    player.cancel_idle()  # Something plays again: no more leaving
     player.now_playing = next_track
     player.is_playing = True
     offset, audio_source, frames, fade_frames = open_track_source(
@@ -539,6 +543,69 @@ async def _advance(ctx, player):
         player.voice_client.pause()
         player.paused_at = now
     player.last_active = state.clock()
+    refresh_panel(player)
+
+
+def channel_empty(player):
+    """True when no human is left in the bot's voice channel. Unknown
+    members (no member list) count as not empty."""
+    channel = getattr(player.voice_client, "channel", None)
+    members = getattr(channel, "members", None)
+    if members is None:
+        return False
+    return stats.count_listeners(channel) == 0
+
+
+def schedule_idle_disconnect(ctx, player, delay=None):
+    """(Re)start the player's single idle timer: leave voice after `delay`
+    seconds (IDLE_DISCONNECT_SECONDS, or the empty channel grace) unless
+    something plays meanwhile. Any previous timer is cancelled first."""
+    if delay is None:
+        delay = config.IDLE_DISCONNECT_SECONDS
+        if channel_empty(player):
+            delay = min(delay, config.EMPTY_CHANNEL_GRACE_SECONDS)
+    player.cancel_idle()
+    task = asyncio.get_running_loop().create_task(
+        _idle_disconnect(ctx, player, player.play_gen, delay)
+    )
+    player.idle_task, player.idle_delay = task, delay
+    state.background_tasks.add(task)
+    task.add_done_callback(state.background_tasks.discard)
+    return task
+
+
+def idle_channel_emptied(ctx, player):
+    """A human left: if the bot lingers alone, leave after the grace."""
+    if not player.lingering() or not channel_empty(player):
+        return
+    grace = min(config.IDLE_DISCONNECT_SECONDS, config.EMPTY_CHANNEL_GRACE_SECONDS)
+    if player.idle_delay is not None and player.idle_delay <= grace:
+        return  # Already on the short timer
+    schedule_idle_disconnect(ctx, player, grace)
+    refresh_panel(player)
+
+
+async def _idle_disconnect(ctx, player, gen, delay):
+    await asyncio.sleep(delay)
+    async with player.lock:
+        if player.idle_task is not asyncio.current_task():
+            return  # Replaced by a newer timer
+        player.idle_task = player.idle_delay = None
+        if (
+            state.music_players.get(ctx.guild.id) is not player
+            or player.should_stop
+            or gen != player.play_gen
+            or player.is_playing
+            or player.queue
+            or not player.in_voice()
+        ):
+            return  # Stale: replaced, stopped, playing again or already out
+        if player.loading or player.pending_downloads or player.single_downloads:
+            # A download is still on its way: wait another round for it.
+            schedule_idle_disconnect(ctx, player)
+            return
+        # Leave exactly as the queue end used to.
+        await player.voice_client.disconnect()
     refresh_panel(player)
 
 

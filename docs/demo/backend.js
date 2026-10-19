@@ -125,7 +125,7 @@
 
     const paused = () => S.pausedAt !== null;
     const elapsed = () => START + Math.max(0, (paused() ? S.pausedAt : now()) - S.startedAt - S.pausedTotal);
-    function play(t) { S.current = t; S.startedAt = now(); S.pausedAt = null; S.pausedTotal = 0; }
+    function play(t) { clearIdle(); S.current = t; S.startedAt = now(); S.pausedAt = null; S.pausedTotal = 0; }
 
     function setAction(text) {
       S.lastAction = text;
@@ -134,7 +134,27 @@
     }
     function progress(text, final) { S.loadLine = text; S.loadFinal = !!final; changed(); }
 
+    // Idle linger (playback.schedule_idle_disconnect): once the queue runs
+    // out the bot stays in voice for a while, so a late add plays at once.
+    // Shorter than the bot's default 5 min.
+    const IDLE_MS = 60000;
+    let idleTimer = null;
+    function clearIdle() { if (idleTimer) clearTimeout(idleTimer); idleTimer = null; }
+    function startIdle() {
+      clearIdle();
+      S.current = null;
+      S.pausedAt = null;
+      idleTimer = setTimeout(() => {
+        idleTimer = null;
+        if (!S.inVoice || S.current || S.queue.length) return;
+        if (S.jobs || S.pending.length) { startIdle(); changed(); return; }
+        leaveVoice();
+        changed();
+      }, IDLE_MS);
+    }
+
     function leaveVoice() {
+      clearIdle();
       S.inVoice = false;
       S.current = null;
       S.pausedAt = null;
@@ -153,7 +173,7 @@
       if (standalone) while (S.queue.length < 4) S.queue.push(mkTrack(rot++));
       if (S.queue.length) play(S.queue.shift());
       else if (S.jobs > 0) S.current = null; // loading: wait for the next track
-      else leaveVoice(); // queue ended: leave voice, the session stays
+      else startIdle(); // queue ended: linger in voice, then leave
       changed();
     }
     function addToQueue(t) {
@@ -232,7 +252,7 @@
         return;
       }
       progress(`✅ ${loaded}/${total} tracks loaded`, true);
-      if (!S.current && !S.queue.length && S.jobs === 0) leaveVoice();
+      if (!S.current && !S.queue.length && S.jobs === 0 && !idleTimer) startIdle();
     }
     async function loadOne(k, readLine, source) {
       const epoch = S.epoch;
@@ -339,6 +359,7 @@
       const lines = [];
       if (S.sid) lines.push(`📺 Watch the clip live: ${BASE_URL}/${S.sid}`);
       if (!S.inVoice) lines.push(`💤 Idle — ${PREFIX}play to resume`);
+      else if (!S.current && idleTimer && !S.queue.length) lines.push("💤 Queue empty — leaving in 1 min unless something is added");
       else if (S.current) lines.push(`🎵 Now playing: **${short(S.current.title)}**` + (paused() ? " ⏸️ paused" : ""));
       else lines.push("🎵 Nothing playing yet");
       if (S.queue.length) {

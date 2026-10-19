@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Idle linger: when the queue runs out the bot stays in voice for
+  `IDLE_DISCONNECT_SECONDS` (default 300) before leaving, so a track added
+  meanwhile (web page, `!play`, a playlist) plays at once without a rejoin; the
+  clip page stays usable. It leaves after 30 s if nobody is left in the
+  channel, and `!stop` still leaves at once.
 - Clip page: a discreet "En cours" row above "À suivre" shows the playing
   track (thumbnail, title, mini equalizer, time left); hidden when idle.
 - Listening stats: a chart button in the clip page header opens the server's

@@ -56,6 +56,10 @@ def fresh_state(tmp_path, monkeypatch):
     monkeypatch.setattr(media, "TEMP_DIR", str(media_dir))
     yield
     for player in state.music_players.values():
+        try:
+            player.cancel_idle()
+        except RuntimeError:
+            pass  # Its loop is already closed
         if player.panel_task is not None and not player.panel_task.done():
             try:
                 player.panel_task.cancel()
