@@ -94,7 +94,8 @@ which is no longer read), `TEMP_DIR`, `POT_BASE_URL`, `WEB_PORT` (47823),
 `WEB_BIND` (host IP the web port is published on, compose only, default
 `127.0.0.1`; set a LAN IP or `0.0.0.0` for a reverse proxy or tunnel),
 `PUBLIC_BASE_URL` (e.g. `https://dj.example.com`; empty falls back to
-`http://localhost:WEB_PORT`), `SESSION_IDLE_HOURS` (6), `DATA_DIR`
+`http://localhost:WEB_PORT`), `SESSION_IDLE_HOURS` (6), `IDLE_DISCONNECT_SECONDS` (300, the idle linger
+before leaving voice once the queue runs out), `DATA_DIR`
 (`/app/data`, mounted from `./data` by Compose; the container's UID 1000 must
 be able to write it), `WEB_THEME` (`arcade`, the theme of guilds that never
 chose one), `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` (optional, both
@@ -172,6 +173,19 @@ Module map, lowest layer first (each imports only the ones above it):
   track themselves: they set `pending_action` under the lock and call
   `voice_client.stop()`. The voice client always plays a `CrossfadeMixer`
   wrapping the FFmpeg source (a pass-through unless a crossfade runs).
+- **Idle linger**: when `_advance()` finds the queue empty and nothing is
+  loading, it does not leave voice: `schedule_idle_disconnect()` starts the
+  player's single timer (`player.idle_task`, also in `state.background_tasks`;
+  a new one cancels the old) for `IDLE_DISCONNECT_SECONDS`, or
+  `EMPTY_CHANNEL_GRACE_SECONDS` (30) when no human is in the channel
+  (`on_voice_state_update` shortens a running one when the last human
+  leaves). `in_voice` stays true, so the page's add works and plays at once.
+  When it fires it re-checks under the lock (same player, same `play_gen`,
+  connected, queue empty, nothing playing, no stop) and disconnects as the
+  queue end used to; a download still running re-arms it. Starting a track,
+  `!stop` (`stop_and_clear()`), `!reset`, a kick and session expiry cancel
+  it (`player.cancel_idle()`). The panel shows "💤 Queue empty — leaving in
+  …". The demo backend lingers 60 s.
 - **Crossfade** (`player.crossfade`, per session, off by default; `!crossfade
   on|off` or the web `crossfade` action): tracks then get a 6 s fade-out. When
   the mixer reaches a track's fade-out it calls `on_tail` on the audio thread,

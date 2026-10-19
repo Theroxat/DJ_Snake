@@ -33,6 +33,7 @@ def expire_session(player):
         player.sid = None
         player.expired = True
         refresh_panel(player)
+    player.cancel_idle()
     if not player.in_voice():
         tracks = list(player.queue) + list(player.history)
         if player.now_playing:
@@ -108,6 +109,13 @@ def short(title, limit=100):
     return title if len(title) <= limit else title[: limit - 1] + "…"
 
 
+def _duration(seconds):
+    seconds = max(0, round(seconds or 0))
+    if seconds >= 60:
+        return f"{round(seconds / 60)} min"
+    return f"{seconds} s"
+
+
 def render_panel(player):
     if player.expired:
         return "⌛ Session expired"
@@ -116,6 +124,11 @@ def render_panel(player):
         lines.append(f"📺 Watch the clip live: {PUBLIC_BASE_URL}/{player.sid}")
     if not player.in_voice():
         lines.append(f"💤 Idle — {COMMAND_PREFIX}play to resume")
+    elif player.lingering() and not player.now_playing and not player.queue:
+        lines.append(
+            f"💤 Queue empty — leaving in {_duration(player.idle_delay)} "
+            "unless something is added"
+        )
     elif player.now_playing:
         line = f"🎵 Now playing: **{short(player.now_playing['title'])}**"
         if player.paused_at is not None:

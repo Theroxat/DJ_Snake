@@ -58,10 +58,24 @@ class MusicPlayer:
         self.play_offset = 0.0  # File time where the current segment began
         self.play_accum = 0.0  # Seconds played before the last seek/restart
         self.play_wall = None  # time.time() when the track started
+        # Idle linger: the one timer that leaves voice once the queue has
+        # run out (see playback.schedule_idle_disconnect), and its delay.
+        self.idle_task = None
+        self.idle_delay = None
 
     @property
     def loading(self):
         return self.loading_jobs > 0
+
+    def lingering(self):
+        """In voice with nothing to play, waiting to leave."""
+        return self.idle_task is not None and not self.idle_task.done()
+
+    def cancel_idle(self):
+        """Drop the idle linger timer, if any (it never leaves after this)."""
+        task, self.idle_task, self.idle_delay = self.idle_task, None, None
+        if task is not None and not task.done():
+            task.cancel()
 
     def in_voice(self):
         return bool(self.voice_client and self.voice_client.is_connected())
@@ -114,6 +128,7 @@ class MusicPlayer:
                 item["title"] = str(title)
 
     def stop_and_clear(self):
+        self.cancel_idle()
         self.should_stop = True
         self.epoch += 1
         self.pending_downloads = []  # Their jobs give up with the epoch

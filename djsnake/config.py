@@ -37,6 +37,11 @@ WEB_INDEX = os.path.join(ROOT_DIR, "web", "index.html")
 # hours without activity (playback, a command or a web control).
 SESSION_IDLE_HOURS = float(os.getenv("SESSION_IDLE_HOURS", "6"))
 SESSION_CLEANUP_SECONDS = 600
+# When the queue runs out, the bot stays in voice this long (seconds) before
+# leaving, so a track added meanwhile plays at once. An empty channel (no
+# human left) cuts the wait to EMPTY_CHANNEL_GRACE_SECONDS.
+IDLE_DISCONNECT_SECONDS = max(0.0, float(os.getenv("IDLE_DISCONNECT_SECONDS", "300")))
+EMPTY_CHANNEL_GRACE_SECONDS = 30.0
 # Persistent data (survives restarts): per-guild web page themes and logos.
 DATA_DIR = os.getenv("DATA_DIR") or "/app/data"
 THEMES_FILE = os.path.join(DATA_DIR, "themes.json")

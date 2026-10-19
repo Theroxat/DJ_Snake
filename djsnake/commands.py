@@ -224,6 +224,7 @@ async def reset_voice(ctx):
 
     # Clean the player. The web session survives a reset: same link.
     if player:
+        player.cancel_idle()
         player.should_stop = True
         player.epoch += 1
         await player.disconnect_voice_client()
