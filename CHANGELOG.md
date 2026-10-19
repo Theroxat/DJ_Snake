@@ -17,8 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Clip page: a discreet "En cours" row above "À suivre" shows the playing
   track (thumbnail, title, mini equalizer, time left); hidden when idle.
 - Listening stats: a chart button in the clip page header opens the server's
-  stats for the last week, month or all time: top tracks, artists and DJs, DJ
-  of the week, most skipped track, hours played, tracks, sessions, peak
+  stats for the last week, month or all time: top tracks, artists, most skipped track, hours played, tracks, sessions, peak
   listeners and a day-by-hour heatmap in the viewer's timezone. Every played
   track is recorded in `DATA_DIR/stats.db` (SQLite) with who asked for it, how
   long it really played (pauses excluded) and whether it was skipped (left

@@ -543,15 +543,8 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
 .tile .k { color: var(--muted); font-size: 13px; }
 .tile .v { font-family: var(--font-mono); font-size: calc(var(--hud-size) * 1.6); line-height: 1.1; color: var(--accent); overflow-wrap: anywhere; }
 .tile .s { color: var(--muted); font-size: 12px; }
-.djweek {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border: var(--bw) solid var(--accent-2);
-  border-radius: var(--radius-sm); padding: 10px 14px;
-}
-[data-shape="arcade"] .djweek { box-shadow: 4px 4px 0 var(--accent-2); }
-.djweek .crown { font-size: 22px; }
-.djweek b { font-family: var(--font-display); text-transform: var(--display-case); font-weight: var(--display-weight); font-size: 18px; overflow-wrap: anywhere; }
-.djweek .s { color: var(--muted); font-size: 13px; }
 .statgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 24px; }
+.statgrid .tall { grid-row: span 2; }
 .statsec h3 { margin: 0 0 8px; font-size: 16px; display: flex; gap: 8px; align-items: baseline; }
 .statsec h3 .hud { color: var(--accent); }
 .rank { list-style: none; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; max-height: none; overflow: visible; display: flex; flex-direction: column; gap: 6px; }
@@ -583,6 +576,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
   .statscard { min-height: 100%; border-width: 0; border-radius: 0; box-shadow: none; padding: 16px; margin: 0; }
   .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .statgrid { grid-template-columns: minmax(0, 1fr); }
+  .statgrid .tall { grid-row: auto; }
   .stathead h2 { font-size: 20px; }
   .rangetabs { order: 3; flex: 1 1 100%; }
   .rangetabs button { flex: 1; min-height: 44px; }
@@ -1866,7 +1860,7 @@ html.demo-embedded .demo-ribbon { display: none; }
       e.appendChild(mk("div", "hud", "NO DATA"));
       e.appendChild(mk("div", "big display", "Pas encore de statistiques"));
       e.appendChild(mk("p", null, statsRange === "all"
-        ? "Lance quelques morceaux avec !play : chaque écoute sera comptée ici, avec les DJ, les artistes et les heures de pointe."
+        ? "Lance quelques morceaux avec !play : chaque écoute sera comptée ici, avec les artistes et les heures de pointe."
         : "Aucune écoute " + (statsRange === "week" ? "ces 7 derniers jours" : "ces 30 derniers jours") + ". Essaie la période « Tout »."));
       statsBody.appendChild(e);
       return;
@@ -1882,22 +1876,13 @@ html.demo-embedded .demo-ribbon { display: none; }
     tiles.appendChild(tile("Pic d'auditeurs", pk ? nf(pk.count) : "—",
       pk && pk.at ? "le " + new Date(pk.at * 1000).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) : null));
     wrap.appendChild(tiles);
-    if (d.dj_of_week && d.dj_of_week.name) {
-      const dj = mk("div", "djweek");
-      dj.appendChild(mk("span", "crown", "👑"));
-      const t = mk("div");
-      t.appendChild(mk("div", "s", "DJ de la semaine"));
-      t.appendChild(mk("b", null, d.dj_of_week.name));
-      dj.appendChild(t);
-      dj.appendChild(mk("span", "s", nf(d.dj_of_week.plays) + " morceaux lancés"));
-      wrap.appendChild(dj);
-    }
     const grid = mk("div", "statgrid");
     const none = (txt) => mk("p", "statnone", txt);
-    const tt = d.top_tracks || [], ta = d.top_artists || [], td = d.top_djs || [];
-    grid.appendChild(section("Top morceaux", "10", tt.length ? rankList(tt, "écoutes") : none("Aucun morceau écouté jusqu'au bout.")));
+    const tt = d.top_tracks || [], ta = d.top_artists || [];
+    const topSec = section("Top morceaux", "10", tt.length ? rankList(tt, "écoutes") : none("Aucun morceau écouté jusqu'au bout."));
+    topSec.classList.add("tall");
+    grid.appendChild(topSec);
     grid.appendChild(section("Top artistes", "10", ta.length ? rankList(ta, "écoutes") : none("Aucun artiste reconnu.")));
-    grid.appendChild(section("Top DJ", "5", td.length ? rankList(td, "morceaux") : none("Personne pour l'instant.")));
     const ms = d.most_skipped;
     let skip;
     if (ms) {

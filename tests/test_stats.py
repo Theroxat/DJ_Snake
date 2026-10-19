@@ -245,18 +245,13 @@ def test_ranges_filter_by_start_time(history):
 def test_guild_scoping(history):
     other = stats.summary(2, "all", now=NOW)
     assert [t["title"] for t in other["top_tracks"]] == ["Other guild"]
-    assert other["top_djs"] == [{"name": "Mallory", "plays": 1}]
     assert other["totals"]["sessions"] == 1 and other["peak_listeners"] is None
     assert stats.summary(3, "all", now=NOW) == stats.empty_summary("all")
 
 
-def test_djs_artists_skips_and_peak(history):
+def test_artists_skips_and_peak(history):
     week = stats.summary(1, "week", now=NOW)
-    assert week["top_djs"] == [
-        {"name": "Alice", "plays": 3},
-        {"name": None, "plays": 2},  # The web page
-    ]
-    assert week["dj_of_week"] == {"name": "Alice", "plays": 3}
+    assert "top_djs" not in week and "dj_of_week" not in week
     assert week["top_artists"] == [{"name": "X", "plays": 3}]
     assert week["most_skipped"]["title"] == "Meh"
     assert week["most_skipped"]["skips"] == 2

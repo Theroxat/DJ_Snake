@@ -22,7 +22,6 @@
   ];
   // Directors of the films, as the "artist" in the fake stats.
   const ARTISTS = ["Pablo Vazquez", "Mathieu Auvray", "Sacha Goedegebure", "Ian Hubert", "Colin Levy"];
-  const DJS = ["Maya", "Theo", "Jun", "you"]; // The Discord demo's members
   const DURATION = 25, START = 1, END = 24;
   const BASE_URL = "https://dj.example.com"; // PUBLIC_BASE_URL (fictional)
   const PREFIX = "!";
@@ -404,7 +403,7 @@
       const days = range === "week" ? 7 : range === "month" ? 30 : 120;
       let seed = 1337;
       const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-      const tracks = new Map(), artists = new Map(), djs = new Map(), skips = new Map();
+      const tracks = new Map(), artists = new Map(), skips = new Map();
       const heatmap = new Array(168).fill(0);
       const nowSec = Date.now() / 1000;
       let seconds = 0, count = 0;
@@ -419,20 +418,16 @@
         heatmap[day * 24 + (hour % 24)]++;
         count++;
         seconds += skipped ? 12 : 200;
-        bump(djs, rnd() < 0.15 ? null : DJS[Math.min(3, Math.floor(Math.pow(rnd(), 1.3) * 4))]);
         if (skipped) { bump(skips, k); continue; }
         bump(tracks, k);
         bump(artists, ARTISTS[k]);
       }
       const top = (m, n) => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, n);
       const worst = top(skips, 1)[0];
-      const weekDj = top(new Map([...djs].filter(([k]) => k !== null)), 1)[0];
       return {
         range,
         top_tracks: top(tracks, 10).map(([k, n]) => ({ title: CATALOG[k][0], artist: ARTISTS[k], video_id: CATALOG[k][1], plays: n })),
         top_artists: top(artists, 10).map(([a, n]) => ({ name: a, plays: n })),
-        top_djs: top(djs, 5).map(([a, n]) => ({ name: a, plays: n })),
-        dj_of_week: weekDj ? { name: weekDj[0], plays: Math.round(weekDj[1] * 7 / days) } : null,
         most_skipped: worst ? { title: CATALOG[worst[0]][0], artist: ARTISTS[worst[0]], skips: worst[1] } : null,
         totals: { hours: Math.round(seconds / 360) / 10, tracks: count, sessions: Math.round(days * 0.8) },
         heatmap,

@@ -356,9 +356,9 @@ Module map, lowest layer first (each imports only the ones above it):
   are cleaned, else the "Artist - Title" split). A session is counted on each
   fresh voice join in `join_voice_channel()`, which also samples listeners;
   `on_voice_state_update` samples them when a human joins the bot's channel.
+  The requester is recorded but never exposed by `summary()`.
   `summary()` returns `top_tracks` (10, skips excluded), `top_artists` (10),
-  `top_djs` (5, null name = web), `dj_of_week` (last 7 days whatever the
-  range), `most_skipped`, `totals {hours, tracks, sessions}`, `heatmap` (168
+  `most_skipped`, `totals {hours, tracks, sessions}`, `heatmap` (168
   UTC hour-of-week counts, Monday 00:00 = 0; the page shifts them to the
   browser's zone) and `peak_listeners {count, at}`. The page renders it all
   with `textContent`.

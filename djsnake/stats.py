@@ -301,8 +301,6 @@ def empty_summary(range_name):
         "range": range_name,
         "top_tracks": [],
         "top_artists": [],
-        "top_djs": [],
-        "dj_of_week": None,
         "most_skipped": None,
         "totals": {"hours": 0.0, "tracks": 0, "sessions": 0},
         "heatmap": [0] * 168,
@@ -349,23 +347,6 @@ def summary(guild_id, range_name, now=None):
                 args,
             )
         ]
-        # A NULL requester is the web page: one entry for all its adds.
-        result["top_djs"] = [
-            {"name": name, "plays": n}
-            for name, n in conn.execute(
-                f"SELECT requester, COUNT(*) AS n FROM plays WHERE {where}"
-                " GROUP BY requester ORDER BY n DESC, MAX(started_at) DESC LIMIT 5",
-                args,
-            )
-        ]
-        row = conn.execute(
-            "SELECT requester, COUNT(*) AS n FROM plays WHERE guild_id = ?"
-            " AND started_at >= ? AND requester IS NOT NULL"
-            " GROUP BY requester ORDER BY n DESC, MAX(started_at) DESC LIMIT 1",
-            (guild_id, now - RANGES["week"]),
-        ).fetchone()
-        if row:
-            result["dj_of_week"] = {"name": row[0], "plays": row[1]}
         row = conn.execute(
             "SELECT title, artist, COUNT(*) AS n FROM plays"
             f" WHERE {where} AND skipped = 1 GROUP BY COALESCE(video_id, title)"
