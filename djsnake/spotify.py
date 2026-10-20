@@ -45,7 +45,7 @@ TOKEN_URL = "https://accounts.spotify.com/api/token"
 
 class SpotifyError(Exception):
     """`code` is a ControlError code (see controls.py), which holds the
-    French and English messages."""
+    message."""
 
     def __init__(self, code, detail=""):
         super().__init__(f"{code}: {detail}" if detail else code)

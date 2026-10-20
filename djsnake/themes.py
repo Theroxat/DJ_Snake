@@ -11,7 +11,7 @@ from . import state
 from .config import (
     LOGO_DIR,
     LOGO_TYPES,
-    PERSO_DEFAULTS,
+    CUSTOM_DEFAULTS,
     THEME_EDIT_SECONDS,
     THEME_NAME_MAX,
     THEME_PRESETS,
@@ -43,11 +43,19 @@ def clean_theme_name(value):
     return value
 
 
+# Theme names from older themes.json files, renamed when the UI went English.
+_LEGACY_SKINS = {"nuit": "night", "vinyle": "vinyl", "perso": "custom"}
+
+
 def _clean_theme(raw):
     """A stored theme record with every bad or missing field dropped."""
     record = {}
     if not isinstance(raw, dict):
         return record
+    raw = {
+        **raw,
+        **{k: _LEGACY_SKINS.get(raw.get(k), raw.get(k)) for k in ("skin", "base")},
+    }
     if raw.get("skin") in THEME_SKINS:
         record["skin"] = raw["skin"]
     if raw.get("base") in THEME_PRESETS:
@@ -116,7 +124,7 @@ def save_themes():
 
 def theme_for(guild_id):
     """The guild's full theme, defaults filled in."""
-    theme = {"skin": WEB_THEME, **PERSO_DEFAULTS, "name": "", "logo": None}
+    theme = {"skin": WEB_THEME, **CUSTOM_DEFAULTS, "name": "", "logo": None}
     theme.update(state.guild_themes.get(guild_id, {}))
     return theme
 

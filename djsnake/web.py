@@ -211,7 +211,7 @@ async def web_stats(request):
         return web.json_response({"active": False}, status=404, headers=headers)
     range_name = request.query.get("range", "week")
     if range_name not in stats.RANGES:
-        return _control_error(400, "Période inconnue.")
+        return _control_error(400, "Unknown period.")
     guild_id = state.sessions[sid]
     key = (guild_id, range_name)
     now = time.monotonic()
@@ -223,7 +223,7 @@ async def web_stats(request):
         result = await loop.run_in_executor(None, stats.summary, guild_id, range_name)
     except Exception as e:
         print(f"Stats read failed: {e}")
-        return _control_error(500, "Statistiques indisponibles pour le moment.")
+        return _control_error(500, "Stats are unavailable right now.")
     for stale in [k for k, v in _stats_cache.items() if v[0] <= now]:
         del _stats_cache[stale]
     _stats_cache[key] = (now + STATS_CACHE_SECONDS, result)
@@ -252,13 +252,13 @@ async def _read_json(request):
     """(dict, None) or (None, error response) for a small JSON body."""
     body = await _read_body(request, MAX_CONTROL_BODY)
     if body is None:
-        return None, _control_error(400, "Requête trop volumineuse.")
+        return None, _control_error(400, "Request too large.")
     try:
         data = json.loads(body)
     except (ValueError, RecursionError):
-        return None, _control_error(400, "Requête invalide.")
+        return None, _control_error(400, "Invalid request.")
     if not isinstance(data, dict):
-        return None, _control_error(400, "Requête invalide.")
+        return None, _control_error(400, "Invalid request.")
     return data, None
 
 
@@ -266,7 +266,7 @@ async def web_control(request):
     sid = request.match_info["sid"]
     player = session_player(sid)
     if player is None:
-        return _control_error(404, "Session inconnue ou expirée.")
+        return _control_error(404, "Unknown or expired session.")
     guild_id = state.sessions[sid]
 
     data, error = await _read_json(request)
@@ -285,16 +285,16 @@ async def web_control(request):
         "jump",
         "crossfade",
     ):
-        return _control_error(400, "Action inconnue.")
+        return _control_error(400, "Unknown action.")
 
     track_id = data.get("id")
     index = data.get("index")
     if action in ("remove", "move", "jump") and not (
         isinstance(track_id, str) and 0 < len(track_id) <= 64
     ):
-        return _control_error(400, "Morceau invalide.")
+        return _control_error(400, "Invalid track.")
     if action == "move" and (type(index) is not int):
-        return _control_error(400, "Position invalide.")
+        return _control_error(400, "Invalid position.")
     position = data.get("position")
     if action == "seek" and not (
         isinstance(position, (int, float))
@@ -302,15 +302,15 @@ async def web_control(request):
         and math.isfinite(position)
         and position >= 0
     ):
-        return _control_error(400, "Position invalide.")
+        return _control_error(400, "Invalid position.")
     if action == "add" and not isinstance(data.get("url"), str):
-        return _control_error(400, "Lien manquant.")
+        return _control_error(400, "Missing link.")
     if action == "crossfade" and not isinstance(data.get("enabled"), bool):
-        return _control_error(400, "Requête invalide.")
+        return _control_error(400, "Invalid request.")
 
     touch(player)
     if player.sid != sid:  # Expired just now
-        return _control_error(404, "Session inconnue ou expirée.")
+        return _control_error(404, "Unknown or expired session.")
 
     try:
         if action == "next":
@@ -345,7 +345,7 @@ async def web_control(request):
             await control_add(player, guild_id, data["url"])
             return web.json_response({"ok": True}, status=202)
     except ControlError as e:
-        return _control_error(e.status, e.french)
+        return _control_error(e.status, e.message)
     return web.json_response({"ok": True})
 
 
@@ -355,7 +355,7 @@ def _theme_auth(request):
     sid = request.match_info["sid"]
     player = session_player(sid)
     if player is None:
-        return None, None, _control_error(404, "Session inconnue ou expirée.")
+        return None, None, _control_error(404, "Unknown or expired session.")
     guild_id = state.sessions[sid]
     if not check_edit_token(request.headers.get("X-Edit-Token"), guild_id):
         return (
@@ -363,8 +363,7 @@ def _theme_auth(request):
             None,
             _control_error(
                 403,
-                "Lien d'édition invalide ou expiré. "
-                "Relance !theme edit dans Discord.",
+                "Invalid or expired edit link. " "Run !theme edit in Discord again.",
             ),
         )
     return player, guild_id, None
@@ -377,7 +376,7 @@ def _theme_saved(request, player, guild_id):
     return web.json_response({"ok": True, "theme": theme})
 
 
-_SAVE_FAILED = "Enregistrement impossible sur le serveur."
+_SAVE_FAILED = "Could not save on the server."
 
 
 async def web_theme(request):
@@ -388,16 +387,14 @@ async def web_theme(request):
     if error is not None:
         return error
     if data.get("skin") not in THEME_SKINS:
-        return _control_error(400, "Thème inconnu.")
+        return _control_error(400, "Unknown theme.")
     if data.get("base") not in THEME_PRESETS:
-        return _control_error(400, "Style de base inconnu.")
+        return _control_error(400, "Unknown base style.")
     if not all(valid_color(data.get(k)) for k in ("bg", "text", "accent")):
-        return _control_error(400, "Couleur invalide (format #rrggbb).")
+        return _control_error(400, "Invalid color (use #rrggbb).")
     name = clean_theme_name(data.get("name", ""))
     if name is None:
-        return _control_error(
-            400, f"Nom invalide ({THEME_NAME_MAX} caractères maximum)."
-        )
+        return _control_error(400, f"Invalid name ({THEME_NAME_MAX} characters max).")
     previous = state.guild_themes.get(guild_id)
     state.guild_themes[guild_id] = {
         **(previous or {}),
@@ -435,12 +432,10 @@ async def web_theme_logo(request):
         return _theme_saved(request, player, guild_id)
     body = await _read_body(request, MAX_LOGO_BYTES)
     if body is None:
-        return _control_error(400, "Image trop lourde (512 Ko maximum).")
+        return _control_error(400, "Image too large (512 KB max).")
     ext = sniff_image(body)
     if ext is None:
-        return _control_error(
-            400, "Format non pris en charge (PNG, JPEG, WebP ou GIF)."
-        )
+        return _control_error(400, "Unsupported format (PNG, JPEG, WebP or GIF).")
     try:
         set_logo(guild_id, body, ext)
     except OSError as e:

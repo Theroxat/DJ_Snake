@@ -16,7 +16,7 @@ GIF = b"GIF89a" + b"\x00" * 20
 WEBP = b"RIFF\x10\x00\x00\x00WEBPVP8 " + b"\x00" * 8
 SVG = b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'
 GOOD = {
-    "skin": "perso",
+    "skin": "custom",
     "base": "club",
     "bg": "#112233",
     "text": "#EEEEEE",
@@ -24,7 +24,7 @@ GOOD = {
     "name": "  Les Potes  ",
 }
 SAVED = {
-    "skin": "perso",
+    "skin": "custom",
     "base": "club",
     "bg": "#112233",
     "text": "#eeeeee",
@@ -82,7 +82,7 @@ async def get_theme(client, player):
 async def test_state_has_the_fallback_theme(client, player):
     assert await get_theme(client, player) == {
         "skin": "minimal",  # WEB_THEME, set by conftest
-        "base": "nuit",
+        "base": "night",
         "bg": "#101820",
         "text": "#f2f2f2",
         "accent": "#ffb703",
@@ -104,7 +104,7 @@ async def test_save_requires_this_guilds_token(save, player, given):
         given = themes.issue_edit_token(OTHER_GUILD)
     status, body = await save(GOOD, given)
     assert status == 403 and body["ok"] is False
-    assert "expiré" in body["error"]
+    assert "expired" in body["error"]
 
 
 async def test_save_on_unknown_session_is_404(client, token):
@@ -135,7 +135,7 @@ def test_token_is_valid_for_its_guild_only():
         {"bg": "#112233\n"},
         {"accent": "#fff"},
         {"skin": "hacker"},
-        {"base": "perso"},
+        {"base": "custom"},
         {"name": "x" * 33},
         {"name": "a\nb"},
         {"name": 5},
@@ -145,7 +145,7 @@ def test_token_is_valid_for_its_guild_only():
         "color-newline",
         "short-color",
         "bad-skin",
-        "perso-as-base",
+        "custom-as-base",
         "name-too-long",
         "name-control-char",
         "name-not-str",
@@ -173,7 +173,7 @@ async def test_valid_theme_is_saved(client, save, player, token, data_dir):
     assert status == 200 and body["ok"] and body["theme"] == SAVED
     assert await get_theme(client, player) == SAVED
     with open(data_dir / "themes.json") as f:
-        assert json.load(f)["1"]["skin"] == "perso"
+        assert json.load(f)["1"]["skin"] == "custom"
     assert not [f for f in os.listdir(data_dir) if f.startswith(".tmp")]
     assert player.last_action and "theme" in player.last_action
 
@@ -196,9 +196,9 @@ async def test_failed_save_rolls_back_the_memory(save, token, monkeypatch):
 @pytest.mark.parametrize(
     "data, message",
     [
-        (SVG, "Format"),
-        (b"<html>" + PNG, "Format"),
-        (b"\x89PNG\r\n\x1a\n" + b"\x00" * (512 * 1024), "lourde"),
+        (SVG, "Unsupported"),
+        (b"<html>" + PNG, "Unsupported"),
+        (b"\x89PNG\r\n\x1a\n" + b"\x00" * (512 * 1024), "too large"),
     ],
     ids=["svg", "not-an-image", "oversize"],
 )
@@ -294,8 +294,8 @@ def theme_ctx(channel):
 
 
 async def test_theme_command_sets_a_preset(theme_ctx, channel):
-    await commands.theme.callback(theme_ctx, "vinyle")
-    assert themes.theme_for(GUILD_ID)["skin"] == "vinyle"
+    await commands.theme.callback(theme_ctx, "vinyl")
+    assert themes.theme_for(GUILD_ID)["skin"] == "vinyl"
     assert channel.reactions == ["✅"]
 
 
@@ -305,13 +305,13 @@ async def test_theme_command_rejects_unknown_names(theme_ctx, channel):
 
 
 async def test_theme_command_shows_the_current_theme(theme_ctx, channel):
-    await commands.theme.callback(theme_ctx, "vinyle")
+    await commands.theme.callback(theme_ctx, "vinyl")
     await commands.theme.callback(theme_ctx, None)
-    assert "vinyle" in channel.log[-1] and "terminal" in channel.log[-1]
+    assert "vinyl" in channel.log[-1] and "terminal" in channel.log[-1]
 
 
 async def test_theme_reset_restores_the_fallback(theme_ctx):
-    await commands.theme.callback(theme_ctx, "vinyle")
+    await commands.theme.callback(theme_ctx, "vinyl")
     await commands.theme.callback(theme_ctx, "reset")
     assert GUILD_ID not in state.guild_themes
     assert themes.theme_for(GUILD_ID)["skin"] == "minimal"
@@ -354,3 +354,9 @@ async def test_page_is_served_without_leaking_the_token(client, player):
     r = await client.get(f"/{player.sid}?edit=abc")
     assert r.status == 200
     assert r.headers.get("Referrer-Policy") == "same-origin"
+
+
+def test_legacy_theme_names_are_migrated():
+    record = themes._clean_theme({"skin": "perso", "base": "vinyle"})
+    assert record == {"skin": "custom", "base": "vinyl"}
+    assert themes._clean_theme({"skin": "nuit"}) == {"skin": "night"}

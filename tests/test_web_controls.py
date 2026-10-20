@@ -225,7 +225,7 @@ async def test_seek_rejects_bad_positions(api, player, tracks, position):
     played = len(player.voice_client.played)
     status, body = await api.control(action="seek", position=position)
     await settle()
-    assert (status, body) == (400, {"ok": False, "error": "Position invalide."})
+    assert (status, body) == (400, {"ok": False, "error": "Invalid position."})
     assert len(player.voice_client.played) == played
 
 

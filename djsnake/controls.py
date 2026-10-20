@@ -51,52 +51,30 @@ class WebContext:
 class ControlError(Exception):
     """A control that cannot be applied. `code` picks the message."""
 
-    # code -> (HTTP status, French message for the web page, English message)
+    # code -> (HTTP status, message), shown on Discord and on the web page
     MESSAGES = {
-        "not_in_voice": (
-            409,
-            "Le bot n'est pas dans un salon vocal.",
-            "I'm not in a voice channel.",
-        ),
-        "nothing_playing": (
-            409,
-            "Rien n'est en cours de lecture.",
-            "No music is currently playing.",
-        ),
-        "track_not_found": (
-            404,
-            "Ce morceau n'est plus dans la file.",
-            "That track is not in the queue.",
-        ),
-        "bad_index": (400, "Position invalide.", "Invalid position."),
+        "not_in_voice": (409, "I'm not in a voice channel."),
+        "nothing_playing": (409, "No music is currently playing."),
+        "track_not_found": (404, "That track is not in the queue."),
+        "bad_index": (400, "Invalid position."),
         "bad_url": (
             400,
-            "Seuls les liens YouTube (vidéo ou playlist) et Spotify (titre, album "
-            "ou playlist) sont acceptés.",
             "Only YouTube (video or playlist) and Spotify (track, album or "
             "playlist) links are accepted.",
         ),
         "spotify_short_link": (
             400,
-            "Les liens courts spotify.link ne sont pas pris en charge : ouvre-le "
-            "et copie le lien open.spotify.com.",
             "Short spotify.link links are not supported: open it and copy the "
             "open.spotify.com link.",
         ),
         "spotify_not_found": (
             404,
-            "Playlist, album ou titre Spotify introuvable (privé ou supprimé ?).",
             "That Spotify playlist, album or track was not found (private or "
             "deleted?).",
         ),
-        "spotify_empty": (
-            400,
-            "Ce lien Spotify ne contient aucun titre.",
-            "That Spotify link has no tracks.",
-        ),
+        "spotify_empty": (400, "That Spotify link has no tracks."),
         "spotify_unreadable": (
             502,
-            "Impossible de lire ce lien Spotify pour le moment.",
             "Could not read that Spotify link right now (Spotify may have "
             "changed its page).",
         ),
@@ -105,7 +83,7 @@ class ControlError(Exception):
     def __init__(self, code):
         super().__init__(code)
         self.code = code
-        self.status, self.french, self.english = self.MESSAGES[code]
+        self.status, self.message = self.MESSAGES[code]
 
 
 def _require_playing(player):

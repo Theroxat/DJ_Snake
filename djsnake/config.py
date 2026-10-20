@@ -57,16 +57,16 @@ STATS_CACHE_SECONDS = 15  # The stats route serves a guild's answer this long
 # timer per second (one per minute after several minutes hidden).
 VIEWER_WINDOW_SECONDS = 30
 MAX_VIEWERS_PER_SESSION = 500
-# Clip page themes. "perso" is a custom palette on top of a preset's shapes.
-THEME_PRESETS = ("arcade", "minimal", "nuit", "vinyle", "club", "terminal")
-THEME_SKINS = THEME_PRESETS + ("perso",)
+# Clip page themes. "custom" is a custom palette on top of a preset's shapes.
+THEME_PRESETS = ("arcade", "minimal", "night", "vinyl", "club", "terminal")
+THEME_SKINS = THEME_PRESETS + ("custom",)
 # Fallback theme for guilds that never chose one.
 WEB_THEME = (os.getenv("WEB_THEME") or "arcade").strip().lower()
 if WEB_THEME not in THEME_PRESETS:
     print(f"⚠️  WEB_THEME={WEB_THEME!r} is not a preset; using 'arcade'.")
     WEB_THEME = "arcade"
-PERSO_DEFAULTS = {
-    "base": "nuit",
+CUSTOM_DEFAULTS = {
+    "base": "night",
     "bg": "#101820",
     "text": "#f2f2f2",
     "accent": "#ffb703",
