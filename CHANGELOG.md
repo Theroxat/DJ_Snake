@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   meanwhile (web page, `!play`, a playlist) plays at once without a rejoin; the
   clip page stays usable. It leaves after 30 s if nobody is left in the
   channel, and `!stop` still leaves at once.
-- Clip page: a discreet "En cours" row above "À suivre" shows the playing
+- Clip page: a discreet "Now playing" row above "Up next" shows the playing
   track (thumbnail, title, mini equalizer, time left); hidden when idle.
 - Listening stats: a chart button in the clip page header opens the server's
   stats for the last week, month or all time: top tracks, artists, most skipped track, hours played, tracks, sessions, peak
@@ -26,15 +26,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Live viewer count ("👁 N") in the clip page header: each tab sends a random
   id with its state poll and counts while it polled in the last 30 s. The
   state JSON gains `viewers`.
-- "En téléchargement" section on the clip page, under "À suivre": every track
+- "Downloading" section on the clip page, under "Up next": every track
   asked for but not queued yet (single links, playlist and Spotify entries, web
   adds), with a spinner, until it is queued, fails or is not found on YouTube.
-  A link shows "Lien en cours…" until yt-dlp reads its title. The state JSON
+  A link shows "Reading link…" until yt-dlp reads its title. The state JSON
   gains `downloading` (first 50) and `downloading_total`; the status panel
   says "📥 Downloading N tracks…".
 
 ### Changed
 
+- Web page and errors are now in English. The `nuit`, `vinyle` and `perso`
+  themes are now `night`, `vinyl` and `custom` (saved themes are migrated).
 - The live demo opens on a simulated Discord channel: send `!play` with a
   Spotify playlist, watch the bot join voice and edit its status panel, then
   open the clip link. Web controls and Discord commands drive one shared fake

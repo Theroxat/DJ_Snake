@@ -134,12 +134,12 @@ Anyone who has the link can control the queue. Treat it as a secret and share it
 
 ![The six preset themes](docs/screenshots/themes.png)
 
-The clip page has six preset themes (`arcade`, the default look, plus `minimal`, `nuit`, `vinyle`, `club` and `terminal`) and a custom one, `perso`, built from three colors (background, text, accent) on top of a preset's fonts and shapes. Viewers can switch theme for themselves with the palette button in the page header; their choice stays in their browser.
+The clip page has six preset themes (`arcade`, the default look, plus `minimal`, `night`, `vinyl`, `club` and `terminal`) and a custom one, `custom`, built from three colors (background, text, accent) on top of a preset's fonts and shapes. Viewers can switch theme for themselves with the palette button in the page header; their choice stays in their browser.
 
 Members with the **Manage Server** permission set the server's default:
 
 - `!theme` shows the current theme and the presets, `!theme <preset>` sets it, and `!theme reset` goes back to `WEB_THEME` (and drops the custom colors, name and logo).
-- `!theme edit` sends you, by direct message, a private link to the page's theme editor. It is valid for 30 minutes. There you can pick the default theme, build a `perso` palette, set a community name shown instead of "DJ Snake", and upload a logo (PNG, JPEG, WebP or GIF, 512 KB max). If the server has no live session, one is opened without joining voice.
+- `!theme edit` sends you, by direct message, a private link to the page's theme editor. It is valid for 30 minutes. There you can pick the default theme, build a `custom` palette, set a community name shown instead of "DJ Snake", and upload a logo (PNG, JPEG, WebP or GIF, 512 KB max). If the server has no live session, one is opened without joining voice.
 
 Themes and logos are stored in `DATA_DIR` (`./data` with Compose), so they survive restarts and rebuilds. The container runs as UID 1000, which must be able to write that directory.
 
@@ -181,7 +181,7 @@ On Python 3.13+, `audioop-lts` is also needed for voice (see `requirements.txt`)
 YouTube breaks yt-dlp extractors every few weeks, usually showing up as `HTTP Error 403: Forbidden`.
 
 - `docker-entrypoint.sh` upgrades yt-dlp on every container start (best effort; `YTDLP_AUTO_UPDATE=0` disables it).
-- `scripts/refresh-dj-snake.sh` restarts the container so a long-running deployment picks up the upgrade. Run it weekly from cron. It logs to `logs/refresh.log`, in French.
+- `scripts/refresh-dj-snake.sh` restarts the container so a long-running deployment picks up the upgrade. Run it weekly from cron. It logs to `logs/refresh.log`.
 
 ```cron
 0 4 * * 1 /path/to/DJ_Snake/scripts/refresh-dj-snake.sh
