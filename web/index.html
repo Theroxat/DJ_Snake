@@ -637,7 +637,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
   <div class="where hud"><span id="guild">—</span><b id="channel" class="hud" style="font-weight:400"></b></div>
   <div class="spacer"></div>
   <span id="net" class="badge net hud" hidden>Reconnecting…</span>
-  <span id="live" class="badge live off hud"><i>●</i> <span id="livetxt">OFFLINE</span></span>
+  <span id="live" class="badge live off hud"><i>●</i> <span id="livetxt">NOT SYNCED</span></span>
   <span class="hud credits">CREDITS: ∞</span>
   <span id="viewers" class="badge hud viewers" title="people on the page" hidden><span aria-hidden="true">👁</span> <b id="viewcount">1</b></span>
   <button id="statsbtn" class="ghost palette" type="button" aria-haspopup="dialog" aria-controls="stats" aria-label="Stats" title="Stats">
@@ -876,7 +876,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
   // ---- UI helpers
   function setLive(on, label) {
     $("live").classList.toggle("off", !on);
-    $("livetxt").textContent = on ? "LIVE" : (label || "OFFLINE");
+    $("livetxt").textContent = on ? "LIVE" : (label || "NOT SYNCED");
   }
   function overlay(text, sub, idle) {
     $("overlay").hidden = !text;
