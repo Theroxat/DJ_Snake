@@ -1,12 +1,12 @@
 #!/bin/bash
-# Rafraîchit le bot pour récupérer la dernière version de yt-dlp.
+# Refresh the bot to pick up the latest version of yt-dlp.
 #
-# Pourquoi : YouTube casse les extracteurs yt-dlp toutes les quelques semaines,
-# ce qui produit un « HTTP Error 403: Forbidden » au téléchargement. L'image
-# Docker fige yt-dlp au build ; l'entrypoint le met à jour à chaque démarrage,
-# donc un simple restart suffit — inutile de reconstruire l'image.
+# Why: YouTube breaks yt-dlp extractors every few weeks,
+# which shows up as "HTTP Error 403: Forbidden" on download. The Docker
+# image freezes yt-dlp at build time; the entrypoint upgrades it on every start,
+# so a plain restart is enough, no need to rebuild the image.
 #
-# Appelé par cron (crontab de l'utilisateur qui gère Docker).
+# Run from cron (the crontab of the user who manages Docker).
 
 set -euo pipefail
 
@@ -16,29 +16,29 @@ LOG="$COMPOSE_DIR/logs/refresh.log"
 mkdir -p "$(dirname "$LOG")"
 exec >>"$LOG" 2>&1
 
-echo "=== $(date -Is) : redémarrage de dj-snake ==="
+echo "=== $(date -Is) : restarting dj-snake ==="
 
 cd "$COMPOSE_DIR"
 docker compose restart dj-snake
 
-# Laisser l'entrypoint faire sa mise à jour avant de relever la version.
+# Give the entrypoint time to upgrade before reading the version.
 sleep 30
 
-version=$(docker exec dj-snake python -c 'import yt_dlp; print(yt_dlp.version.__version__)' 2>/dev/null || echo "indisponible")
+version=$(docker exec dj-snake python -c 'import yt_dlp; print(yt_dlp.version.__version__)' 2>/dev/null || echo "unavailable")
 echo "yt-dlp: $version"
 
-# Le fournisseur de jetons POT : sans lui, YouTube répond « Sign in to confirm
-# you're not a bot ». Il tourne en permanence, on vérifie juste qu'il est sain.
-pot_state=$(docker inspect --format '{{.State.Health.Status}}' dj-snake-pot-provider 2>/dev/null || echo "absent")
+# The POT token provider: without it, YouTube answers "Sign in to confirm
+# you're not a bot". It runs all the time; just check that it is healthy.
+pot_state=$(docker inspect --format '{{.State.Health.Status}}' dj-snake-pot-provider 2>/dev/null || echo "missing")
 echo "pot-provider: $pot_state"
 if [ "$pot_state" != "healthy" ]; then
-    echo "AVERTISSEMENT : le fournisseur POT n'est pas sain, tentative de relance." >&2
+    echo "WARNING: the POT provider is not healthy, trying to start it." >&2
     docker compose up -d pot-provider
 fi
 
 if docker ps --filter name=dj-snake --filter status=running --format '{{.Names}}' | grep -q dj-snake; then
-    echo "OK : le conteneur tourne."
+    echo "OK: the container is running."
 else
-    echo "ERREUR : le conteneur ne tourne pas après le redémarrage." >&2
+    echo "ERROR: the container is not running after the restart." >&2
     exit 1
 fi

@@ -25,28 +25,26 @@
   const DURATION = 25, START = 1, END = 24;
   const BASE_URL = "https://dj.example.com"; // PUBLIC_BASE_URL (fictional)
   const PREFIX = "!";
-  const PRESETS = ["arcade", "minimal", "nuit", "vinyle", "club", "terminal"];
-  const SKINS = PRESETS.concat(["perso"]);
+  const PRESETS = ["arcade", "minimal", "night", "vinyl", "club", "terminal"];
+  const SKINS = PRESETS.concat(["custom"]);
   const PANEL_SHORT = 100;
 
-  // code -> [HTTP status, French (web page), English (Discord)], as ControlError.
+  // code -> [HTTP status, message], as ControlError.
   const ERRORS = {
-    not_in_voice: [409, "Le bot n'est pas dans un salon vocal.", "I'm not in a voice channel."],
-    nothing_playing: [409, "Rien n'est en cours de lecture.", "No music is currently playing."],
-    track_not_found: [404, "Ce morceau n'est plus dans la file.", "That track is not in the queue."],
-    bad_index: [400, "Position invalide.", "Invalid position."],
+    not_in_voice: [409, "I'm not in a voice channel."],
+    nothing_playing: [409, "No music is currently playing."],
+    track_not_found: [404, "That track is not in the queue."],
+    bad_index: [400, "Invalid position."],
     bad_url: [400,
-      "Seuls les liens YouTube (vidéo ou playlist) et Spotify (titre, album ou playlist) sont acceptés.",
       "Only YouTube (video or playlist) and Spotify (track, album or playlist) links are accepted."],
     spotify_short_link: [400,
-      "Les liens courts spotify.link ne sont pas pris en charge : ouvre-le et copie le lien open.spotify.com.",
       "Short spotify.link links are not supported: open it and copy the open.spotify.com link."],
   };
   class ControlError extends Error {
     constructor(code) {
       super(code);
       this.code = code;
-      [this.status, this.french, this.english] = ERRORS[code];
+      [this.status, this.message] = ERRORS[code];
     }
   }
 
@@ -109,7 +107,7 @@
       crossfade: false, epoch: 0, jobs: 0, single: 0,
       pending: [], // pending_downloads: {key, title (null: link not read), source}
       loadLine: null, loadFinal: false, lastAction: null,
-      theme: { skin: "arcade", base: "nuit", bg: "#101820", text: "#f2f2f2", accent: "#ffb703", name: "", logo_url: null },
+      theme: { skin: "arcade", base: "night", bg: "#101820", text: "#f2f2f2", accent: "#ffb703", name: "", logo_url: null },
     };
 
     // ---- events: {type: "change"} on any state change, "voice" on join/leave,
@@ -207,7 +205,7 @@
     // ---- loading (fake downloads with realistic delays)
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const cancelled = (epoch) => epoch !== S.epoch || !S.inVoice;
-    // The "En téléchargement" list (player.pending_downloads).
+    // The "Downloading" list (player.pending_downloads).
     let pkey = 0;
     function pend(title, source) {
       const key = "dl" + ++pkey;
@@ -374,7 +372,7 @@
       return lines.join("\n");
     }
 
-    // ---- web API (web.py), French errors as the real page expects
+    // ---- web API (web.py), errors as the real page expects
     const pub = (t) => ({ id: t.id, title: t.title, duration: t.duration, thumbnail: t.thumbnail, url: t.url });
     function state() {
       if (!S.sid) return { status: 404, body: { active: false } };
@@ -439,7 +437,7 @@
     function control(d) {
       d = d || {};
       const a = d.action;
-      if (!S.sid) return fail(404, "Session inconnue ou expirée.");
+      if (!S.sid) return fail(404, "Unknown or expired session.");
       try {
         if (a === "next") { C.next(); setAction("⏭️ Skipped via the web page"); }
         else if (a === "previous") setAction(C.previous() === "restart" ? "⏮️ Restarted via the web page" : "⏮️ Previous track via the web page");
@@ -448,24 +446,24 @@
         else if (a === "remove") setAction(`🗑️ Removed: ${short(C.remove(d.id).title)}`);
         else if (a === "move") {
           const idx = parseInt(d.index, 10);
-          if (!(idx >= 0)) return fail(400, "Position invalide.");
+          if (!(idx >= 0)) return fail(400, "Invalid position.");
           C.move(d.id, idx); setAction("🔀 Queue reordered");
         } else if (a === "seek") {
           const p = Number(d.position);
-          if (!isFinite(p) || p < 0) return fail(400, "Position invalide.");
+          if (!isFinite(p) || p < 0) return fail(400, "Invalid position.");
           setAction(seekLabel(C.seek(p)));
         } else if (a === "jump") setAction(`▶️ Jumped to: ${short(C.jump(d.id).title)}`);
         else if (a === "crossfade") {
-          if (typeof d.enabled !== "boolean") return fail(400, "Requête invalide.");
+          if (typeof d.enabled !== "boolean") return fail(400, "Invalid request.");
           C.crossfade(d.enabled);
         } else if (a === "add") {
-          if (typeof d.url !== "string") return fail(400, "Lien manquant.");
+          if (typeof d.url !== "string") return fail(400, "Missing link.");
           C.add(d.url);
           emit("web", { action: a });
           return { status: 202, body: { ok: true } };
-        } else return fail(400, "Action inconnue.");
+        } else return fail(400, "Unknown action.");
       } catch (e) {
-        if (e instanceof ControlError) return fail(e.status, e.french);
+        if (e instanceof ControlError) return fail(e.status, e.message);
         throw e;
       }
       emit("web", { action: a });
@@ -476,7 +474,7 @@
       const col = (v, f) => (/^#[0-9a-fA-F]{6}$/.test(v) ? v : f);
       S.theme = {
         skin: SKINS.includes(d.skin) ? d.skin : "arcade",
-        base: PRESETS.includes(d.base) ? d.base : "nuit",
+        base: PRESETS.includes(d.base) ? d.base : "night",
         bg: col(d.bg, S.theme.bg), text: col(d.text, S.theme.text), accent: col(d.accent, S.theme.accent),
         name: String(d.name || "").slice(0, 32), logo_url: null,
       };
@@ -489,13 +487,13 @@
       if (route === "stats") {
         if (!S.sid) return { status: 404, body: { active: false } };
         const range = body && body.range;
-        if (!["week", "month", "all"].includes(range)) return fail(400, "Période inconnue.");
+        if (!["week", "month", "all"].includes(range)) return fail(400, "Unknown period.");
         return { status: 200, body: fakeStats(range) };
       }
       if (route === "control") return control(body);
-      if (!S.sid) return fail(404, "Session inconnue ou expirée.");
+      if (!S.sid) return fail(404, "Unknown or expired session.");
       if (route === "theme") return setTheme(body);
-      return fail(400, "Le logo n'est pas disponible dans la démo.");
+      return fail(400, "Logos are not available in the demo.");
     }
 
     if (standalone) {
@@ -508,7 +506,7 @@
 
     return {
       /** Standalone demo: a fake playlist that loads slowly, so the page's
-       * "En téléchargement" list has something to show. */
+       * "Downloading" list has something to show. */
       demoLoad(n) {
         if (S.jobs || !S.inVoice || S.queue.length > 6) return null;
         const ks = [];

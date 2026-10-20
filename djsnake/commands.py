@@ -96,7 +96,7 @@ async def play(ctx, url: str = None):
     try:
         spotify_ref = spotify.check_url(url)
     except spotify.SpotifyError as e:
-        await ctx.send(f"❌ {ControlError(e.code).english}")
+        await ctx.send(f"❌ {ControlError(e.code).message}")
         return
 
     if not await join_voice_channel(ctx):
@@ -188,7 +188,7 @@ async def _play_spotify(ctx, player, kind, spotify_id):
         if not player.should_stop:
             await queue_spotify(ctx, player, kind, tracks)
     except ControlError as e:
-        await ctx.send(f"❌ {e.english}")
+        await ctx.send(f"❌ {e.message}")
     except Exception as e:
         await ctx.send(f"❌ An error occurred: {str(e)}")
 
@@ -284,7 +284,7 @@ async def _run_command_control(ctx, control):
     try:
         result = await control(player)
     except ControlError as e:
-        await ctx.send(f"❌ {e.english}")
+        await ctx.send(f"❌ {e.message}")
         return _FAILED
     await ack(ctx)
     refresh_panel(player)

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr" data-skin="arcade" data-shape="arcade">
+<html lang="en" data-skin="arcade" data-shape="arcade">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,7 +9,7 @@
 // arrives with the first state poll).
 try {
   const v = localStorage.getItem("djsnake.skin");
-  if (["arcade", "minimal", "nuit", "vinyle", "club", "terminal"].includes(v)) {
+  if (["arcade", "minimal", "night", "vinyl", "club", "terminal"].includes(v)) {
     document.documentElement.dataset.skin = v;
     document.documentElement.dataset.shape = v;
   }
@@ -22,13 +22,13 @@ try {
 /* ======================================================================
    THEME TOKENS. Each preset is a [data-skin] block of custom properties on
    <html>. "Shape" (fonts, radius, shadows, effects) is split from colors so
-   the custom skin (perso) inherits the shape of a preset via data-base.
-   data-shape (= skin, or base for perso) scopes a few Arcade-only details.
+   the custom skin (custom) inherits the shape of a preset via data-base.
+   data-shape (= skin, or base for custom) scopes a few Arcade-only details.
    The page below only references tokens; Arcade is the original look.
    ====================================================================== */
 
 /* ---- 1. Arcade (the original look) ---- */
-[data-skin="arcade"], [data-skin="perso"][data-base="arcade"] {
+[data-skin="arcade"], [data-skin="custom"][data-base="arcade"] {
   --font-display: "Archivo Black", Impact, sans-serif;
   --font-body: "Space Mono", ui-monospace, monospace;
   --font-mono: "VT323", ui-monospace, monospace;
@@ -56,7 +56,7 @@ try {
 }
 
 /* ---- 2. Minimal ---- */
-[data-skin="minimal"], [data-skin="perso"][data-base="minimal"] {
+[data-skin="minimal"], [data-skin="custom"][data-base="minimal"] {
   --font-display: "Inter", system-ui, "Segoe UI", sans-serif;
   --font-body: "Inter", system-ui, "Segoe UI", sans-serif;
   --font-mono: "Inter", system-ui, sans-serif;
@@ -83,8 +83,8 @@ try {
   --focus: #4a6fa5; --ok: #2f9e6b; --video-bg: #14171f; --pp-border: #4a6fa5;
 }
 
-/* ---- 3. Nuit ---- */
-[data-skin="nuit"], [data-skin="perso"][data-base="nuit"] {
+/* ---- 3. Night ---- */
+[data-skin="night"], [data-skin="custom"][data-base="night"] {
   --font-display: "Nunito", system-ui, sans-serif;
   --font-body: "Nunito", system-ui, sans-serif;
   --font-mono: "Nunito", system-ui, sans-serif;
@@ -103,7 +103,7 @@ try {
   --scanlines: 0; --scan-color: transparent; --scan-blend: normal;
   --text-glow: none; --display-glow: none; --logo-mark: "";
 }
-[data-skin="nuit"] {
+[data-skin="night"] {
   --bg: #11131b; --surface: #1a1d29; --text: #d5d9e6; --muted: #8a90a8;
   --accent: #9aa5dd; --accent-2: #86b3c4; --accent-3: #b49bc9; --on-accent: #11131b;
   --border: #2b3042; --hair: #242838; --track: #242838;
@@ -111,8 +111,8 @@ try {
   --focus: #b9c2f2; --ok: #7fcfa0; --video-bg: #07080c; --pp-border: #9aa5dd;
 }
 
-/* ---- 4. Vinyle ---- */
-[data-skin="vinyle"], [data-skin="perso"][data-base="vinyle"] {
+/* ---- 4. Vinyl ---- */
+[data-skin="vinyl"], [data-skin="custom"][data-base="vinyl"] {
   --font-display: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
   --font-body: "DM Sans", system-ui, sans-serif;
   --font-mono: "DM Mono", ui-monospace, monospace;
@@ -131,7 +131,7 @@ try {
   --scanlines: 0; --scan-color: transparent; --scan-blend: normal;
   --text-glow: none; --display-glow: none; --logo-mark: "";
 }
-[data-skin="vinyle"] {
+[data-skin="vinyl"] {
   --bg: #2a170d; --surface: #3a2112; --text: #fbe2b4; --muted: #fbe2b4a8;
   --accent: #ff8a1f; --accent-2: #f2b705; --accent-3: #9bb53a; --on-accent: #2a170d;
   --border: #6b3d1e; --hair: #fbe2b41f; --track: #1d0f08;
@@ -140,7 +140,7 @@ try {
 }
 
 /* ---- 5. Club ---- */
-[data-skin="club"], [data-skin="perso"][data-base="club"] {
+[data-skin="club"], [data-skin="custom"][data-base="club"] {
   --font-display: "Orbitron", "Eurostile", system-ui, sans-serif;
   --font-body: "Rajdhani", system-ui, sans-serif;
   --font-mono: "Share Tech Mono", ui-monospace, monospace;
@@ -168,7 +168,7 @@ try {
 }
 
 /* ---- 6. Terminal ---- */
-[data-skin="terminal"], [data-skin="perso"][data-base="terminal"] {
+[data-skin="terminal"], [data-skin="custom"][data-base="terminal"] {
   --font-display: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
   --font-body: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
   --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
@@ -192,8 +192,8 @@ try {
   --focus: #ffb000; --ok: #35ff72; --video-bg: #020502; --pp-border: #ffb000;
 }
 
-/* ---- 7. Perso: colors derived from three picks (--c-*) ---- */
-[data-skin="perso"] {
+/* ---- 7. Custom: colors derived from three picks (--c-*) ---- */
+[data-skin="custom"] {
   --bg: var(--c-bg); --text: var(--c-text); --accent: var(--c-accent); --on-accent: var(--c-on-accent);
   --surface: color-mix(in srgb, var(--c-bg) 90%, var(--c-text));
   --muted: color-mix(in srgb, var(--c-text) 62%, var(--c-bg));
@@ -636,20 +636,20 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
   <h1 class="wordmark display" id="wordmark">DJ <span>Snake</span></h1>
   <div class="where hud"><span id="guild">—</span><b id="channel" class="hud" style="font-weight:400"></b></div>
   <div class="spacer"></div>
-  <span id="net" class="badge net hud" hidden>Reconnexion…</span>
-  <span id="live" class="badge live off hud"><i>●</i> <span id="livetxt">HORS SYNC</span></span>
+  <span id="net" class="badge net hud" hidden>Reconnecting…</span>
+  <span id="live" class="badge live off hud"><i>●</i> <span id="livetxt">NOT SYNCED</span></span>
   <span class="hud credits">CREDITS: ∞</span>
-  <span id="viewers" class="badge hud viewers" title="personnes sur la page" hidden><span aria-hidden="true">👁</span> <b id="viewcount">1</b></span>
-  <button id="statsbtn" class="ghost palette" type="button" aria-haspopup="dialog" aria-controls="stats" aria-label="Statistiques" title="Statistiques">
+  <span id="viewers" class="badge hud viewers" title="people on the page" hidden><span aria-hidden="true">👁</span> <b id="viewcount">1</b></span>
+  <button id="statsbtn" class="ghost palette" type="button" aria-haspopup="dialog" aria-controls="stats" aria-label="Stats" title="Stats">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16v2H4zM5 11h3v7H5zM10.5 4h3v14h-3zM16 8h3v10h-3z"/></svg>
   </button>
-  <button id="palbtn" class="ghost palette" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="thememenu" aria-label="Changer de thème" title="Changer de thème">
+  <button id="palbtn" class="ghost palette" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="thememenu" aria-label="Change theme" title="Change theme">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0 0 18c1.4 0 2-.9 2-1.8 0-.5-.2-.9-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.4 17 3 12 3zM7.5 12a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>
   </button>
-  <a class="ghub" href="https://github.com/Theroxat/DJ_Snake" target="_blank" rel="noopener noreferrer" aria-label="Code source sur GitHub" title="Code source sur GitHub">
+  <a class="ghub" href="https://github.com/Theroxat/DJ_Snake" target="_blank" rel="noopener noreferrer" aria-label="Source code on GitHub" title="Source code on GitHub">
     <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
   </a>
-  <div class="menu" id="thememenu" role="menu" aria-label="Thème" hidden></div>
+  <div class="menu" id="thememenu" role="menu" aria-label="Theme" hidden></div>
 </header>
 
 <main>
@@ -657,28 +657,28 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     <div class="frame" id="frame">
       <video id="video" class="front" muted playsinline preload="auto"></video>
       <video id="video2" muted playsinline preload="auto" aria-hidden="true"></video>
-      <div class="pausebadge hud" id="pausebadge" hidden><i>❚❚</i> PAUSE</div>
+      <div class="pausebadge hud" id="pausebadge" hidden><i>❚❚</i> PAUSED</div>
       <div class="overlay" id="overlay">
         <div class="hud blink" id="overlayhud" style="color:var(--accent-3)">PLAYER 1 — READY</div>
-        <div class="big display" id="overlaytxt">Connexion…</div>
+        <div class="big display" id="overlaytxt">Connecting…</div>
         <p class="sub" id="overlaysub" hidden></p>
       </div>
     </div>
-    <div class="transport" role="group" aria-label="Contrôles de lecture">
-      <button id="prev" type="button" aria-label="Morceau précédent" title="Précédent" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h3v14H5zM20 5v14L9 12z"/></svg></button>
+    <div class="transport" role="group" aria-label="Playback controls">
+      <button id="prev" type="button" aria-label="Previous track" title="Previous" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h3v14H5zM20 5v14L9 12z"/></svg></button>
       <button id="pp" type="button" aria-label="Pause" title="Pause" disabled><svg id="ppicon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg></button>
-      <button id="next" type="button" aria-label="Morceau suivant" title="Suivant" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h3v14h-3zM4 5v14l11-7z"/></svg></button>
-      <button id="xfade" class="synctoggle xfade" type="button" role="switch" aria-checked="false" title="Fondu enchaîné entre les morceaux (pour tout le salon)" disabled><span class="box" aria-hidden="true"></span>Crossfade</button>
+      <button id="next" type="button" aria-label="Next track" title="Next" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h3v14h-3zM4 5v14l11-7z"/></svg></button>
+      <button id="xfade" class="synctoggle xfade" type="button" role="switch" aria-checked="false" title="Fade between tracks (for everyone in the channel)" disabled><span class="box" aria-hidden="true"></span>Crossfade</button>
       <form id="addform" class="addform" autocomplete="off">
-        <input id="addurl" type="text" inputmode="url" placeholder="Colle un lien YouTube ou Spotify…" aria-label="Lien YouTube ou Spotify à ajouter" disabled>
-        <button id="addbtn" type="submit" aria-label="Ajouter à la file" disabled>Ajouter</button>
+        <input id="addurl" type="text" inputmode="url" placeholder="Paste a YouTube or Spotify link…" aria-label="YouTube or Spotify link to add" disabled>
+        <button id="addbtn" type="submit" aria-label="Add to queue" disabled>Add</button>
       </form>
     </div>
     <div class="bar">
       <div class="trackinfo">
         <h2 class="title display" id="title">&nbsp;</h2>
         <div class="progline" id="progline" hidden>
-          <div class="seek disabled" id="seek" role="slider" tabindex="-1" aria-label="Position dans le morceau" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="00:00" aria-disabled="true">
+          <div class="seek disabled" id="seek" role="slider" tabindex="-1" aria-label="Position in the track" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="00:00" aria-disabled="true">
             <div class="prog"><i id="progfill"></i></div>
             <span class="ghost" id="seekghost" hidden></span>
             <span class="tip hud" id="seektip" hidden>00:00</span>
@@ -687,76 +687,76 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
         </div>
       </div>
       <div class="tools">
-        <button id="synctoggle" class="synctoggle" type="button" aria-expanded="false" aria-controls="syncpanel" title="Décalage image / son">⚙ Sync<b id="syncbadge" hidden></b></button>
-        <button id="fs" type="button">Plein écran</button>
+        <button id="synctoggle" class="synctoggle" type="button" aria-expanded="false" aria-controls="syncpanel" title="Video / audio offset">⚙ Sync<b id="syncbadge" hidden></b></button>
+        <button id="fs" type="button">Fullscreen</button>
       </div>
-      <div class="offset" id="syncpanel" role="group" aria-label="Décalage de synchronisation" hidden>
-        <span class="hud" style="color:var(--accent-3)">Décalage</span>
-        <input id="offset" type="range" min="-2" max="2" step="0.05" value="0" aria-label="Décalage en secondes">
+      <div class="offset" id="syncpanel" role="group" aria-label="Sync offset" hidden>
+        <span class="hud" style="color:var(--accent-3)">Offset</span>
+        <input id="offset" type="range" min="-2" max="2" step="0.05" value="0" aria-label="Offset in seconds">
         <output id="offsetval">0.00 s</output>
-        <button id="offsetreset" type="button" aria-label="Remettre le décalage à zéro">0</button>
-        <p class="hint">Le son vient de Discord, la vidéo est muette. Si l'image est en avance ou en retard sur le son, ajuste le décalage.</p>
+        <button id="offsetreset" type="button" aria-label="Reset offset to zero">0</button>
+        <p class="hint">The audio comes from Discord and the video is muted. If the picture runs ahead of or behind the sound, adjust the offset.</p>
       </div>
     </div>
   </section>
 
   <aside>
     <section class="editor" id="editor" aria-labelledby="edh" hidden>
-      <h2 class="display" id="edh">Thème du serveur</h2>
-      <p class="note">Le thème par défaut de la page pour tout le serveur. Chaque spectateur peut toujours choisir le sien avec le bouton palette.</p>
+      <h2 class="display" id="edh">Server theme</h2>
+      <p class="note">The page's default theme for the whole server. Each viewer can still pick their own with the palette button.</p>
       <div>
-        <label for="e-skin">Thème</label>
+        <label for="e-skin">Theme</label>
         <select id="e-skin">
-          <option value="arcade">Arcade</option><option value="minimal">Minimal</option><option value="nuit">Nuit</option>
-          <option value="vinyle">Vinyle</option><option value="club">Club</option><option value="terminal">Terminal</option>
-          <option value="perso">Perso (couleurs personnalisées)</option>
+          <option value="arcade">Arcade</option><option value="minimal">Minimal</option><option value="night">Night</option>
+          <option value="vinyl">Vinyl</option><option value="club">Club</option><option value="terminal">Terminal</option>
+          <option value="custom">Custom colors</option>
         </select>
       </div>
-      <div id="e-perso" hidden>
+      <div id="e-custom" hidden>
         <div class="row3">
-          <div><label for="e-bg">Fond</label><input type="color" id="e-bg" value="#101820"></div>
-          <div><label for="e-text">Texte</label><input type="color" id="e-text" value="#f2f2f2"></div>
+          <div><label for="e-bg">Background</label><input type="color" id="e-bg" value="#101820"></div>
+          <div><label for="e-text">Text</label><input type="color" id="e-text" value="#f2f2f2"></div>
           <div><label for="e-accent">Accent</label><input type="color" id="e-accent" value="#ffb703"></div>
         </div>
-        <p class="note" style="margin-top:8px">Surface, bordures et textes secondaires sont déduits automatiquement.</p>
+        <p class="note" style="margin-top:8px">Surface, borders and secondary text are derived automatically.</p>
         <div style="margin-top:14px">
-          <label for="e-base">Style de base (polices, formes, effets)</label>
+          <label for="e-base">Base style (fonts, shapes, effects)</label>
           <select id="e-base">
-            <option value="arcade">Arcade</option><option value="minimal">Minimal</option><option value="nuit">Nuit</option>
-            <option value="vinyle">Vinyle</option><option value="club">Club</option><option value="terminal">Terminal</option>
+            <option value="arcade">Arcade</option><option value="minimal">Minimal</option><option value="night">Night</option>
+            <option value="vinyl">Vinyl</option><option value="club">Club</option><option value="terminal">Terminal</option>
           </select>
         </div>
       </div>
       <div>
-        <label for="e-name">Nom de la communauté</label>
+        <label for="e-name">Community name</label>
         <input type="text" id="e-name" maxlength="32" placeholder="DJ Snake" autocomplete="off">
       </div>
       <div>
-        <span class="lbl" id="logolbl">Logo (PNG, JPEG, WebP ou GIF, 512 Ko max), enregistré dès l'envoi</span>
+        <span class="lbl" id="logolbl">Logo (PNG, JPEG, WebP or GIF, 512 KB max), saved as soon as you upload it</span>
         <div class="drop" id="drop">
-          Glisse une image ici ou dans l'en-tête
+          Drop an image here or on the header
           <input type="file" id="e-logo" accept="image/png,image/jpeg,image/webp,image/gif" aria-labelledby="logolbl">
         </div>
       </div>
       <div class="btns">
-        <button id="e-save" type="button">Enregistrer</button>
-        <button id="e-revert" class="ghost" type="button">Annuler les changements</button>
-        <button id="e-logoclear" class="ghost" type="button" hidden>Retirer le logo</button>
+        <button id="e-save" type="button">Save</button>
+        <button id="e-revert" class="ghost" type="button">Discard changes</button>
+        <button id="e-logoclear" class="ghost" type="button" hidden>Remove logo</button>
       </div>
       <p class="msg" id="e-msg" role="status" aria-live="polite"></p>
     </section>
     <div id="nowwrap" hidden>
-      <h2 class="display">En cours</h2>
-      <ol id="nowrow" class="now" aria-label="Morceau en cours"></ol>
+      <h2 class="display">Now playing</h2>
+      <ol id="nowrow" class="now" aria-label="Now playing"></ol>
     </div>
     <div>
-      <h2 class="display"><span class="hud" id="qcount">00</span> À suivre</h2>
-      <ol id="queue" aria-label="File d'attente"></ol>
-      <div id="queueempty" class="empty">La file est vide.</div>
+      <h2 class="display"><span class="hud" id="qcount">00</span> Up next</h2>
+      <ol id="queue" aria-label="Queue"></ol>
+      <div id="queueempty" class="empty">The queue is empty.</div>
     </div>
     <div id="dlwrap" hidden>
-      <h2 class="display"><span class="hud" id="dlcount">00</span> En téléchargement</h2>
-      <ol id="dl" class="dl" aria-label="Morceaux en cours de téléchargement"></ol>
+      <h2 class="display"><span class="hud" id="dlcount">00</span> Downloading</h2>
+      <ol id="dl" class="dl" aria-label="Tracks being downloaded"></ol>
     </div>
   </aside>
 </main>
@@ -766,13 +766,13 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
 <div id="stats" class="statsdlg" role="dialog" aria-modal="true" aria-labelledby="stath" hidden>
   <div class="statscard" id="statscard">
     <div class="stathead">
-      <h2 class="display" id="stath">Statistiques</h2>
-      <div class="rangetabs" role="tablist" aria-label="Période">
-        <button type="button" role="tab" data-range="week" aria-selected="true">Semaine</button>
-        <button type="button" role="tab" data-range="month" aria-selected="false">Mois</button>
-        <button type="button" role="tab" data-range="all" aria-selected="false">Tout</button>
+      <h2 class="display" id="stath">Stats</h2>
+      <div class="rangetabs" role="tablist" aria-label="Period">
+        <button type="button" role="tab" data-range="week" aria-selected="true">Week</button>
+        <button type="button" role="tab" data-range="month" aria-selected="false">Month</button>
+        <button type="button" role="tab" data-range="all" aria-selected="false">All time</button>
       </div>
-      <button type="button" class="ghost statclose" id="statsclose" aria-label="Fermer les statistiques" title="Fermer (Échap)">×</button>
+      <button type="button" class="ghost statclose" id="statsclose" aria-label="Close stats" title="Close (Esc)">×</button>
     </div>
     <div id="statsbody" aria-live="polite"></div>
   </div>
@@ -781,9 +781,9 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
 <div id="ended" hidden>
   <div class="card">
     <div class="hud" style="color:var(--accent)">GAME OVER</div>
-    <h1 class="display">Session terminée</h1>
-    <p>Le bot a quitté le salon vocal.</p>
-    <p>Quand DJ Snake reviendra, utilise le nouveau lien posté dans Discord.</p>
+    <h1 class="display">Session ended</h1>
+    <p>The bot has left the voice channel.</p>
+    <p>When DJ Snake comes back, use the new link posted in Discord.</p>
   </div>
 </div>
 
@@ -876,7 +876,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
   // ---- UI helpers
   function setLive(on, label) {
     $("live").classList.toggle("off", !on);
-    $("livetxt").textContent = on ? "LIVE" : (label || "HORS SYNC");
+    $("livetxt").textContent = on ? "LIVE" : (label || "NOT SYNCED");
   }
   function overlay(text, sub, idle) {
     $("overlay").hidden = !text;
@@ -903,8 +903,8 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     a.href = url;
     a.target = "_blank";
     a.rel = "noopener noreferrer";
-    a.title = "Ouvrir sur YouTube";
-    a.setAttribute("aria-label", "Ouvrir sur YouTube");
+    a.title = "Open on YouTube";
+    a.setAttribute("aria-label", "Open on YouTube");
     a.innerHTML = YT; // static markup, no server data
     return a;
   }
@@ -939,27 +939,27 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
       const grip = mk("button", "grip");
       grip.type = "button";
       grip.innerHTML = GRIP; // static markup, no server data
-      grip.setAttribute("aria-label", "Déplacer « " + t.title + " » (glisser, ou flèches haut et bas)");
+      grip.setAttribute("aria-label", "Move \u201c" + t.title + "\u201d (drag, or use the up and down arrow keys)");
       grip.dataset.id = t.id;
       li.appendChild(grip);
       const idx = mk("span", "idx");
       idx.appendChild(mk("span", "num", String(i + 1).padStart(2, "0")));
       idx.appendChild(mk("span", "pl", "▶"));
       li.appendChild(idx);
-      li.title = "Lire maintenant";
+      li.title = "Play now";
       if (t.thumbnail) li.appendChild(safeImg(t.thumbnail));
       const n = mk("span", "n");
       n.textContent = t.title;
       n.tabIndex = 0;
       n.setAttribute("role", "button");
-      n.setAttribute("aria-label", "Lire maintenant « " + t.title + " »");
+      n.setAttribute("aria-label", "Play \u201c" + t.title + "\u201d now");
       li.appendChild(n);
       const yt = ytLink(t.url);
       if (yt) li.appendChild(yt);
       li.appendChild(mk("span", "d", fmt(t.duration)));
       const rm = mk("button", "rm", "×");
       rm.type = "button";
-      rm.setAttribute("aria-label", "Retirer « " + t.title + " » de la file");
+      rm.setAttribute("aria-label", "Remove \u201c" + t.title + "\u201d from the queue");
       li.appendChild(rm);
       ol.appendChild(li);
     });
@@ -1020,13 +1020,13 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
       const li = mk("li");
       li.appendChild(mk("span", "spin"));
       const known = typeof t.title === "string" && t.title !== "";
-      li.appendChild(mk("span", known ? "n" : "n unknown", known ? t.title : "Lien en cours…"));
+      li.appendChild(mk("span", known ? "n" : "n unknown", known ? t.title : "Reading link…"));
       li.appendChild(mk("span", "src", t.source === "spotify" ? "Spotify" : "YouTube"));
       ol.appendChild(li);
     });
     if (total > items.length) {
       const rest = total - items.length;
-      ol.appendChild(mk("li", "more", "+ " + rest + (rest > 1 ? " autres" : " autre")));
+      ol.appendChild(mk("li", "more", "+ " + rest + " more"));
     }
     $("dlcount").textContent = String(total).padStart(2, "0");
     $("dlwrap").hidden = total === 0;
@@ -1200,7 +1200,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     } else {
       video.pause();
       delete video.dataset.dissolve;
-      overlay("Chargement de la vidéo…");
+      overlay("Loading video…");
     }
     // A retry gets a fresh URL, so nothing reuses the stalled request.
     video.src = np.video_url + (loadTries ? (np.video_url.includes("?") ? "&" : "?") + "r=" + loadTries : "");
@@ -1226,7 +1226,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
   }
   function onErr(e) {
     if (e.target !== video) return;
-    if (curId) overlay("Vidéo indisponible…");
+    if (curId) overlay("Video unavailable…");
     if (!errAt) errAt = performance.now();
     setLive(false);
   }
@@ -1363,11 +1363,11 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
   // override the preset locally (localStorage); a `?edit=<token>` link (sent
   // by `!theme edit` in DMs) opens the editor, whose draft is previewed live.
   const PRESETS = [
-    ["arcade", "Arcade"], ["minimal", "Minimal"], ["nuit", "Nuit"],
-    ["vinyle", "Vinyle"], ["club", "Club"], ["terminal", "Terminal"],
+    ["arcade", "Arcade"], ["minimal", "Minimal"], ["night", "Night"],
+    ["vinyl", "Vinyl"], ["club", "Club"], ["terminal", "Terminal"],
   ];
   const PRESET_IDS = PRESETS.map((p) => p[0]);
-  const SKIN_NAMES = Object.fromEntries(PRESETS.concat([["perso", "Perso"]]));
+  const SKIN_NAMES = Object.fromEntries(PRESETS.concat([["custom", "Custom"]]));
   const SKIN_KEY = "djsnake.skin";
   const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
   const LOGO_MAX = 512 * 1024;
@@ -1395,7 +1395,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     const logo = typeof t.logo_url === "string" && /^\/theme-logo\/[A-Za-z0-9_-]+\?v=\d+$/.test(t.logo_url) ? t.logo_url : null;
     return {
       skin: Object.prototype.hasOwnProperty.call(SKIN_NAMES, t.skin) ? t.skin : "arcade",
-      base: PRESET_IDS.includes(t.base) ? t.base : "nuit",
+      base: PRESET_IDS.includes(t.base) ? t.base : "night",
       bg: COLOR_RE.test(t.bg) ? t.bg : "#101820",
       text: COLOR_RE.test(t.text) ? t.text : "#f2f2f2",
       accent: COLOR_RE.test(t.accent) ? t.accent : "#ffb703",
@@ -1408,15 +1408,15 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     const c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
     return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2] > 0.35 ? "#101010" : "#ffffff";
   }
-  // Put a theme's attributes (and perso colors) on an element.
+  // Put a theme's attributes (and custom colors) on an element.
   function skinElement(el, t) {
     el.dataset.skin = t.skin;
     el.dataset.base = t.base;
     for (const k of ["bg", "text", "accent"]) {
-      if (t.skin === "perso") el.style.setProperty("--c-" + k, t[k]);
+      if (t.skin === "custom") el.style.setProperty("--c-" + k, t[k]);
       else el.style.removeProperty("--c-" + k);
     }
-    if (t.skin === "perso") el.style.setProperty("--c-on-accent", onAccent(t.accent));
+    if (t.skin === "custom") el.style.setProperty("--c-on-accent", onAccent(t.accent));
     else el.style.removeProperty("--c-on-accent");
   }
   function effectiveTheme() {
@@ -1431,7 +1431,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
   function applyTheme() {
     const t = effectiveTheme();
     skinElement(html, t);
-    html.dataset.shape = t.skin === "perso" ? t.base : t.skin;
+    html.dataset.shape = t.skin === "custom" ? t.base : t.skin;
     const words = brandName().split(/\s+/), last = words.pop();
     const wm = $("wordmark");
     wm.textContent = words.length ? words.join(" ") + " " : "";
@@ -1483,7 +1483,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
       b.appendChild(dots(t));
       menu.appendChild(b);
     };
-    item("server", "Thème du serveur (par défaut) · " + SKIN_NAMES[st.skin], st);
+    item("server", "Server theme (default) \u00b7 " + SKIN_NAMES[st.skin], st);
     menu.appendChild(mk("hr"));
     PRESETS.forEach(([id, name]) => item(id, name, Object.assign({}, st, { skin: id })));
     if (focused) { const f = menu.querySelector('[data-choice="' + focused + '"]'); if (f) f.focus(); }
@@ -1533,12 +1533,12 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     $("e-accent").value = draft.accent;
     $("e-base").value = draft.base;
     $("e-name").value = draft.name;
-    $("e-perso").hidden = draft.skin !== "perso";
+    $("e-custom").hidden = draft.skin !== "custom";
   }
   const editField = (id, key) => $(id).addEventListener("input", (e) => {
     if (!draft) return;
     draft[key] = e.target.value;
-    $("e-perso").hidden = draft.skin !== "perso";
+    $("e-custom").hidden = draft.skin !== "custom";
     editMsg("");
     applyTheme();
   });
@@ -1561,9 +1561,9 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
       let j = null;
       try { j = await r.json(); } catch (e) {}
       if (r.ok && j && j.ok) return j.theme;
-      editMsg((j && j.error) || "Enregistrement impossible (erreur " + r.status + ").");
+      editMsg((j && j.error) || "Could not save (error " + r.status + ").");
     } catch (e) {
-      editMsg("Réseau indisponible, réessaie.");
+      editMsg("Network unavailable, try again.");
     }
     return null;
   }
@@ -1577,29 +1577,29 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
   $("e-save").addEventListener("click", async () => {
     if (!draft || !editToken) return;
     const name = draft.name.trim();
-    if (name.length > 32) { editMsg("Nom trop long (32 caractères maximum)."); return; }
+    if (name.length > 32) { editMsg("Name too long (32 characters max)."); return; }
     const btn = $("e-save");
     btn.disabled = true;
     const body = JSON.stringify({ skin: draft.skin, base: draft.base, bg: draft.bg, text: draft.text, accent: draft.accent, name });
     const t = await themeRequest("/theme", "POST", body, "application/json");
     btn.disabled = false;
-    if (t) { adoptSaved(t, false); editMsg("Thème enregistré.", true); }
+    if (t) { adoptSaved(t, false); editMsg("Theme saved.", true); }
   });
   async function uploadLogo(file) {
     editMsg("");
     if (!file || !editToken || !draft) return;
-    if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) { editMsg("Format non pris en charge (PNG, JPEG, WebP ou GIF)."); return; }
-    if (file.size > LOGO_MAX) { editMsg("Image trop lourde (512 Ko maximum)."); return; }
-    editMsg("Envoi du logo…", true);
+    if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) { editMsg("Unsupported format (PNG, JPEG, WebP or GIF)."); return; }
+    if (file.size > LOGO_MAX) { editMsg("Image too large (512 KB max)."); return; }
+    editMsg("Uploading logo…", true);
     const t = await themeRequest("/theme/logo", "POST", file, file.type);
     $("e-logo").value = "";
-    if (t) { adoptSaved(t, true); editMsg("Logo enregistré.", true); }
+    if (t) { adoptSaved(t, true); editMsg("Logo saved.", true); }
   }
   $("e-logo").addEventListener("change", (e) => uploadLogo(e.target.files[0]));
   $("e-logoclear").addEventListener("click", async () => {
     if (!editToken || !draft) return;
     const t = await themeRequest("/theme/logo", "DELETE", null, null);
-    if (t) { adoptSaved(t, true); editMsg("Logo retiré.", true); }
+    if (t) { adoptSaved(t, true); editMsg("Logo removed.", true); }
   });
   for (const el of [$("drop"), $("header")]) {
     el.addEventListener("dragover", (e) => { if (!draft) return; e.preventDefault(); el.classList.add("dragover"); });
@@ -1632,7 +1632,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     const nv = Number.isInteger(d.viewers) && d.viewers > 0 ? d.viewers : 0;
     $("viewers").hidden = !nv;
     $("viewcount").textContent = String(nv);
-    $("viewers").title = nv > 1 ? nv + " personnes sur la page" : "1 personne sur la page";
+    $("viewers").title = nv > 1 ? nv + " people on the page" : "1 person on the page";
     renderQueue(d.queue || []);
     renderDownloading(d.downloading, d.downloading_total);
     const np = d.now_playing;
@@ -1643,8 +1643,8 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
       clearVideo(video);
       $("title").textContent = ""; $("title").dataset.sig = "";
       $("progline").hidden = true;
-      overlay("En pause", "DJ Snake n'est dans aucune room. Lance !play dans Discord pour reprendre, ce lien reste valable.", true);
-      setLive(false, "EN PAUSE");
+      overlay("Idle", "DJ Snake isn't in a voice channel. Run !play in Discord to resume; this link stays valid.", true);
+      setLive(false, "IDLE");
       updateControls();
       return;
     }
@@ -1654,7 +1654,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
       clearVideo(video);
       $("title").textContent = "";
       $("progline").hidden = true;
-      overlay(d.loading ? "Le bot prépare le morceau…" : "En attente d'un morceau…");
+      overlay(d.loading ? "The bot is preparing the track…" : "Waiting for a track…");
       setLive(false);
       updateControls();
       return;
@@ -1693,8 +1693,8 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     dis("xfade", !inVoice || pending.has("crossfade"));
     $("xfade").setAttribute("aria-checked", String(xfade));
     const pp = $("pp");
-    pp.setAttribute("aria-label", paused ? "Reprendre" : "Pause");
-    pp.title = paused ? "Reprendre" : "Pause";
+    pp.setAttribute("aria-label", paused ? "Resume" : "Pause");
+    pp.title = paused ? "Resume" : "Pause";
     $("ppicon").innerHTML = paused ? '<path d="M7 4.5v15l12-7.5z"/>' : '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>';
   }
 
@@ -1717,12 +1717,12 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
       try { j = await r.json(); } catch (e) {}
       if (r.ok && j && j.ok) {
         ok = true;
-        if (action === "add") toast("Ajouté — téléchargement en cours…", "ok");
+        if (action === "add") toast("Added \u2014 downloading\u2026", "ok");
       } else {
-        toast((j && j.error) || "Action impossible (erreur " + r.status + ").", "err");
+        toast((j && j.error) || "Action failed (error " + r.status + ").", "err");
       }
     } catch (e) {
-      toast("Réseau indisponible, réessaie.", "err");
+      toast("Network unavailable, try again.", "err");
     } finally {
       clearTimeout(kill);
       pending.delete(action);
@@ -1762,10 +1762,10 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
 
   // ---- stats panel. Titles and names come from users: textContent only.
   const statsDlg = $("stats"), statsBtn = $("statsbtn"), statsBody = $("statsbody");
-  const DAYS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
-  const RANGE_LABEL = { week: "7 derniers jours", month: "30 derniers jours", all: "depuis le début" };
+  const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const RANGE_LABEL = { week: "last 7 days", month: "last 30 days", all: "all time" };
   let statsRange = "week", statsSeq = 0;
-  const nf = (n) => Number(n || 0).toLocaleString("fr-FR");
+  const nf = (n) => Number(n || 0).toLocaleString("en");
   function rankList(items, label) {
     const ol = mk("ol", "rank");
     const max = Math.max(1, ...items.map((i) => i.plays || 0));
@@ -1773,10 +1773,10 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
       const li = mk("li");
       li.appendChild(mk("span", "r", String(i + 1)));
       const t = mk("span", "t");
-      if (it.name === null) t.appendChild(mk("span", "web", "page web"));
+      if (it.name === null) t.appendChild(mk("span", "web", "web page"));
       else t.appendChild(document.createTextNode(it.title != null ? it.title : it.name));
       if (it.artist) { t.appendChild(document.createTextNode(" ")); t.appendChild(mk("small", null, "· " + it.artist)); }
-      t.title = (it.title != null ? it.title : it.name || "page web") + (it.artist ? " · " + it.artist : "");
+      t.title = (it.title != null ? it.title : it.name || "web page") + (it.artist ? " · " + it.artist : "");
       li.appendChild(t);
       li.appendChild(mk("span", "c", "×" + nf(it.plays)));
       const bar = mk("span", "meter"), fill = mk("i");
@@ -1814,7 +1814,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     g.setAttribute("role", "img");
     g.appendChild(mk("span"));
     for (let h = 0; h < 24; h++) {
-      const l = mk("span", "hl", h % 6 === 0 ? h + "h" : "");
+      const l = mk("span", "hl", h % 6 === 0 ? String(h).padStart(2, "0") : "");
       l.style.gridColumn = String(h + 2);
       g.appendChild(l);
     }
@@ -1828,13 +1828,13 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
           c.style.setProperty("--p", Math.round(25 + (75 * n) / max) + "%");
           if (!busiest || n > busiest[2]) busiest = [d, h, n];
         }
-        c.title = DAYS[d] + " " + h + "h : " + n + (n > 1 ? " écoutes" : " écoute");
+        c.title = DAYS[d] + " " + String(h).padStart(2, "0") + ":00 \u2014 " + n + (n === 1 ? " play" : " plays");
         g.appendChild(c);
       }
     }
     g.setAttribute("aria-label", busiest
-      ? "Écoutes par jour et par heure. Créneau le plus chargé : " + DAYS[busiest[0]] + " " + busiest[1] + "h (" + busiest[2] + ")."
-      : "Écoutes par jour et par heure : aucune.");
+      ? "Plays by day and hour. Busiest slot: " + DAYS[busiest[0]] + " " + String(busiest[1]).padStart(2, "0") + ":00 (" + busiest[2] + ")."
+      : "Plays by day and hour: none.");
     return g;
   }
   function renderStats(d) {
@@ -1843,10 +1843,10 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     if (!totals.tracks) {
       const e = mk("div", "statempty");
       e.appendChild(mk("div", "hud", "NO DATA"));
-      e.appendChild(mk("div", "big display", "Pas encore de statistiques"));
+      e.appendChild(mk("div", "big display", "No stats yet"));
       e.appendChild(mk("p", null, statsRange === "all"
-        ? "Lance quelques morceaux avec !play : chaque écoute sera comptée ici, avec les artistes et les heures de pointe."
-        : "Aucune écoute " + (statsRange === "week" ? "ces 7 derniers jours" : "ces 30 derniers jours") + ". Essaie la période « Tout »."));
+        ? "Play a few tracks with !play: every listen is counted here, along with artists and peak hours."
+        : "No plays in the " + (statsRange === "week" ? "last 7 days" : "last 30 days") + ". Try the \u201cAll time\u201d period."));
       statsBody.appendChild(e);
       return;
     }
@@ -1854,20 +1854,20 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     wrap.style.cssText = "display:flex;flex-direction:column;gap:18px";
     const tiles = mk("div", "tiles");
     const hours = Number(totals.hours) || 0;
-    tiles.appendChild(tile("Heures d'écoute", hours.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " h", RANGE_LABEL[statsRange]));
-    tiles.appendChild(tile("Morceaux joués", nf(totals.tracks)));
-    tiles.appendChild(tile("Sessions", nf(totals.sessions), "connexions au vocal"));
+    tiles.appendChild(tile("Hours listened", hours.toLocaleString("en", { maximumFractionDigits: 1 }) + " h", RANGE_LABEL[statsRange]));
+    tiles.appendChild(tile("Tracks played", nf(totals.tracks)));
+    tiles.appendChild(tile("Sessions", nf(totals.sessions), "voice connections"));
     const pk = d.peak_listeners;
-    tiles.appendChild(tile("Pic d'auditeurs", pk ? nf(pk.count) : "—",
-      pk && pk.at ? "le " + new Date(pk.at * 1000).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) : null));
+    tiles.appendChild(tile("Peak listeners", pk ? nf(pk.count) : "—",
+      pk && pk.at ? "on " + new Date(pk.at * 1000).toLocaleDateString("en", { day: "numeric", month: "short", year: "numeric" }) : null));
     wrap.appendChild(tiles);
     const grid = mk("div", "statgrid");
     const none = (txt) => mk("p", "statnone", txt);
     const tt = d.top_tracks || [], ta = d.top_artists || [];
-    const topSec = section("Top morceaux", "10", tt.length ? rankList(tt, "écoutes") : none("Aucun morceau écouté jusqu'au bout."));
+    const topSec = section("Top tracks", "10", tt.length ? rankList(tt, "plays") : none("No track played to the end."));
     topSec.classList.add("tall");
     grid.appendChild(topSec);
-    grid.appendChild(section("Top artistes", "10", ta.length ? rankList(ta, "écoutes") : none("Aucun artiste reconnu.")));
+    grid.appendChild(section("Top artists", "10", ta.length ? rankList(ta, "plays") : none("No artists recognized.")));
     const ms = d.most_skipped;
     let skip;
     if (ms) {
@@ -1875,12 +1875,12 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
       const t = mk("div", "t", ms.title);
       if (ms.artist) { t.appendChild(document.createTextNode(" ")); t.appendChild(mk("small", null, "· " + ms.artist)); }
       skip.appendChild(t);
-      skip.appendChild(mk("div", "s", "zappé " + nf(ms.skips) + " fois avant 30 s"));
-    } else skip = none("Rien n'a été zappé. Belle sélection.");
-    grid.appendChild(section("Le plus zappé", "⏭", skip));
+      skip.appendChild(mk("div", "s", "skipped " + nf(ms.skips) + (ms.skips === 1 ? " time" : " times") + " before 30 s"));
+    } else skip = none("Nothing was skipped. Nice picks.");
+    grid.appendChild(section("Most skipped", "⏭", skip));
     wrap.appendChild(grid);
-    const hm = section("Heures de pointe", null, heatmap(d.heatmap));
-    hm.appendChild(mk("p", "heatnote", "Écoutes par jour et par heure, à l'heure de ton navigateur."));
+    const hm = section("Peak hours", null, heatmap(d.heatmap));
+    hm.appendChild(mk("p", "heatnote", "Plays by day and hour, in your browser's time zone."));
     wrap.appendChild(hm);
     statsBody.appendChild(wrap);
   }
@@ -1889,7 +1889,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     statsDlg.querySelectorAll("[data-range]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.range === statsRange)));
     if (!statsBody.firstChild || statsBody.querySelector(".statmsg")) {
       statsBody.textContent = "";
-      statsBody.appendChild(mk("p", "statmsg hud", "Chargement…"));
+      statsBody.appendChild(mk("p", "statmsg hud", "Loading…"));
     }
     try {
       const r = await fetch("/api/" + encodeURIComponent(sid) + "/stats?range=" + statsRange, { cache: "no-store" });
@@ -1900,7 +1900,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     } catch (e) {
       if (seq !== statsSeq) return;
       statsBody.textContent = "";
-      statsBody.appendChild(mk("p", "statmsg", "Statistiques indisponibles pour le moment."));
+      statsBody.appendChild(mk("p", "statmsg", "Stats are unavailable right now."));
     }
   }
   function openStats() {

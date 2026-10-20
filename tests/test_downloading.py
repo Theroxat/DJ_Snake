@@ -1,4 +1,4 @@
-"""The "En téléchargement" list: player.pending_downloads and its state field."""
+"""The "Downloading" list: player.pending_downloads and its state field."""
 
 import asyncio
 import threading

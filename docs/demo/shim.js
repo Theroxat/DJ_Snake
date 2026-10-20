@@ -5,7 +5,7 @@
  * Embedded in the Discord demo (index.html), it talks to the wrapper's fake
  * bot (window.parent.DJDemoBackend.shared), so both sides share one session;
  * opened on its own, it runs a standalone fake bot that is always playing and
- * now and then loads a fake playlist (the "En téléchargement" list). */
+ * now and then loads a fake playlist (the "Downloading" list). */
 (() => {
   "use strict";
 
@@ -29,7 +29,7 @@
   } catch (e) {}
 
   // Standalone, nobody adds anything: load a fake playlist now and then so
-  // the "En téléchargement" list shows how downloads queue up.
+  // the "Downloading" list shows how downloads queue up.
   if (!embedded && backend.demoLoad) {
     setTimeout(() => backend.demoLoad(5), 1500);
     setInterval(() => backend.demoLoad(4), 45000);

@@ -244,7 +244,7 @@
     if (!B.sid) { await botSay("❌ No music is currently playing."); return false; }
     let result;
     try { result = fn(); } catch (e) {
-      if (e instanceof B.ControlError) { await botSay("❌ " + e.english); return false; }
+      if (e instanceof B.ControlError) { await botSay("❌ " + e.message); return false; }
       throw e;
     }
     await later(250);
@@ -261,7 +261,7 @@
       if (!arg) return botSay(`❌ Usage: \`${P}play <YouTube or Spotify link>\``);
       let link;
       try { link = B.parseLink(arg); } catch (e) {
-        if (e instanceof B.ControlError) return botSay("❌ " + e.english);
+        if (e instanceof B.ControlError) return botSay("❌ " + e.message);
         throw e;
       }
       tourDone("send");

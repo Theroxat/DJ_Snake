@@ -202,8 +202,8 @@ Module map, lowest layer first (each imports only the ones above it):
   `crossfading` is true while the old track drains; only then does the page
   cross-dissolve its two stacked `<video>`s (skips stay an instant swap).
 - **Controls** (`control_next/previous/pause/resume/remove/move/add/seek/jump/crossfade`) are shared
-  by Discord commands and the web page and raise `ControlError` (HTTP status,
-  French web message, English Discord message). Previous restarts the track
+  by Discord commands and the web page and raise `ControlError` (HTTP status and
+  one English message, shown on Discord and on the web page). Previous restarts the track
   after 5 s of play or with empty history. Add accepts only YouTube hosts and
   rebuilds a canonical URL (`parse_youtube_url()`, no SSRF via yt-dlp), or a
   Spotify link (see Spotify links; `control_add()` is async); `v=`
@@ -251,10 +251,9 @@ Module map, lowest layer first (each imports only the ones above it):
   `queue_spotify()`. Queued items are ordinary YouTube tracks. Tests:
   `tests/test_spotify.py`, fixtures in `tests/fixtures/spotify/`; patch
   `spotify.get_tracks`, `spotify._http` or `media.search_youtube`.
-- **Pending downloads** (`player.pending_downloads`, the page's "En
-  téléchargement"): an ordered list of `{key, title, source}` (`source`
-  `youtube` or `spotify`; `title` None until known, the page then shows "Lien
-  en cours…") for every track asked for but not queued yet. `add_pending()`
+- **Pending downloads** (`player.pending_downloads`, the page's "Downloading"): an ordered list of `{key, title, source}` (`source`
+  `youtube` or `spotify`; `title` None until known, the page then shows "Reading
+  link…") for every track asked for but not queued yet. `add_pending()`
   returns a key that the caller drops in a `finally` (`drop_pending()`).
   `download_and_queue_song()` lists a link itself unless given `pending_key`,
   and names it from yt-dlp's progress hook (`download_media(url, on_title=)`;
@@ -304,7 +303,7 @@ Module map, lowest layer first (each imports only the ones above it):
   `enabled`; seek restarts the track at `position` seconds (file time),
   clamped, staying paused if it was, unannounced; jump plays a queued `id` now)
   and returns 200 `{"ok": true}` (202 for add, which downloads in the
-  background) or `{"ok": false, "error": "<French>"}` with 400 (bad input,
+  background) or `{"ok": false, "error": "<message>"}` with 400 (bad input,
   non-YouTube URL), 404 (unknown sid or track id) or 409 (not in voice, nothing
   playing). `GET /media/{sid}/{id}` streams the playing, a queued or a history
   track's mp4 with Range support. Files are found by track id, never by a path
@@ -312,15 +311,15 @@ Module map, lowest layer first (each imports only the ones above it):
   `POST|DELETE /api/{sid}/theme/logo`, `GET /theme-logo/{sid}` (see Themes).
 - **Themes**: the page is fully token-driven: each preset is a `[data-skin]`
   block of CSS custom properties on `<html>` (Arcade is the original look);
-  `perso` takes `--c-bg/--c-text/--c-accent` and derives the rest with
+  `custom` takes `--c-bg/--c-text/--c-accent` and derives the rest with
   `color-mix`, inheriting fonts and shapes from the preset in `data-base`;
-  `data-shape` (the skin, or the base for perso) scopes a few Arcade-only
+  `data-shape` (the skin, or the base for custom) scopes a few Arcade-only
   details. Per-guild defaults live in `guild_themes`, persisted to
   `{DATA_DIR}/themes.json` (`{guild id: {skin, base, bg, text, accent, name,
   logo: {ext, v} | null}}`, written atomically with a temp file and
   `os.replace`, cleaned field by field on load); a logo is
   `{DATA_DIR}/logos/{guild id}.{ext}`. `theme_for()` fills in `WEB_THEME` and
-  the perso defaults. `!theme edit` issues an edit token
+  the custom defaults. `!theme edit` issues an edit token
   (`secrets.token_urlsafe(24)`, in memory in `edit_tokens` with the guild id,
   30 min) and DMs `{PUBLIC_BASE_URL}/{sid}?edit=<token>`, opening a session
   (and its panel) without joining voice if the guild has none. Theme routes
@@ -328,7 +327,7 @@ Module map, lowest layer first (each imports only the ones above it):
   bound to the session's guild: `POST /api/{sid}/theme` (`{skin, base, bg,
   text, accent, name}`, JSON <= 4 KB, colors `#rrggbb`, name <= 32 chars) and
   `POST|DELETE /api/{sid}/theme/logo` (raw body <= 512 KB, PNG/JPEG/WebP/GIF
-  by magic bytes, never SVG) answer `{"ok": true, "theme": ...}` or a French
+  by magic bytes, never SVG) answer `{"ok": true, "theme": ...}` or an English
   error (400 bad input, 403 bad or expired token, 404 unknown session, 500
   write failed). `GET /theme-logo/{sid}` serves the logo with `nosniff`;
   `logo_url` carries `?v=` for cache busting. The page strips the token from
@@ -395,7 +394,7 @@ has two defenses:
    the script reports the result by comparing versions before and after.
 2. **`scripts/refresh-dj-snake.sh`**, run weekly from the host's cron, restarts
    the container so that upgrade actually happens on a long-running deployment.
-   It logs to `logs/refresh.log`. Its comments and log lines are in French.
+   It logs to `logs/refresh.log`.
 
 `REMOTE_COMPONENTS = ["ejs:github"]` in `djsnake/config.py` lets yt-dlp fetch
 the EJS challenge solver. Without it, signature and `n` challenge solving fail
@@ -433,8 +432,8 @@ docker exec dj-snake python -m yt_dlp --remote-components ejs:github \
 
 ## Conventions
 
-- User-facing messages, code comments and docs are in English, except the
-  host-side refresh script, which is in French.
+- User-facing messages, code comments, docs and the host-side refresh script
+  are all in English.
 - Black formatting with its default 88-column limit (there is no
   `pyproject.toml`), so CI's `black --check` reformats anything longer. The 127
   in CI's flake8 call is a non-blocking warning pass.

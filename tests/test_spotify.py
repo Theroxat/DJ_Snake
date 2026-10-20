@@ -561,7 +561,7 @@ async def test_web_add_spotify_track(web_add, player, spotify_env):
     "code, status",
     [("spotify_not_found", 404), ("spotify_unreadable", 502), ("spotify_empty", 400)],
 )
-async def test_web_add_spotify_errors_are_french(
+async def test_web_add_spotify_errors_use_the_control_message(
     web_add, monkeypatch, spotify_env, code, status
 ):
     def failing(kind, spotify_id, limit):
@@ -570,7 +570,7 @@ async def test_web_add_spotify_errors_are_french(
     monkeypatch.setattr(spotify, "get_tracks", failing)
     got_status, body = await web_add(f"https://open.spotify.com/playlist/{ID}")
     assert got_status == status
-    assert body == {"ok": False, "error": controls.ControlError(code).french}
+    assert body == {"ok": False, "error": controls.ControlError(code).message}
     assert spotify_env == []
 
 
