@@ -33,7 +33,7 @@ services:
   # which this service mints. Not exposed on the host: only dj-snake needs it,
   # over the compose network at http://pot-provider:4416.
   pot-provider:
-    image: brainicism/bgutil-ytdlp-pot-provider:1.3.2-deno
+    image: brainicism/bgutil-ytdlp-pot-provider:2.0.2-deno
     container_name: dj-snake-pot-provider
     restart: unless-stopped
     expose:

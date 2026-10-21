@@ -1,7 +1,7 @@
 # Development and CI tools, on top of the runtime dependencies.
 -r requirements.txt
 
-pytest>=8.0
-pytest-asyncio>=0.24
-black
-flake8
+pytest>=9.1.1
+pytest-asyncio>=1.4.0
+black>=26.10.1
+flake8>=7.4.1
