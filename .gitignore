@@ -80,3 +80,4 @@ htmlcov/
 *.temp
 temp/
 .claude/settings.local.json
+docs/_build/

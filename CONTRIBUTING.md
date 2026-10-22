@@ -36,4 +36,6 @@ Playback itself still needs a hand test: run the bot against a test server and t
 
 Keep them focused, one change each, and update the docs (`README.md`, `CLAUDE.md`) when behaviour or configuration changes. History uses gitmoji-style prefixes (for example a sparkles emoji for features), then a short imperative summary.
 
+User documentation lives in `docs/source/` (Markdown, built with Sphinx and published at https://dj-snake.readthedocs.io). Build it with `pip install -r docs/requirements.txt && sphinx-build -W -b html docs/source docs/_build/html`; CI fails on any warning.
+
 Never commit `.env`, a `token` file or any real token, hostname or IP.
