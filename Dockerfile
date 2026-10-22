@@ -1,3 +1,19 @@
+# Builder stage: compiles the Python dependencies that have no prebuilt wheel for
+# the target platform (davey has no cp315 aarch64 wheel; it is built from source
+# with Rust, which maturin fetches itself, but that needs a C linker). The
+# toolchain stays here and never reaches the final image.
+FROM python:3.15-slim AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        gcc \
+        libc6-dev \
+        curl \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
 FROM python:3.15-slim
 
 # System dependencies:
@@ -16,9 +32,8 @@ COPY --from=denoland/deno:bin /deno /usr/local/bin/deno
 
 WORKDIR /app
 
-# Install Python dependencies first for better layer caching.
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Python dependencies, built in the builder stage.
+COPY --from=builder /install /usr/local
 
 # Application code.
 COPY bot.py .
