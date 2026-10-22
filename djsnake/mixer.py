@@ -1,11 +1,54 @@
 """CrossfadeMixer: the audio source handed to the voice client."""
 
+import array
 import audioop  # Standard library up to 3.12; audioop-lts on 3.13+
+import math
 import threading
 
 import discord
 
-from .config import FRAMES_PER_SECOND, PCM_FRAME_SIZE
+from .config import (
+    FRAMES_PER_SECOND,
+    PCM_FRAME_SIZE,
+    VOLUME_MAX,
+    VOLUME_RAMP_FRAMES,
+)
+
+# Where the soft limiter starts, as a fraction of full scale. Below it the
+# signal is only scaled; above it peaks are squeezed towards (never past) full
+# scale instead of clipping hard.
+LIMIT_KNEE = 0.9
+GAIN_SLICES = 8  # A frame is ramped in this many steps, so a change is smooth
+# Largest gain change per frame: the whole range in VOLUME_RAMP_FRAMES frames.
+MAX_GAIN_STEP = (VOLUME_MAX / 100.0) / VOLUME_RAMP_FRAMES
+
+
+def scale(chunk, gain):
+    """16-bit PCM `chunk` times `gain`, soft-limited above LIMIT_KNEE."""
+    full = 32767
+    if audioop.max(chunk, 2) * gain <= LIMIT_KNEE * full:
+        return audioop.mul(chunk, 2, gain)
+    samples = array.array("h", chunk)
+    knee, room = LIMIT_KNEE, 1.0 - LIMIT_KNEE
+    for i, x in enumerate(samples):
+        v = abs(x) * gain / full
+        if v > knee:
+            v = knee + room * math.tanh((v - knee) / room)
+        v = min(v, 1.0) * full
+        samples[i] = int(v) if x >= 0 else -int(v)
+    return samples.tobytes()
+
+
+def apply_gain(chunk, start, end):
+    """`chunk` with the gain gliding linearly from `start` to `end`."""
+    if start == end:
+        return scale(chunk, end)
+    size = max(4, len(chunk) // GAIN_SLICES // 4 * 4)
+    out = []
+    for i, pos in enumerate(range(0, len(chunk), size)):
+        gain = start + (end - start) * min(1.0, (i + 1) * size / len(chunk))
+        out.append(scale(chunk[pos : pos + size], gain))
+    return b"".join(out)
 
 
 class CrossfadeMixer(discord.AudioSource):
@@ -21,7 +64,9 @@ class CrossfadeMixer(discord.AudioSource):
     when the last one ends, and reads `gen` to know which track that was.
     """
 
-    def __init__(self, source, gen, frames=None, fade_frames=0, on_tail=None):
+    def __init__(
+        self, source, gen, frames=None, fade_frames=0, on_tail=None, volume=1.0
+    ):
         self._lock = threading.Lock()
         self.source = source
         self.outgoing = None  # Previous track, draining under `source`
@@ -32,6 +77,8 @@ class CrossfadeMixer(discord.AudioSource):
         self._tail_signalled = False
         self._pending = None  # First frame of an attached source, already read
         self.finished = False
+        # Output gain stage (the server's volume). `_gain` glides to `_target`.
+        self._gain = self._target = float(volume)
 
     @property
     def _current_error(self):
@@ -45,6 +92,15 @@ class CrossfadeMixer(discord.AudioSource):
         if self._frames_left is None:
             return None
         return self._frames_left / FRAMES_PER_SECOND
+
+    @property
+    def volume(self):
+        """The gain the output is heading to (1.0 = the normalised level)."""
+        return self._target
+
+    def set_volume(self, gain):
+        """Change the gain without restarting: it glides over a few frames."""
+        self._target = max(0.0, float(gain))
 
     def rearm(self):
         """Signal the tail again on the next frame (the crossfade was put off,
@@ -66,6 +122,19 @@ class CrossfadeMixer(discord.AudioSource):
             return True
 
     def read(self):
+        data = self._read_mixed()
+        if not data or (self._gain == self._target == 1.0):
+            return data
+        start = self._gain
+        step = max(-MAX_GAIN_STEP, min(MAX_GAIN_STEP, self._target - start))
+        self._gain = (
+            self._target
+            if abs(self._target - start) <= MAX_GAIN_STEP
+            else (start + step)
+        )
+        return apply_gain(data, start, self._gain)
+
+    def _read_mixed(self):
         with self._lock:
             if self.finished:
                 return b""
@@ -90,7 +159,7 @@ class CrossfadeMixer(discord.AudioSource):
                 attached = self.source is not source
                 if not attached:
                     self.finished = True
-            return self.read() if attached else b""
+            return self._read_mixed() if attached else b""
         if self._frames_left is not None:
             self._frames_left -= 1
             if (

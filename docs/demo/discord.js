@@ -253,7 +253,8 @@
   }
   const HELP = "```\n​No Category:\n  crossfade\n  help      Shows this message\n  list\n  next\n  pause\n  play\n" +
     "  reset     Force reset the voice connection\n  resume\n  seek\n  stop\n" +
-    "  theme     Show or set the clip page's default theme for this server.\n\n" +
+    "  theme     Show or set the clip page's default theme for this server.\n" +
+    "  volume    Show the server's volume, or set it (0-150 %, 100 = normal).\n\n" +
     `Type ${P}help command for more info on a command.\nYou can also type ${P}help category for more info on a category.\n` + "```";
 
   const COMMANDS = {
@@ -284,6 +285,16 @@
       const mode = (arg || "").toLowerCase();
       if (mode !== "on" && mode !== "off") return botSay(`❌ Usage: \`${P}crossfade on|off\``);
       B.C.crossfade(mode === "on");
+      await later(250);
+      react(msg);
+    },
+    async volume(msg, arg) {
+      if (!arg) {
+        return botSay(`🔊 Volume: **${B.volume}%**\n\`${P}volume <0-150>\` changes it (100 is the normal level).`);
+      }
+      const n = /^\d+%?$/.test(arg.trim()) ? parseInt(arg, 10) : NaN;
+      if (!(n >= 0 && n <= 150)) return botSay(`❌ Usage: \`${P}volume [0-150]\``);
+      B.C.volume(n);
       await later(250);
       react(msg);
     },

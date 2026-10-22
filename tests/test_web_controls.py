@@ -23,6 +23,7 @@ STATE_KEYS = {
     "can_previous",
     "crossfade",
     "crossfading",
+    "volume",
     "server_time",
     "viewers",
     "now_playing",

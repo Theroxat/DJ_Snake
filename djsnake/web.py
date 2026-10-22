@@ -36,6 +36,7 @@ from .controls import (
     control_remove,
     control_resume,
     control_seek,
+    control_volume,
     seek_label,
 )
 from .sessions import refresh_panel, session_player, set_action, short, touch
@@ -50,6 +51,7 @@ from .themes import (
     theme_state,
     valid_color,
 )
+from .volume import valid_volume, volume_for
 
 # --- Web server: synced clip page -------------------------------------------
 #
@@ -65,7 +67,8 @@ from .themes import (
 #   POST /api/{sid}/control    {"action", "id"?, "index"?, "url"?, "position"?,
 #                              "enabled"?} -> {"ok": ...}; actions: next,
 #                              previous, pause, resume, remove, move, add,
-#                              seek, jump, crossfade ({"enabled": bool})
+#                              seek, jump, crossfade ({"enabled": bool}),
+#                              volume ({"value": int 0-150, percent})
 #   GET /media/{sid}/{id}      the mp4 of a playing, queued or history track
 #   POST /api/{sid}/theme      {skin, base, bg, text, accent, name}, with the
 #                              X-Edit-Token header of a `!theme edit` link
@@ -161,6 +164,7 @@ async def web_state(request):
             "paused": now_playing is not None and player.paused_at is not None,
             "can_previous": now_playing is not None and player.pending_action is None,
             "crossfade": player.crossfade,
+            "volume": volume_for(state.sessions[sid]),
             # True while the previous track still drains under this one.
             "crossfading": now_playing is not None
             and player.mixer is not None
@@ -284,6 +288,7 @@ async def web_control(request):
         "seek",
         "jump",
         "crossfade",
+        "volume",
     ):
         return _control_error(400, "Unknown action.")
 
@@ -307,6 +312,9 @@ async def web_control(request):
         return _control_error(400, "Missing link.")
     if action == "crossfade" and not isinstance(data.get("enabled"), bool):
         return _control_error(400, "Invalid request.")
+
+    if action == "volume" and not valid_volume(data.get("value")):
+        return _control_error(400, ControlError("bad_volume").message)
 
     touch(player)
     if player.sid != sid:  # Expired just now
@@ -338,6 +346,8 @@ async def web_control(request):
             set_action(player, seek_label(player, applied))
         elif action == "crossfade":
             control_crossfade(player, data["enabled"])
+        elif action == "volume":
+            _announce_volume(player, guild_id, data["value"])
         elif action == "jump":
             track = await control_jump(player, guild_id, track_id)
             set_action(player, f"▶️ Jumped to: {short(track['title'])}")
@@ -347,6 +357,15 @@ async def web_control(request):
     except ControlError as e:
         return _control_error(e.status, e.message)
     return web.json_response({"ok": True})
+
+
+def _announce_volume(player, guild_id, percent):
+    """Apply a web volume change. The panel line is the usual coalesced edit
+    (one per PANEL_MIN_INTERVAL), so dragging the slider does not spam."""
+    try:
+        control_volume(player, guild_id, percent)
+    finally:
+        set_action(player, f"🔊 Volume set to {percent}% via the web page")
 
 
 def _theme_auth(request):

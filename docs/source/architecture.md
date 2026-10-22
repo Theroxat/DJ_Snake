@@ -14,6 +14,7 @@ Lowest layer first; each module imports only the ones above it.
 | `player.py` | `MusicPlayer` (per-server state), cleanup of files and history helpers. |
 | `sessions.py` | Session expiry and the status panel. |
 | `themes.py` | Theme storage, logos and `!theme edit` tokens. |
+| `volume.py` | Per-server volume storage and the percent to gain mapping. |
 | `media.py` | YouTube URL parsing, yt-dlp downloads, the SponsorBlock cut, audio analysis and FFmpeg options, YouTube search. |
 | `spotify.py` | Spotify link parsing, track lists, and matching to YouTube. |
 | `mixer.py` | `CrossfadeMixer`, the audio source wrapping FFmpeg. |
@@ -41,7 +42,7 @@ Controls never choose the next track themselves. They set a pending action under
 
 ### Controls and the web API
 
-Next, previous, pause, resume, remove, move, add, seek, jump and crossfade are shared between Discord and the page. They raise one error type carrying an HTTP status and an English message, shown in Discord and on the page. Added URLs must be YouTube hosts (rebuilt into a canonical URL) or Spotify links, which avoids server-side request forgery through yt-dlp.
+Next, previous, pause, resume, remove, move, add, seek, jump, crossfade and volume are shared between Discord and the page. They raise one error type carrying an HTTP status and an English message, shown in Discord and on the page. Added URLs must be YouTube hosts (rebuilt into a canonical URL) or Spotify links, which avoids server-side request forgery through yt-dlp.
 
 The page uses these routes:
 
@@ -68,7 +69,7 @@ discord.py drops and resumes the gateway roughly every couple of hours. Do no cl
 
 ### Persistent data
 
-Everything persistent lives in `DATA_DIR`: `themes.json` (per-server themes, written atomically), `logos/` and `stats.db` (SQLite, WAL).
+Everything persistent lives in `DATA_DIR`: `themes.json` (per-server themes, written atomically), `volume.json` (per-server volume), `logos/` and `stats.db` (SQLite, WAL).
 
 ## Demo site
 

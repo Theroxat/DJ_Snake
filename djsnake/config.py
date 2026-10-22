@@ -46,6 +46,7 @@ EMPTY_CHANNEL_GRACE_SECONDS = 30.0
 DATA_DIR = os.getenv("DATA_DIR") or "/app/data"
 THEMES_FILE = os.path.join(DATA_DIR, "themes.json")
 LOGO_DIR = os.path.join(DATA_DIR, "logos")
+VOLUME_FILE = os.path.join(DATA_DIR, "volume.json")
 # Listening statistics (stats.py): SQLite, written by one background thread.
 STATS_DB = os.path.join(DATA_DIR, "stats.db")
 # A track left (next, jump, previous, !stop) before this much actual play
@@ -147,6 +148,10 @@ CROSSFADE_SECONDS = 6.0
 CROSSFADE_MIN_TRACK = 15.0
 FRAMES_PER_SECOND = 50  # discord.py reads 20 ms PCM frames
 PCM_FRAME_SIZE = discord.opus.Encoder.FRAME_SIZE  # 3840 bytes, 48 kHz s16 stereo
+# Per-server volume, in percent of the normalised level (100 = unchanged).
+VOLUME_DEFAULT = 100
+VOLUME_MAX = 150
+VOLUME_RAMP_FRAMES = 5  # A volume change glides over this many frames (100 ms)
 
 # Spotify links: the track list is read from the public embed page (no
 # configuration, at most 100 tracks), or from the Web API when both

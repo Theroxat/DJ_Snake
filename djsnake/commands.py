@@ -22,6 +22,7 @@ from .controls import (
     control_pause,
     control_resume,
     control_seek,
+    control_volume,
     read_spotify,
     seek_label,
 )
@@ -42,6 +43,7 @@ from .sessions import (
     touch,
 )
 from .themes import issue_edit_token, reset_theme, save_themes, theme_for
+from .volume import parse_volume, volume_for
 
 bot = state.bot
 
@@ -339,6 +341,29 @@ async def crossfade(ctx, mode: str = None):
     player = state.music_players.setdefault(ctx.guild.id, MusicPlayer())
     touch(player)
     control_crossfade(player, mode == "on")
+    await ack(ctx)
+
+
+@bot.command(name="volume")
+async def volume(ctx, level: str = None):
+    """Show the server's volume, or set it (0-150 %, 100 = normal)."""
+    if level is None:
+        await ctx.send(
+            f"🔊 Volume: **{volume_for(ctx.guild.id)}%**\n"
+            f"`{COMMAND_PREFIX}volume <0-150>` changes it (100 is the normal level)."
+        )
+        return
+    percent = parse_volume(level)
+    if percent is None:
+        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}volume [0-150]`")
+        return
+    player = state.music_players.setdefault(ctx.guild.id, MusicPlayer())
+    touch(player)
+    try:
+        control_volume(player, ctx.guild.id, percent)
+    except ControlError as e:
+        await ctx.send(f"⚠️ {e.message}")
+        return
     await ack(ctx)
 
 

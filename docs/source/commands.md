@@ -10,6 +10,7 @@ Commands are text messages sent in a server channel. The prefix is `!` by defaul
 | `!pause` / `!resume` | Pause or resume playback. |
 | `!seek <pos>` | Jump to a position in the track, in seconds or `mm:ss`, as the clip page shows it. |
 | `!crossfade on\|off` | Enable or disable crossfade for this session (off by default). |
+| `!volume [0-150]` | Show the server's volume, or set it in percent (100 is the normal level). Saved across restarts. |
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
 | `!theme [preset\|reset\|edit]` | Show or set the clip page's default theme for the server. `edit` DMs you a private editor link. Needs the Manage Server permission. |
@@ -46,6 +47,10 @@ Jumps to a position in seconds (`90`) or as `mm:ss` (`1:30`). The position is re
 ### `!crossfade on|off`
 
 Turns crossfade on or off for the current session. When on, tracks fade out for 6 seconds and the next track fades in over the end of the previous one. It only overlaps when both tracks are long enough (at least 15 seconds of music each); otherwise tracks follow each other as usual. Off by default.
+
+### `!volume [0-150]`
+
+Without an argument, shows the server's volume. With a number from 0 to 150 (a trailing `%` is fine), sets it. 100 is the normal level (tracks are normalised to -14 LUFS); 0 is silent and 150 is about 3.5 dB louder, with a soft limiter so loud peaks are squeezed instead of clipping. The change applies to the playing track at once, without restarting it, and glides over a tenth of a second to avoid clicks. The volume belongs to the server, is shared with the clip page and is saved in `DATA_DIR/volume.json`.
 
 ### `!stop`
 

@@ -77,6 +77,7 @@ The prefix is `!` by default (`COMMAND_PREFIX`).
 | `!pause` / `!resume` | Pause or resume playback. |
 | `!seek <pos>` | Jump to a position in the track, in seconds or `mm:ss`, as the clip page shows it. |
 | `!crossfade on\|off` | Enable or disable crossfade for this session (off by default). |
+| `!volume [0-150]` | Show the server's volume, or set it in percent (100 is the normal level). Saved across restarts. |
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
 | `!theme [preset\|reset\|edit]` | Show or set the clip page's default theme for the server. `edit` DMs you a private editor link. Needs the Manage Server permission. |
@@ -160,7 +161,7 @@ Set these in `.env` (see `.env.example`).
 | `WEB_BIND` | `127.0.0.1` | Host IP the port is published on (Compose only). |
 | `PUBLIC_BASE_URL` | empty (`http://localhost:WEB_PORT`) | Public address used in the posted clip link. |
 | `SESSION_IDLE_HOURS` | `6` | Idle hours before a clip link expires. |
-| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), logos and listening stats (`stats.db`). Compose mounts `./data` there. |
+| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), volumes (`volume.json`), logos and listening stats (`stats.db`). Compose mounts `./data` there. |
 | `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`. |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | empty | Optional Spotify Web API credentials, for playlists over 100 tracks. Without them, Spotify links are read from the public embed page. |
 | `YTDLP_AUTO_UPDATE` | `1` | Upgrade yt-dlp on container start (`0` to skip). |

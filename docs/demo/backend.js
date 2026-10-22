@@ -35,6 +35,7 @@
     nothing_playing: [409, "No music is currently playing."],
     track_not_found: [404, "That track is not in the queue."],
     bad_index: [400, "Invalid position."],
+    bad_volume: [400, "Volume must be a whole number from 0 to 150."],
     bad_url: [400,
       "Only YouTube (video or playlist) and Spotify (track, album or playlist) links are accepted."],
     spotify_short_link: [400,
@@ -104,7 +105,7 @@
     const S = {
       sid: null, inVoice: false, current: null, queue: [], history: [],
       startedAt: 0, pausedAt: null, pausedTotal: 0,
-      crossfade: false, epoch: 0, jobs: 0, single: 0,
+      crossfade: false, volume: 100, epoch: 0, jobs: 0, single: 0,
       pending: [], // pending_downloads: {key, title (null: link not read), source}
       loadLine: null, loadFinal: false, lastAction: null,
       theme: { skin: "arcade", base: "night", bg: "#101820", text: "#f2f2f2", accent: "#ffb703", name: "", logo_url: null },
@@ -334,6 +335,11 @@
         return p;
       },
       crossfade(on) { S.crossfade = !!on; changed(); },
+      volume(n) {
+        if (!Number.isInteger(n) || n < 0 || n > 150) throw new ControlError("bad_volume");
+        S.volume = n;
+        changed();
+      },
       add(url) {
         if (!S.inVoice) throw new ControlError("not_in_voice");
         queueLink(parseLink(url));
@@ -365,6 +371,7 @@
         lines.push(line);
       }
       if (S.crossfade) lines.push("🔀 Crossfade on");
+      if (S.volume !== 100) lines.push(`🔊 Volume ${S.volume}%`);
       if (S.loadLine) lines.push(S.loadLine);
       else if (S.pending.length > 1) lines.push(`📥 Downloading ${S.pending.length} tracks…`);
       else if (S.single || S.pending.length) lines.push("📥 Downloading…");
@@ -382,7 +389,7 @@
         body: {
           active: true, in_voice: S.inVoice, guild: "Friday Night", channel: "Lounge",
           loading: S.jobs > 0, paused: !!c && paused(), can_previous: !!c,
-          crossfade: S.crossfade, crossfading: false, server_time: Date.now() / 1000,
+          crossfade: S.crossfade, volume: S.volume, crossfading: false, server_time: Date.now() / 1000,
           viewers: viewers(),
           theme: S.theme,
           now_playing: c ? Object.assign(pub(c), { video_url: c.video_url, elapsed: elapsed(), start: START, end: END }) : null,
@@ -456,6 +463,9 @@
         else if (a === "crossfade") {
           if (typeof d.enabled !== "boolean") return fail(400, "Invalid request.");
           C.crossfade(d.enabled);
+        } else if (a === "volume") {
+          C.volume(d.value);
+          setAction(`🔊 Volume set to ${d.value}% via the web page`);
         } else if (a === "add") {
           if (typeof d.url !== "string") return fail(400, "Missing link.");
           C.add(d.url);
@@ -522,6 +532,7 @@
       get queue() { return S.queue.slice(); },
       get jobs() { return S.jobs; },
       get theme() { return S.theme; },
+      get volume() { return S.volume; },
       setSkin(skin) { S.theme = Object.assign({}, S.theme, { skin }); changed(); },
       setAction,
     };

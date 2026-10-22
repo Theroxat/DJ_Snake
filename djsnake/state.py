@@ -33,6 +33,8 @@ sessions = {}
 
 # Guild id -> stored theme record (see themes.py).
 guild_themes = {}
+# Guild id -> volume percent (see volume.py); absent means VOLUME_DEFAULT.
+guild_volumes = {}
 # `!theme edit` links: token -> (guild id, expiry on clock()). In memory only.
 edit_tokens = {}
 
