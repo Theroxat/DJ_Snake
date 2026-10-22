@@ -10,6 +10,8 @@ Commands are text messages sent in a server channel. The prefix is `!` by defaul
 | `!pause` / `!resume` | Pause or resume playback. |
 | `!seek <pos>` | Jump to a position in the track, in seconds or `mm:ss`, as the clip page shows it. |
 | `!crossfade on\|off` | Enable or disable crossfade for this session (off by default). |
+| `!loop [off\|track\|queue]` | Repeat the current track or the whole queue; with no argument, cycle through the modes (off by default). |
+| `!shuffle` | Shuffle the upcoming queue once; the current track keeps playing. |
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
 | `!theme [preset\|reset\|edit]` | Show or set the clip page's default theme for the server. `edit` DMs you a private editor link. Needs the Manage Server permission. |
@@ -46,6 +48,14 @@ Jumps to a position in seconds (`90`) or as `mm:ss` (`1:30`). The position is re
 ### `!crossfade on|off`
 
 Turns crossfade on or off for the current session. When on, tracks fade out for 6 seconds and the next track fades in over the end of the previous one. It only overlaps when both tracks are long enough (at least 15 seconds of music each); otherwise tracks follow each other as usual. Off by default.
+
+### `!loop [off|track|queue]`
+
+Sets the loop mode for the session, or cycles off, track, queue when called without an argument. In `track` mode the current track replays each time it ends (skipping still moves on). In `queue` mode each finished or skipped track goes back to the end of the queue, so the list repeats. Each pass counts as one play in the listening stats. It works with crossfade. Off by default.
+
+### `!shuffle`
+
+Shuffles the upcoming queue once. The current track keeps playing and the order is not kept afterwards. It needs at least two queued tracks.
 
 ### `!stop`
 

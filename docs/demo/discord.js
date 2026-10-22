@@ -251,8 +251,8 @@
     react(msg);
     return { result };
   }
-  const HELP = "```\n​No Category:\n  crossfade\n  help      Shows this message\n  list\n  next\n  pause\n  play\n" +
-    "  reset     Force reset the voice connection\n  resume\n  seek\n  stop\n" +
+  const HELP = "```\n​No Category:\n  crossfade\n  help      Shows this message\n  list\n  loop\n  next\n  pause\n  play\n" +
+    "  reset     Force reset the voice connection\n  resume\n  seek\n  shuffle\n  stop\n" +
     "  theme     Show or set the clip page's default theme for this server.\n\n" +
     `Type ${P}help command for more info on a command.\nYou can also type ${P}help category for more info on a category.\n` + "```";
 
@@ -286,6 +286,16 @@
       B.C.crossfade(mode === "on");
       await later(250);
       react(msg);
+    },
+    async loop(msg, arg) {
+      const mode = (arg || "").toLowerCase() || null;
+      if (mode !== null && !["off", "track", "queue"].includes(mode)) return botSay(`❌ Usage: \`${P}loop [off|track|queue]\``);
+      B.C.loop(mode);
+      await later(250);
+      react(msg);
+    },
+    async shuffle(msg) {
+      if (await runControl(msg, () => B.C.shuffle())) refreshPanel();
     },
     async stop(msg) {
       if (!B.sid) return botSay("❌ No music is currently playing.");

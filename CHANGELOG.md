@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Loop and shuffle. `!loop [off|track|queue]` (no argument cycles) replays the current track or sends finished tracks back to the end of the queue; `!shuffle` shuffles the upcoming queue once. The clip page has matching shuffle and loop buttons, the control API gets `loop` and `shuffle` actions, `/api/{sid}/state` exposes `loop`, and the status panel shows the loop mode.
+
 ## [1.3.0] - 2026-10-22
 
 ### Added

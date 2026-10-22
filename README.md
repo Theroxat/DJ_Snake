@@ -30,9 +30,10 @@
 - **Spotify playlists, albums and tracks.** Paste a link and the bot finds every song on YouTube, preferring the official music video, with no Spotify account or API key needed (see [Spotify links](#spotify-links)).
 - YouTube URLs and playlists. Tracks are fully downloaded before they play (no streaming).
 - Independent queue per server.
-- Live clip page: muted video synced with the audio, plus web controls (next, previous, pause, resume, seek, jump, remove, reorder, add).
+- Live clip page: muted video synced with the audio, plus web controls (next, previous, pause, resume, seek, jump, remove, reorder, add, shuffle, loop).
 - Automix, always on: SponsorBlock `music_offtopic` segments are cut, loudness is normalised to -14 LUFS, leading and trailing silence is trimmed, and tracks fade in and out.
 - Optional crossfade between tracks.
+- Loop (track or queue) and one-shot queue shuffle.
 - Listening stats per server on the clip page: top tracks and artists, the most skipped track, hours played, sessions, peak listeners and a day-by-hour heatmap, for the last week, month or all time.
 - Live viewer count in the clip page header.
 - Themable clip page: eight looks, including a custom one with your colors, name and logo (see [Themes](#themes) below).
@@ -77,6 +78,8 @@ The prefix is `!` by default (`COMMAND_PREFIX`).
 | `!pause` / `!resume` | Pause or resume playback. |
 | `!seek <pos>` | Jump to a position in the track, in seconds or `mm:ss`, as the clip page shows it. |
 | `!crossfade on\|off` | Enable or disable crossfade for this session (off by default). |
+| `!loop [off\|track\|queue]` | Repeat the current track or the whole queue; with no argument, cycle through the modes (off by default). |
+| `!shuffle` | Shuffle the upcoming queue once; the current track keeps playing. |
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
 | `!theme [preset\|reset\|edit]` | Show or set the clip page's default theme for the server. `edit` DMs you a private editor link. Needs the Manage Server permission. |

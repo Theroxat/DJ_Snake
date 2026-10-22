@@ -143,6 +143,8 @@ def render_panel(player):
         lines.append(line)
     if player.crossfade:
         lines.append("🔀 Crossfade on")
+    if player.loop != "off":
+        lines.append(f"🔁 Loop: {player.loop}")
     if player.load_line:
         lines.append(player.load_line)
     elif len(player.pending_downloads) > 1:

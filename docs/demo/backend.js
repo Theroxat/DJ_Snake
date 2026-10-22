@@ -35,6 +35,8 @@
     nothing_playing: [409, "No music is currently playing."],
     track_not_found: [404, "That track is not in the queue."],
     bad_index: [400, "Invalid position."],
+    bad_loop: [400, "Loop mode must be off, track or queue."],
+    nothing_to_shuffle: [409, "Not enough queued tracks to shuffle."],
     bad_url: [400,
       "Only YouTube (video or playlist) and Spotify (track, album or playlist) links are accepted."],
     spotify_short_link: [400,
@@ -104,7 +106,7 @@
     const S = {
       sid: null, inVoice: false, current: null, queue: [], history: [],
       startedAt: 0, pausedAt: null, pausedTotal: 0,
-      crossfade: false, epoch: 0, jobs: 0, single: 0,
+      crossfade: false, loop: "off", epoch: 0, jobs: 0, single: 0,
       pending: [], // pending_downloads: {key, title (null: link not read), source}
       loadLine: null, loadFinal: false, lastAction: null,
       theme: { skin: "arcade", base: "night", bg: "#101820", text: "#f2f2f2", accent: "#ffb703", name: "", logo_url: null },
@@ -165,7 +167,11 @@
         play(S.history.pop());
         return;
       }
-      if (S.current) S.history.push(S.current);
+      if (action === "end" && S.loop === "track" && S.current) { play(S.current); changed(); return; }
+      if (S.current) {
+        S.history.push(S.current);
+        if (S.loop === "queue") S.queue.push(S.current); // back to the end of the queue
+      }
       S.history = S.history.slice(-5);
       if (standalone) while (S.queue.length < 4) S.queue.push(mkTrack(rot++));
       if (S.queue.length) play(S.queue.shift());
@@ -178,7 +184,7 @@
       if (!S.current && S.inVoice) advance();
       changed();
     }
-    setInterval(() => { if (S.current && !paused() && elapsed() >= END) advance(); }, 250);
+    setInterval(() => { if (S.current && !paused() && elapsed() >= END) advance("end"); }, 250);
 
     // ---- session and voice
     const sidChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
@@ -334,6 +340,22 @@
         return p;
       },
       crossfade(on) { S.crossfade = !!on; changed(); },
+      loop(mode) {
+        const modes = ["off", "track", "queue"];
+        if (mode == null) mode = modes[(modes.indexOf(S.loop) + 1) % 3];
+        if (!modes.includes(mode)) throw new ControlError("bad_loop");
+        S.loop = mode; changed();
+        return mode;
+      },
+      shuffle() {
+        if (!S.inVoice) throw new ControlError("not_in_voice");
+        if (S.queue.length < 2) throw new ControlError("nothing_to_shuffle");
+        for (let i = S.queue.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [S.queue[i], S.queue[j]] = [S.queue[j], S.queue[i]];
+        }
+        changed();
+      },
       add(url) {
         if (!S.inVoice) throw new ControlError("not_in_voice");
         queueLink(parseLink(url));
@@ -365,6 +387,7 @@
         lines.push(line);
       }
       if (S.crossfade) lines.push("🔀 Crossfade on");
+      if (S.loop !== "off") lines.push(`🔁 Loop: ${S.loop}`);
       if (S.loadLine) lines.push(S.loadLine);
       else if (S.pending.length > 1) lines.push(`📥 Downloading ${S.pending.length} tracks…`);
       else if (S.single || S.pending.length) lines.push("📥 Downloading…");
@@ -382,7 +405,7 @@
         body: {
           active: true, in_voice: S.inVoice, guild: "Friday Night", channel: "Lounge",
           loading: S.jobs > 0, paused: !!c && paused(), can_previous: !!c,
-          crossfade: S.crossfade, crossfading: false, server_time: Date.now() / 1000,
+          crossfade: S.crossfade, loop: S.loop, crossfading: false, server_time: Date.now() / 1000,
           viewers: viewers(),
           theme: S.theme,
           now_playing: c ? Object.assign(pub(c), { video_url: c.video_url, elapsed: elapsed(), start: START, end: END }) : null,
@@ -456,6 +479,11 @@
         else if (a === "crossfade") {
           if (typeof d.enabled !== "boolean") return fail(400, "Invalid request.");
           C.crossfade(d.enabled);
+        } else if (a === "loop") {
+          if (d.mode != null && !["off", "track", "queue"].includes(d.mode)) return fail(400, ERRORS.bad_loop[1]);
+          setAction(`🔁 Loop: ${C.loop(d.mode)} via the web page`);
+        } else if (a === "shuffle") {
+          C.shuffle(); setAction("🔀 Queue shuffled via the web page");
         } else if (a === "add") {
           if (typeof d.url !== "string") return fail(400, "Missing link.");
           C.add(d.url);

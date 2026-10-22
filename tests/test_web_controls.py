@@ -22,6 +22,7 @@ STATE_KEYS = {
     "paused",
     "can_previous",
     "crossfade",
+    "loop",
     "crossfading",
     "server_time",
     "viewers",

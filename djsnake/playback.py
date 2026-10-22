@@ -464,9 +464,14 @@ async def _advance(ctx, player):
     elif action == "previous" and finished and player.history:
         player.queue.insert(0, finished)
         next_track = player.history.pop()
+    elif action is None and player.loop == "track" and finished:
+        # Loop track: replay it as a new play (stats count each pass)
+        next_track = finished
     else:
         if finished:
             push_history(player, finished)
+            if player.loop == "queue" and action in (None, "next"):
+                player.queue.append(finished)  # Back to the end of the queue
         next_track = player.next_in_queue()
 
     while next_track is not None and not os.path.exists(next_track["filepath"]):
@@ -538,7 +543,10 @@ async def _advance(ctx, player):
         raise
     now = time.monotonic()
     player.started_at = now - offset
-    player.mark_started(offset, same_track=next_track is finished)
+    # A loop replay is a new play; only a restart or seek continues one
+    player.mark_started(
+        offset, same_track=next_track is finished and action in ("restart", "seek")
+    )
     if keep_paused:
         player.voice_client.pause()
         player.paused_at = now
@@ -628,13 +636,22 @@ async def _start_crossfade(player, mixer, gen):
                 or player.pending_action is not None
                 or not player.is_playing
                 or not player.in_voice()
-                or not player.queue
             ):
+                return
+            current = player.now_playing
+            # Loop track (or a one-track loop queue) overlaps the track with itself
+            replay = player.loop == "track" or (
+                player.loop == "queue" and not player.queue
+            )
+            if replay:
+                upcoming = current
+            elif player.queue:
+                upcoming = player.queue[0]
+            else:
                 return
             if player.paused_at is not None:
                 mixer.rearm()  # Try again once resumed
                 return
-            current, upcoming = player.now_playing, player.queue[0]
             if not (crossfade_eligible(current) and crossfade_eligible(upcoming)):
                 return
             if not os.path.exists(upcoming["filepath"]):
@@ -659,9 +676,12 @@ async def _start_crossfade(player, mixer, gen):
                 source.cleanup()
                 return
             player.play_gen += 1
-            player.queue.remove(upcoming)
             retire_play(player, guild_of(player), None)
-            push_history(player, current)
+            if not replay:
+                player.queue.remove(upcoming)
+                push_history(player, current)
+                if player.loop == "queue":
+                    player.queue.append(current)
             player.now_playing = upcoming
             player.started_at = time.monotonic() - offset
             player.paused_at = None
