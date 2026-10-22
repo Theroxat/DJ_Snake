@@ -41,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   1.6.2, davey 0.1.7, audioop-lts 0.2.2, bgutil-ytdlp-pot-provider and its
   `pot-provider` image 2.0.2; dev tools pytest 9.1.1, pytest-asyncio 1.4.0,
   black 26.10.1, flake8 7.4.1; GitHub Actions bumped to their latest majors.
+- Docker image now runs on Python 3.15 (`python:3.15-slim`), CI tests Python
+  3.10 to 3.15, and the yt-dlp floor is raised to 2026.10.21.
 
 - Web page and errors are now in English. The `nuit`, `vinyle` and `perso`
   themes are now `night`, `vinyl` and `custom` (saved themes are migrated).
