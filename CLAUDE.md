@@ -314,7 +314,10 @@ Module map, lowest layer first (each imports only the ones above it):
   `custom` takes `--c-bg/--c-text/--c-accent` and derives the rest with
   `color-mix`, inheriting fonts and shapes from the preset in `data-base`;
   `data-shape` (the skin, or the base for custom) scopes a few Arcade-only
-  details. Per-guild defaults live in `guild_themes`, persisted to
+  details. Shape tokens also set the play button's radius (`--radius-pp`),
+  the prev/next button border and shadow (`--ghost-border`, `--ghost-shadow`)
+  and the opacity of the blurred artwork glow behind the player (`--ambient`,
+  0 turns it off). Per-guild defaults live in `guild_themes`, persisted to
   `{DATA_DIR}/themes.json` (`{guild id: {skin, base, bg, text, accent, name,
   logo: {ext, v} | null}}`, written atomically with a temp file and
   `os.replace`, cleaned field by field on load); a logo is
