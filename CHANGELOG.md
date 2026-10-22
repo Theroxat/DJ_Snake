@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- User documentation on Read the Docs (https://dj-snake.readthedocs.io), built
+  from `docs/source/` with Sphinx, MyST and Furo; CI builds it with warnings as
+  errors.
 - Theme preset `space` (label "Space"), available with `!theme space`, as a
   `WEB_THEME` default and as a base for the custom theme.
 - Idle linger: when the queue runs out the bot stays in voice for

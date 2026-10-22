@@ -1,0 +1,9 @@
+/* Keep short inline code (env vars, commands) on one line in tables. */
+table.docutils td code,
+table.docutils th code {
+  white-space: nowrap;
+}
+
+article img {
+  border-radius: 6px;
+}
