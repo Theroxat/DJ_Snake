@@ -99,7 +99,8 @@ before leaving voice once the queue runs out), `DATA_DIR`
 (`/app/data`, mounted from `./data` by Compose; the container's UID 1000 must
 be able to write it), `WEB_THEME` (`arcade`, the theme of guilds that never
 chose one), `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` (optional, both
-needed to use the Spotify Web API), and `YTDLP_AUTO_UPDATE` (entrypoint only).
+needed to use the Spotify Web API), `LYRICS` (`1`; `0`, `false`, `no` or `off`
+turns the LRCLIB lyrics off), and `YTDLP_AUTO_UPDATE` (entrypoint only).
 
 ## Architecture (`djsnake/`)
 
@@ -115,6 +116,9 @@ Module map, lowest layer first (each imports only the ones above it):
 - `stats.py`: listening stats in SQLite (`record_play()`,
   `record_session()`, `record_listeners()`, `summary()`, `guess_artist()`),
   written by one background thread. Imports only `config`.
+- `lyrics.py`: LRCLIB lyrics (`parse_lrc()`, `parse_title()`,
+  `lookup_fields()`, `fetch()`, `prefetch()`, `get()`). Imports `config`,
+  `state` and `stats.clean_artist`.
 - `player.py`: `MusicPlayer`, `discard_tracks()`, `file_in_use()`,
   `push_history()`, `retire_play()`, `guild_of()`.
 - `sessions.py`: session expiry (`touch()`, `session_player()`,
@@ -285,7 +289,8 @@ Module map, lowest layer first (each imports only the ones above it):
   paused, can_previous, crossfade, crossfading, server_time, viewers, now_playing: {id,
   title, duration, thumbnail, url, video_url, elapsed, start, end} | null, queue: [{id, title, duration,
   thumbnail, url}], downloading: [{key, title, source}], downloading_total,
-  theme: {skin, base, bg, text, accent, name, logo_url}}`
+  theme: {skin, base, bg, text, accent, name, logo_url}, lyrics}` (`lyrics`:
+  the `LYRICS` setting; the page hides its Lyrics button when false)
   (404 `{"active": false}` when the sid is unknown or
   expired; out of voice, `now_playing` is null and `queue` and `downloading`
   empty; `elapsed` freezes while paused; `downloading` is the first
@@ -307,7 +312,11 @@ Module map, lowest layer first (each imports only the ones above it):
   non-YouTube URL), 404 (unknown sid or track id) or 409 (not in voice, nothing
   playing). `GET /media/{sid}/{id}` streams the playing, a queued or a history
   track's mp4 with Range support. Files are found by track id, never by a path
-  from the request. Theme routes: `POST /api/{sid}/theme`,
+  from the request. `GET /api/{sid}/lyrics/{id}` (same tracks, see Lyrics)
+  returns `{synced: [[ms, line]...] | null, plain: str | null}`, 202
+  `{"pending": true}` while the lookup still runs after `LYRICS_WAIT_SECONDS`
+  (4), or 404 (unknown sid or track, nothing found, LRCLIB down, `LYRICS=0`).
+  Theme routes: `POST /api/{sid}/theme`,
   `POST|DELETE /api/{sid}/theme/logo`, `GET /theme-logo/{sid}` (see Themes).
 - **Themes**: the page is fully token-driven: each preset is a `[data-skin]`
   block of CSS custom properties on `<html>` (Arcade is the original look;
@@ -367,6 +376,38 @@ Module map, lowest layer first (each imports only the ones above it):
   UTC hour-of-week counts, Monday 00:00 = 0; the page shifts them to the
   browser's zone) and `peak_listeners {count, at}`. The page renders it all
   with `textContent`.
+- **Lyrics** (`lyrics.py`, LRCLIB at `https://lrclib.net/api`, no key, a
+  User-Agent naming the project): `_download_and_queue()` calls
+  `lyrics.prefetch(track)` right after queueing, which starts one background
+  task per cache key (the YouTube `video_id`, else `track:{id}`; tracked in
+  `_tasks` and `state.background_tasks`) running `_load()` in an executor:
+  the disk cache `{DATA_DIR}/lyrics/{video_id}.json` (found lyrics only,
+  validated on read, written atomically), else `fetch()`. Never on the
+  playback path; `get()` (the route) awaits a running task at most
+  `LYRICS_WAIT_SECONDS`. Search fields come from `lookup_fields()`: a
+  Spotify track's `artist`, `lyrics_title` and `lyrics_duration` (set by
+  `spotify_fields()`), else `parse_title(title, channel)` ("Artist - Title"
+  split on a spaced dash, bracketed noise like "(Official Video)" and
+  "ft. …" dropped, first of several artists, the cleaned channel when there is
+  no dash) and the file duration. `fetch()` tries `/api/get` with the
+  duration (exact match), then `/api/search` by artist and title, then a free
+  `q=` search, keeping the result closest in duration (synced first, within
+  `MAX_DURATION_GAP` 30 s). Instrumental records and stubs (under `MIN_LINES`
+  3 lines of text) count as nothing. `_http()` is urllib with
+  `LYRICS_TIMEOUT` (6 s) and `LYRICS_MAX_BYTES`; a 404 is "none" (cached in
+  memory, LRU `CACHE_SIZE` 256), anything else raises `LyricsUnavailable`
+  (logged, not cached, retried by the next request). `parse_lrc()` reads
+  `[mm:ss.xx]` tags (several per line), applies `[offset:±ms]` and keeps
+  empty lines (instrumental breaks). Timestamps are song time and the page
+  compares them with file time: SponsorBlock already cut talking intros out
+  of the file and the automix `start` only moves the seek point, so no offset
+  is applied. The page fetches lyrics for the playing track when its toggle
+  (`djsnake.lyrics` in localStorage) is on, retries a 202 every 2.5 s, and
+  drives the karaoke band from `targetPos()` (the video's clock, viewer offset
+  included) in a `requestAnimationFrame` loop. Tests: `tests/test_lyrics.py`;
+  `conftest.py` replaces `lyrics._http` with a function raising
+  `LyricsUnavailable`, so no test reaches the network; patch `lyrics._http`
+  to fake LRCLIB.
 - **Status panel**: each web session has one message in its text channel
   (`player.panel_message`), edited in place instead of announcing events:
   clip link, now playing / paused / idle, up next, loading progress and the

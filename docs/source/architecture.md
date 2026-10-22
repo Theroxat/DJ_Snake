@@ -11,6 +11,7 @@ Lowest layer first; each module imports only the ones above it.
 | `config.py` | Environment variables and constants, read once at import. |
 | `state.py` | Shared mutable state: the `bot`, `music_players`, `sessions`, `guild_themes`, `edit_tokens`, `viewers`, `background_tasks` and `clock()`. Always used as `state.music_players`, never imported by name, so every module and test sees the same objects. |
 | `stats.py` | Listening stats in SQLite, written by one background thread. |
+| `lyrics.py` | Lyrics from LRCLIB: LRC and YouTube title parsing, the lookup run in the background when a track is queued, and its memory and disk cache. |
 | `player.py` | `MusicPlayer` (per-server state), cleanup of files and history helpers. |
 | `sessions.py` | Session expiry and the status panel. |
 | `themes.py` | Theme storage, logos and `!theme edit` tokens. |
@@ -50,6 +51,7 @@ The page uses these routes:
 | `GET /{sid}` | Serves the page. |
 | `GET /api/{sid}/state` | The full player state: now playing, queue, downloads, viewers, theme. `404 {"active": false}` for an unknown or expired session. |
 | `GET /api/{sid}/stats?range=week\|month\|all` | Listening stats, cached for a few seconds. |
+| `GET /api/{sid}/lyrics/{id}` | Lyrics of a playing, queued or history track: `{synced: [[ms, line]...] \| null, plain}`, `202 {"pending": true}` while the lookup runs, 404 when none are found or `LYRICS=0`. |
 | `POST /api/{sid}/control` | Runs a control action. |
 | `GET /media/{sid}/{id}` | Streams a track's mp4 with Range support. Files are found by track id, never by a path from the request. |
 | `POST /api/{sid}/theme`, `POST\|DELETE /api/{sid}/theme/logo`, `GET /theme-logo/{sid}` | Theme editor routes, protected by an edit token. |
@@ -68,7 +70,7 @@ discord.py drops and resumes the gateway roughly every couple of hours. Do no cl
 
 ### Persistent data
 
-Everything persistent lives in `DATA_DIR`: `themes.json` (per-server themes, written atomically), `logos/` and `stats.db` (SQLite, WAL).
+Everything persistent lives in `DATA_DIR`: `themes.json` (per-server themes, written atomically), `logos/`, `stats.db` (SQLite, WAL) and `lyrics/` (lyrics found on LRCLIB, one JSON file per YouTube video id).
 
 ## Demo site
 

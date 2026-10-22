@@ -158,6 +158,19 @@ SPOTIFY_TIMEOUT = 10  # Seconds per HTTP request
 SPOTIFY_MAX_BYTES = 4 * 1024 * 1024  # Larger responses are refused
 YOUTUBE_SEARCH_RESULTS = 5  # Candidates compared per Spotify track
 
+# Synced lyrics on the clip page, from LRCLIB (lrclib.net, free, no key).
+# Fetched in the background when a track is queued; LYRICS=0 turns them off.
+LYRICS_ENABLED = os.getenv("LYRICS", "1").strip().lower() not in (
+    "0",
+    "false",
+    "no",
+    "off",
+)
+LYRICS_DIR = os.path.join(DATA_DIR, "lyrics")  # Found lyrics, by video id
+LYRICS_TIMEOUT = 6  # Seconds per LRCLIB request
+LYRICS_MAX_BYTES = 1024 * 1024  # Larger responses are refused
+LYRICS_WAIT_SECONDS = 4.0  # The web route waits this long for a fetch
+
 # Only create a temp directory if one wasn't provided. Using tempfile.mkdtemp()
 # directly as the default argument would create an orphan directory on every run
 # because default arguments are evaluated eagerly.

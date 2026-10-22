@@ -21,13 +21,22 @@ The page shows the current video, the queue ("Up next"), a "Now playing" row, tr
 - play a queued track now (jump);
 - remove or reorder queued tracks by dragging;
 - add YouTube or [Spotify](spotify.md) links;
-- toggle crossfade.
+- toggle crossfade;
+- show the lyrics of the current track.
 
 Web actions are applied exactly like Discord commands and are reflected in the status message. The header shows how many people have the page open and a chart button that opens the server's listening stats.
 
 ### Sync
 
 The page polls the bot for its state and keeps the muted video aligned with the audio position, including pauses and seeks. When crossfade is on, the page cross-dissolves its two videos during an overlap; skips are an instant swap.
+
+### Lyrics
+
+The Lyrics button (next to Sync) shows the words of the current track over the bottom of the clip, and follows the clip into fullscreen. With synced lyrics, the line being sung is highlighted and scrolled into place, with a thin bar under it that runs out when the next line starts. Lyrics follow the same clock as the video, your Sync offset included, so if the clip matches what you hear, so do the words. When only plain lyrics exist they appear in a scrollable sheet; when none are found the page says so quietly. Your choice is remembered in your browser.
+
+Lyrics come from [LRCLIB](https://lrclib.net), a free lyrics database that needs no account or key. The bot looks them up in the background as soon as a track is queued, so playback never waits. It searches for the artist and title from Spotify when the track came from a Spotify link, and otherwise parses the YouTube title ("Artist - Title", dropping tags such as "(Official Video)" or "ft. …", or using the channel name as the artist); the track's duration picks the right version. Found lyrics are cached in `DATA_DIR/lyrics/`. Set `LYRICS=0` to turn the feature off.
+
+Timing can be off for music videos with a long intro that SponsorBlock does not cut, or for a different edit of the song than the one LRCLIB has.
 
 ### Listening stats
 

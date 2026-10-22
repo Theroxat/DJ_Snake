@@ -21,7 +21,7 @@ import discord  # noqa: E402
 import pytest  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 
-from djsnake import media, state, stats, themes, web  # noqa: E402
+from djsnake import lyrics, media, state, stats, themes, web  # noqa: E402
 from djsnake.player import MusicPlayer  # noqa: E402
 from djsnake.sessions import open_session  # noqa: E402
 from djsnake.web import build_web_app  # noqa: E402
@@ -45,12 +45,21 @@ def fresh_state(tmp_path, monkeypatch):
         state.viewers,
         stats._peaks,
         web._stats_cache,
+        lyrics._cache,
+        lyrics._tasks,
     ):
         registry.clear()
     data_dir = tmp_path / "data"
     monkeypatch.setattr(stats, "DB_PATH", str(data_dir / "stats.db"))
     monkeypatch.setattr(themes, "THEMES_FILE", str(data_dir / "themes.json"))
     monkeypatch.setattr(themes, "LOGO_DIR", str(data_dir / "logos"))
+    monkeypatch.setattr(lyrics, "LYRICS_DIR", str(data_dir / "lyrics"))
+    monkeypatch.setattr(lyrics, "ENABLED", True)
+
+    def no_network(url):
+        raise lyrics.LyricsUnavailable("no network in tests")
+
+    monkeypatch.setattr(lyrics, "_http", no_network)
     media_dir = tmp_path / "media"
     media_dir.mkdir()
     monkeypatch.setattr(media, "TEMP_DIR", str(media_dir))

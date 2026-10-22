@@ -1,7 +1,8 @@
 /* DJ Snake demo shim. Replaces window.fetch for the bot's web API so the real
  * clip page (web/index.html, built into player.html) runs on static hosting.
  * Intercepted: GET /api/{sid}/state, GET /api/{sid}/stats, POST /api/{sid}/control,
- * POST /api/{sid}/theme, POST|DELETE /api/{sid}/theme/logo.
+ * POST /api/{sid}/theme, POST|DELETE /api/{sid}/theme/logo,
+ * GET /api/{sid}/lyrics/{id}.
  * Embedded in the Discord demo (index.html), it talks to the wrapper's fake
  * bot (window.parent.DJDemoBackend.shared), so both sides share one session;
  * opened on its own, it runs a standalone fake bot that is always playing and
@@ -44,7 +45,7 @@
   const realFetch = window.fetch.bind(window);
   window.fetch = async (input, init) => {
     const url = typeof input === "string" ? input : input.url;
-    const m = /\/api\/[^/]+\/(state|stats|control|theme(?:\/logo)?)(?:\?|$)/.exec(url);
+    const m = /\/api\/[^/]+\/(state|stats|control|theme(?:\/logo)?|lyrics\/[^/?]+)(?:\?|$)/.exec(url);
     if (!m) return realFetch(input, init);
     const method = ((init && init.method) || "GET").toUpperCase();
     let body = null;

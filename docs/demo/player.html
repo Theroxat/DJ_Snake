@@ -829,6 +829,63 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
 #ended h1 { font-size: clamp(32px, 8vw, 64px); margin: 8px 0 16px; line-height: 1; }
 #ended p { color: var(--muted); margin: 8px 0; }
 
+/* Lyrics: inside the frame, so they follow it to fullscreen. Synced lyrics are
+   a karaoke band over the bottom of the clip: the sung line in the display
+   face, its neighbours dimmed, and a thin bar under it that shrinks until the
+   next line. Plain lyrics are a scrollable sheet; nothing found is one quiet
+   pill. The video clock (targetPos, with the viewer's offset) drives it. */
+.frame { container-type: inline-size; }
+.lyrics { position: absolute; inset: 0; z-index: 2; pointer-events: none; color: var(--text); }
+.lyrics .band {
+  position: absolute; left: 0; right: 0; bottom: 0; height: clamp(84px, 44%, 320px); overflow: hidden;
+  background: linear-gradient(to top, color-mix(in srgb, var(--bg) 90%, transparent) 0%, color-mix(in srgb, var(--bg) 72%, transparent) 62%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 30%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 30%);
+}
+.lyrics ol {
+  position: absolute; left: 0; right: 0; top: 0; margin: 0; padding: 0 clamp(12px, 5cqi, 56px);
+  border: 0; border-radius: 0; background: none; box-shadow: none; max-height: none; overflow: visible;
+  transition: transform .45s cubic-bezier(.2, .7, .2, 1);
+}
+.lyrics li {
+  display: block; min-height: 0; padding: .16em 0; border: 0; cursor: default; text-align: center;
+  font: 500 clamp(12px, 2.5cqi, 24px)/1.25 var(--font-body); color: color-mix(in srgb, var(--text) 50%, transparent);
+  text-shadow: 0 1px 3px var(--bg); overflow-wrap: anywhere; transition: color .3s ease;
+}
+.lyrics li:hover, .lyrics li:active { background: none; color: color-mix(in srgb, var(--text) 50%, transparent); }
+.lyrics li.cur {
+  font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: var(--display-ls);
+  font-size: clamp(15px, 3.6cqi, 40px); line-height: 1.15; color: var(--text); text-shadow: 0 2px 10px var(--bg);
+}
+.lyrics li.cur::after {
+  content: ""; display: block; height: 3px; width: calc(var(--left, 0) * min(100%, 7em)); margin: .32em auto 0;
+  background: var(--accent); border-radius: var(--bar-radius);
+}
+[data-shape="arcade"] .lyrics li.cur { color: var(--accent-2); text-shadow: .07em .07em 0 var(--accent); }
+[data-shape="terminal"] .lyrics li.cur { color: var(--accent); }
+[data-shape="club"] .lyrics li.cur, [data-shape="space"] .lyrics li.cur { text-shadow: var(--display-glow), 0 2px 10px var(--bg); }
+[data-shape="cobalt"] .lyrics li.cur { color: var(--accent-2); }
+.lyrics .sheet {
+  position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; pointer-events: auto;
+  background: color-mix(in srgb, var(--surface) 92%, transparent); padding: 14px clamp(14px, 5cqi, 48px) 18px;
+}
+.lyrics .sheet .in { max-width: 34em; margin: 0 auto; font-size: clamp(13px, 2.2cqi, 18px); line-height: 1.6; }
+.lyrics .sheet p { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+.lyrics .sheet p.note { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+.lyrics .sheet:focus-visible { outline: 2px solid var(--focus); outline-offset: -4px; }
+.lyrics .pill {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); max-width: calc(100% - 24px);
+  background: color-mix(in srgb, var(--bg) 82%, transparent); color: var(--muted); border: 1px solid var(--hair);
+  border-radius: var(--radius-btn); padding: 2px 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.frame:fullscreen .lyrics .band { height: 34%; }
+button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: var(--accent-3); background: color-mix(in srgb, var(--accent-3) 14%, transparent); }
+[data-shape="cobalt"] button.synctoggle[aria-pressed="true"] { background: var(--accent-3); color: var(--on-accent); }
+@media (prefers-reduced-motion: reduce) {
+  .lyrics ol, .lyrics li { transition: none !important; }
+  .lyrics li.cur::after { display: none; }
+}
+
 @media (min-width: 901px) and (max-width: 1400px) { li a.yt { display: none; } }
 @media (max-width: 900px) {
   main { grid-template-columns: minmax(0, 1fr); gap: 28px; padding: 18px 16px 32px; }
@@ -843,9 +900,13 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
   .hdrtools { flex: 1 1 100%; }
   .hdrtools .live { margin-right: auto; }
   .deck { padding: 14px 14px 12px; }
-  .transport { grid-template-columns: 1fr 1fr; row-gap: 10px; }
-  .tcenter { grid-column: 1 / -1; grid-row: 1; justify-content: center; gap: 22px; }
-  .tside { grid-row: 2; }
+  /* Play controls on their own row; the toggles share the next one and wrap
+     onto a third only when they cannot fit (narrow phones, wide fonts). */
+  .transport { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 8px; }
+  .tcenter { flex: 1 1 100%; order: -1; justify-content: center; gap: 22px; }
+  .tside.end { margin-left: auto; }
+  .tside.end .lbl { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .tside.end button { justify-content: center; min-width: 44px; padding-inline: 10px; }
   .offset { left: 8px; right: 8px; width: auto; }
 }
 @media (max-width: 480px) {
@@ -917,6 +978,11 @@ html.demo-embedded .demo-ribbon { display: none; }
       <div class="frame" id="frame">
         <video id="video" class="front" muted playsinline preload="auto"></video>
         <video id="video2" muted playsinline preload="auto" aria-hidden="true"></video>
+        <div class="lyrics" id="lyrics" role="region" aria-label="Lyrics" hidden>
+          <div class="band" id="lyrband" hidden><ol id="lyrlines" aria-live="off"></ol></div>
+          <div class="sheet" id="lyrsheet" tabindex="0" aria-label="Lyrics, not synced" hidden><div class="in"><p class="note">These lyrics aren't synced to the track.</p><p id="lyrplain"></p></div></div>
+          <div class="pill hud" id="lyrpill" hidden></div>
+        </div>
         <div class="pausebadge hud" id="pausebadge" hidden><i>❚❚</i> PAUSED</div>
         <div class="overlay" id="overlay">
           <div class="hud blink" id="overlayhud" style="color:var(--accent-3)">PLAYER 1 — READY</div>
@@ -947,6 +1013,7 @@ html.demo-embedded .demo-ribbon { display: none; }
           </div>
           <div class="tside end">
             <button id="synctoggle" class="synctoggle" type="button" aria-expanded="false" aria-controls="syncpanel" title="Video / audio offset"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h9.2a3 3 0 0 1 5.6 0H20v2h-1.2a3 3 0 0 1-5.6 0H4zm12 2a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM4 16h1.2a3 3 0 0 1 5.6 0H20v2h-9.2a3 3 0 0 1-5.6 0H4zm4 2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg><span class="lbl">Sync</span><b id="syncbadge" hidden></b></button>
+            <button id="lyrbtn" class="synctoggle" type="button" aria-pressed="false" aria-controls="lyrics" title="Show lyrics" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h14v2H3zm0 4h10v2H3zm0 4h7v2H3zm14-3.6 4-1.4v2.2l-2 .7v6.6a2.6 2.6 0 1 1-2-2.5z"/></svg><span class="lbl">Lyrics</span></button>
             <button id="fs" class="synctoggle" type="button" aria-label="Fullscreen" title="Fullscreen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v2H6v4H4zm10 0h6v6h-2V6h-4zM4 14h2v4h4v2H4zm14 0h2v6h-6v-2h4z"/></svg></button>
           </div>
         </div>
@@ -1428,6 +1495,7 @@ html.demo-embedded .demo-ribbon { display: none; }
     endDissolve();
     video.pause();
     state = null; curId = null; curNp = null; // a revived session reloads the video from scratch
+    lyricsFor(null);
   }
 
   // ---- sync
@@ -1634,6 +1702,123 @@ html.demo-embedded .demo-ribbon { display: none; }
     seekTo(curElapsed() + (e.key === "ArrowLeft" ? -5 : 5));
   });
   setInterval(tick, 200);
+
+  // ---- lyrics (LRCLIB, through the bot): GET /api/{sid}/lyrics/{track id}
+  // answers {synced: [[ms, line]...] | null, plain}, 202 while the bot is
+  // still looking, 404 when there are none. Synced lines follow targetPos(),
+  // the clock the video follows (offset included), so they match the sound.
+  const LYR_KEY = "djsnake.lyrics";
+  let lyrOn = false, lyrAvail = false;
+  try { lyrOn = localStorage.getItem(LYR_KEY) === "1"; } catch (e) {}
+  let lyrId = null;           // track whose lyrics the page wants
+  let lyr = null;             // {id, kind: loading | synced | plain | none, lines?, plain?}
+  let lyrShown = null, lyrIdx = -2, lyrRetry = null, lyrFrame = 0;
+  const lyrCache = new Map(); // track id -> answer, for the last few tracks
+
+  function cleanLyrics(id, d) {
+    const lines = [];
+    if (d && Array.isArray(d.synced)) {
+      for (const e of d.synced) {
+        if (Array.isArray(e) && Number.isFinite(e[0]) && typeof e[1] === "string") lines.push([e[0], e[1]]);
+      }
+      lines.sort((a, b) => a[0] - b[0]);
+    }
+    if (lines.length) return { id, kind: "synced", lines };
+    if (d && typeof d.plain === "string" && d.plain.trim()) return { id, kind: "plain", plain: d.plain };
+    return { id, kind: "none" };
+  }
+  async function fetchLyrics(id, tries) {
+    let ans = null, keep = true;
+    try {
+      const r = await fetch("/api/" + encodeURIComponent(sid) + "/lyrics/" + encodeURIComponent(id), { cache: "no-store" });
+      if (r.status === 202 && tries < 8) {
+        // The bot is still asking LRCLIB: ask again shortly.
+        lyrRetry = setTimeout(() => { if (lyrOn && lyrId === id) fetchLyrics(id, tries + 1); }, 2500);
+        return;
+      }
+      ans = cleanLyrics(id, r.ok ? await r.json() : null);
+    } catch (e) {
+      ans = { id, kind: "none" };
+      keep = false; // network trouble: try again next time
+    }
+    if (keep) {
+      lyrCache.set(id, ans);
+      while (lyrCache.size > 30) lyrCache.delete(lyrCache.keys().next().value);
+    }
+    if (lyrId === id) { lyr = ans; renderLyrics(); }
+  }
+  function lyricsFor(id) {
+    lyrId = id;
+    if (lyrOn && lyrAvail && id && !(lyr && lyr.id === id)) {
+      clearTimeout(lyrRetry);
+      if (lyrCache.has(id)) lyr = lyrCache.get(id);
+      else { lyr = { id, kind: "loading" }; fetchLyrics(id, 0); }
+    }
+    renderLyrics();
+  }
+  function renderLyrics() {
+    const show = lyrOn && lyrAvail && !!lyrId && !!state && !!lyr && lyr.id === lyrId;
+    $("lyrics").hidden = !show;
+    if (!show) { cancelAnimationFrame(lyrFrame); lyrFrame = 0; return; }
+    const k = lyr.kind;
+    $("lyrband").hidden = k !== "synced";
+    $("lyrsheet").hidden = k !== "plain";
+    $("lyrpill").hidden = k !== "loading" && k !== "none";
+    $("lyrpill").textContent = k === "loading" ? "Looking for lyrics…" : "No lyrics found";
+    if (lyrShown !== lyr) {
+      lyrShown = lyr;
+      lyrIdx = -2;
+      const ol = $("lyrlines");
+      ol.textContent = "";
+      if (k === "synced") {
+        for (const [, line] of lyr.lines) ol.appendChild(mk("li", line ? "" : "gap", line || "♪"));
+      }
+      $("lyrplain").textContent = k === "plain" ? lyr.plain : "";
+      $("lyrsheet").scrollTop = 0;
+    }
+    if (k === "synced" && !lyrFrame) lyrFrame = requestAnimationFrame(lyrStep);
+    if (k !== "synced") { cancelAnimationFrame(lyrFrame); lyrFrame = 0; }
+  }
+  // Center the sung line (or the first one, before the singing starts) a
+  // little below the middle of the band.
+  function placeLyrics() {
+    const ol = $("lyrlines"), cur = ol.children[Math.max(0, lyrIdx)];
+    if (!cur) return;
+    const y = $("lyrband").clientHeight * 0.56 - (cur.offsetTop + cur.offsetHeight / 2);
+    ol.style.transform = "translateY(" + Math.round(y) + "px)";
+  }
+  function lyrStep() {
+    lyrFrame = 0;
+    if (!lyr || lyr.kind !== "synced" || $("lyrics").hidden || !state) return;
+    const t = targetPos() * 1000, L = lyr.lines, ol = $("lyrlines");
+    let lo = 0, hi = L.length - 1, i = -1; // last line at or before t
+    while (lo <= hi) { const m = (lo + hi) >> 1; if (L[m][0] <= t) { i = m; lo = m + 1; } else hi = m - 1; }
+    if (i !== lyrIdx) {
+      const old = ol.children[lyrIdx];
+      if (old) { old.classList.remove("cur"); old.style.removeProperty("--left"); }
+      lyrIdx = i;
+      if (ol.children[i]) ol.children[i].classList.add("cur");
+      placeLyrics();
+    }
+    const cur = ol.children[i];
+    if (cur) {
+      const until = i + 1 < L.length ? L[i + 1][0] : Math.max(L[i][0] + 1, (state.end || 0) * 1000);
+      const left = 1 - (t - L[i][0]) / Math.max(1, until - L[i][0]);
+      cur.style.setProperty("--left", Math.max(0, Math.min(1, left)).toFixed(3));
+    }
+    lyrFrame = requestAnimationFrame(lyrStep);
+  }
+  function setLyrics(on, save) {
+    lyrOn = on;
+    $("lyrbtn").setAttribute("aria-pressed", String(on));
+    $("lyrbtn").title = on ? "Hide lyrics" : "Show lyrics";
+    if (save) { try { localStorage.setItem(LYR_KEY, on ? "1" : "0"); } catch (e) {} }
+    lyricsFor(lyrId);
+  }
+  setLyrics(lyrOn, false);
+  $("lyrbtn").addEventListener("click", () => setLyrics(!lyrOn, true));
+  window.addEventListener("resize", () => { if (lyrShown && lyrShown.kind === "synced") placeLyrics(); });
+  document.addEventListener("fullscreenchange", () => { if (lyrShown && lyrShown.kind === "synced") requestAnimationFrame(placeLyrics); });
 
   // ---- themes
   // The server sends the guild's default theme in every state. A viewer can
@@ -1904,6 +2089,8 @@ html.demo-embedded .demo-ribbon { display: none; }
     paused = !!d.paused && inVoice;
     canPrev = !!d.can_previous;
     if (!pending.has("crossfade")) xfade = !!d.crossfade;
+    lyrAvail = d.lyrics === true; // false when the bot runs with LYRICS=0
+    $("lyrbtn").hidden = !lyrAvail;
     $("pausebadge").hidden = !(paused && d.now_playing);
     $("guild").textContent = d.guild || "—";
     $("channel").textContent = d.channel ? " # " + d.channel : "";
@@ -1923,6 +2110,7 @@ html.demo-embedded .demo-ribbon { display: none; }
       $("progline").hidden = true;
       overlay("Idle", "DJ Snake isn't in a voice channel. Run !play in Discord to resume; this link stays valid.", true);
       setLive(false, "IDLE");
+      lyricsFor(null);
       updateControls();
       return;
     }
@@ -1934,6 +2122,7 @@ html.demo-embedded .demo-ribbon { display: none; }
       $("progline").hidden = true;
       overlay(d.loading ? "The bot is preparing the track…" : "Waiting for a track…");
       setLive(false);
+      lyricsFor(null);
       updateControls();
       return;
     }
@@ -1957,6 +2146,7 @@ html.demo-embedded .demo-ribbon { display: none; }
     updateNow();
     if (np.id !== curId) loadTrack(np, !!d.crossfading);
     else curNp = np;
+    lyricsFor(np.id);
     updateControls();
   }
 
