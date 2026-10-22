@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Theme preset `space` (label "Space"), available with `!theme space`, as a
+  `WEB_THEME` default and as a base for the custom theme.
 - Idle linger: when the queue runs out the bot stays in voice for
   `IDLE_DISCONNECT_SECONDS` (default 300) before leaving, so a track added
   meanwhile (web page, `!play`, a playlist) plays at once without a rejoin; the

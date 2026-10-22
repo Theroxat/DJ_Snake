@@ -12,7 +12,7 @@
 // arrives with the first state poll).
 try {
   const v = localStorage.getItem("djsnake.skin");
-  if (["arcade", "minimal", "night", "vinyl", "club", "terminal"].includes(v)) {
+  if (["arcade", "minimal", "night", "vinyl", "club", "terminal", "space"].includes(v)) {
     document.documentElement.dataset.skin = v;
     document.documentElement.dataset.shape = v;
   }
@@ -195,6 +195,34 @@ try {
   --focus: #ffb000; --ok: #35ff72; --video-bg: #020502; --pp-border: #ffb000;
 }
 
+/* ---- 6b. Space: night-sky gradient, star field, violet and cyan glow ---- */
+[data-skin="space"], [data-skin="custom"][data-base="space"] {
+  --font-display: "Rajdhani", system-ui, sans-serif;
+  --font-body: "DM Sans", system-ui, sans-serif;
+  --font-mono: "DM Mono", ui-monospace, monospace;
+  --fs: 15px; --display-weight: 700; --display-case: none; --display-ls: .02em;
+  --hud-size: 14px; --hud-case: none; --hud-ls: .03em; --btn-size: 15px; --wordmark-size: 28px;
+  --radius: 18px; --radius-btn: 999px; --radius-sm: 12px; --bw: 1px; --bar-radius: 6px;
+  --shadow-frame: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent), 0 0 40px color-mix(in srgb, var(--accent) 25%, transparent), 0 18px 40px rgba(0,0,0,.5);
+  --shadow-card: 0 8px 28px rgba(0,0,0,.35);
+  --shadow-btn: 0 0 12px color-mix(in srgb, var(--accent-2) 30%, transparent);
+  --shadow-btn-hover: 0 0 20px color-mix(in srgb, var(--accent-2) 55%, transparent);
+  --shadow-btn-active: 0 0 6px color-mix(in srgb, var(--accent-2) 40%, transparent);
+  --shadow-pp: 0 0 22px color-mix(in srgb, var(--accent) 60%, transparent);
+  --shadow-input: inset 0 2px 6px rgba(0,0,0,.35);
+  --shadow-pop: 0 16px 40px rgba(0,0,0,.55), 0 0 22px color-mix(in srgb, var(--accent) 22%, transparent);
+  --hover-transform: translateY(-1px); --active-transform: translateY(1px);
+  --scanlines: 0; --scan-color: transparent; --scan-blend: normal;
+  --text-glow: none; --display-glow: 0 0 16px color-mix(in srgb, var(--accent-2) 40%, transparent); --logo-mark: "";
+}
+[data-skin="space"] {
+  --bg: #070a1c; --surface: #11163a; --text: #e8ebff; --muted: #a9b1dc;
+  --accent: #9b7bff; --accent-2: #3fe0ff; --accent-3: #c0adff; --on-accent: #07091a;
+  --border: #7f88d8; --hair: #2e3470; --track: #1a2050;
+  --hover-bg: #232a66; --hover-text: #ffffff; --hover-muted: #bfe9ff;
+  --focus: #3fe0ff; --ok: #6ff0c0; --video-bg: #03040d; --pp-border: #c0adff;
+}
+
 /* ---- 7. Custom: colors derived from three picks (--c-*) ---- */
 [data-skin="custom"] {
   --bg: var(--c-bg); --text: var(--c-text); --accent: var(--c-accent); --on-accent: var(--c-on-accent);
@@ -232,6 +260,56 @@ body::after {
 .display { font-family: var(--font-display); text-transform: var(--display-case); letter-spacing: var(--display-ls); font-weight: var(--display-weight); text-shadow: var(--display-glow); }
 .hud { font-family: var(--font-mono); font-size: var(--hud-size); letter-spacing: var(--hud-ls); text-transform: var(--hud-case); }
 [hidden] { display: none !important; }
+
+/* ---- Space details (also the base of custom) ---- */
+[data-shape="space"] body {
+  background:
+    radial-gradient(ellipse 80% 50% at 85% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
+    radial-gradient(ellipse 70% 45% at 5% 100%, color-mix(in srgb, var(--accent-2) 12%, transparent), transparent 70%),
+    linear-gradient(180deg, color-mix(in srgb, var(--bg) 82%, #2a2f8a) 0%, var(--bg) 55%, color-mix(in srgb, var(--bg) 80%, black) 100%);
+  background-attachment: fixed; min-height: 100vh;
+}
+[data-shape="space"] body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 20px 30px, #fff, transparent),
+    radial-gradient(1px 1px at 90px 140px, #cfe8ff, transparent),
+    radial-gradient(1.5px 1.5px at 160px 70px, #fff, transparent),
+    radial-gradient(1px 1px at 230px 190px, #e4dcff, transparent),
+    radial-gradient(1px 1px at 60px 210px, #fff, transparent);
+  background-size: 260px 240px;
+  opacity: .7;
+}
+[data-shape="space"] body::after { display: none; }
+[data-shape="space"] button.synctoggle,
+[data-shape="space"] button.ghost,
+[data-shape="space"] a.ghub { border-color: var(--border); }
+[data-shape="space"] .transport #pp,
+[data-shape="space"] .addform button { box-shadow: var(--shadow-pp); }
+[data-shape="space"] .transport #pp:hover,
+[data-shape="space"] .addform button:hover { box-shadow: 0 0 30px color-mix(in srgb, var(--accent) 80%, transparent); }
+[data-shape="space"] button:focus-visible,
+[data-shape="space"] input:focus-visible,
+[data-shape="space"] select:focus-visible,
+[data-shape="space"] .seek:focus-visible,
+[data-shape="space"] a.ghub:focus-visible { box-shadow: 0 0 0 4px color-mix(in srgb, var(--focus) 30%, transparent), 0 0 18px color-mix(in srgb, var(--focus) 60%, transparent); }
+[data-shape="space"] header { background: color-mix(in srgb, var(--bg) 70%, transparent); }
+/* Glass panels: solid surface first, translucent blur where supported */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-shape="space"] header { -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+  [data-shape="space"] ol, [data-shape="space"] .offset, [data-shape="space"] .menu,
+  [data-shape="space"] .editor, [data-shape="space"] .statscard, [data-shape="space"] #toast,
+  [data-shape="space"] #ended .card, [data-shape="space"] .dl {
+    background: color-mix(in srgb, var(--surface) 78%, transparent);
+    -webkit-backdrop-filter: blur(14px) saturate(130%); backdrop-filter: blur(14px) saturate(130%);
+  }
+  [data-shape="space"] .now { background: color-mix(in srgb, var(--accent) 14%, color-mix(in srgb, var(--surface) 78%, transparent)); }
+  [data-shape="space"] .statsdlg { background: color-mix(in srgb, var(--bg) 70%, transparent); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  [data-shape="space"] body::before { animation: twinkle 7s ease-in-out infinite alternate; }
+  @keyframes twinkle { from { opacity: .45; } to { opacity: .85; } }
+}
 
 /* Header */
 header {
@@ -723,7 +801,7 @@ html.demo-embedded .demo-ribbon { display: none; }
         <label for="e-skin">Theme</label>
         <select id="e-skin">
           <option value="arcade">Arcade</option><option value="minimal">Minimal</option><option value="night">Night</option>
-          <option value="vinyl">Vinyl</option><option value="club">Club</option><option value="terminal">Terminal</option>
+          <option value="vinyl">Vinyl</option><option value="club">Club</option><option value="terminal">Terminal</option><option value="space">Space</option>
           <option value="custom">Custom colors</option>
         </select>
       </div>
@@ -738,7 +816,7 @@ html.demo-embedded .demo-ribbon { display: none; }
           <label for="e-base">Base style (fonts, shapes, effects)</label>
           <select id="e-base">
             <option value="arcade">Arcade</option><option value="minimal">Minimal</option><option value="night">Night</option>
-            <option value="vinyl">Vinyl</option><option value="club">Club</option><option value="terminal">Terminal</option>
+            <option value="vinyl">Vinyl</option><option value="club">Club</option><option value="terminal">Terminal</option><option value="space">Space</option>
           </select>
         </div>
       </div>
@@ -1380,6 +1458,7 @@ html.demo-embedded .demo-ribbon { display: none; }
   const PRESETS = [
     ["arcade", "Arcade"], ["minimal", "Minimal"], ["night", "Night"],
     ["vinyl", "Vinyl"], ["club", "Club"], ["terminal", "Terminal"],
+    ["space", "Space"],
   ];
   const PRESET_IDS = PRESETS.map((p) => p[0]);
   const SKIN_NAMES = Object.fromEntries(PRESETS.concat([["custom", "Custom"]]));
