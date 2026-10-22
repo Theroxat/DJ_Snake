@@ -43,7 +43,7 @@ Outside Compose, `POT_BASE_URL` defaults to `http://pot-provider:4416`, which
 will not resolve. Point it at a reachable provider, or expect intermittent
 "Sign in to confirm you're not a bot" failures.
 
-CI (`.github/workflows/ci.yml`) runs these checks on Python 3.10 to 3.12, and a
+CI (`.github/workflows/ci.yml`) runs these checks on Python 3.10 to 3.15, and a
 change must pass them:
 
 ```bash
