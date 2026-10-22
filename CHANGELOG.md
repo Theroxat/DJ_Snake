@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-22
+
 ### Added
 
 - Theme preset `cobalt`: a flat ultramarine page with blush-pink and butter-yellow accents, wide Unbounded headings, borderless rounded panels and springy controls (`!theme cobalt`, `WEB_THEME`, base for custom).
@@ -138,7 +140,8 @@ compose up -d`).
 - Queued tracks being wiped on routine gateway reconnects.
 - Python 3.13+ compatibility.
 
-[Unreleased]: https://github.com/Theroxat/DJ_Snake/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/Theroxat/DJ_Snake/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/Theroxat/DJ_Snake/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/Theroxat/DJ_Snake/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Theroxat/DJ_Snake/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Theroxat/DJ_Snake/compare/v1.0.0...v1.1.0
