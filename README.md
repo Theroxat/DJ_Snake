@@ -9,7 +9,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/Theroxat/DJ_Snake/ci.yml?branch=main&label=CI&logo=githubactions&logoColor=white)](https://github.com/Theroxat/DJ_Snake/actions/workflows/ci.yml)
 ![Spotify](https://img.shields.io/badge/Spotify-playlists%20%C2%B7%20albums%20%C2%B7%20tracks-1DB954?logo=spotify&logoColor=white)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776ab?logo=python&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-159%20passing-2ea44f)
+![Tests](https://img.shields.io/badge/tests-303%20passing-2ea44f)
 [![Docs](https://img.shields.io/readthedocs/dj-snake?logo=readthedocs&logoColor=white&label=docs)](https://dj-snake.readthedocs.io)
 [![Release](https://img.shields.io/github/v/release/Theroxat/DJ_Snake?color=ff2c41)](https://github.com/Theroxat/DJ_Snake/releases)
 [![Docker](https://img.shields.io/badge/ghcr.io-amd64%20%7C%20arm64-2496ed?logo=docker&logoColor=white)](https://github.com/Theroxat/DJ_Snake/pkgs/container/dj_snake)

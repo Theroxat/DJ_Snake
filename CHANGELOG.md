@@ -7,60 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-22
+
+Upgrading: the bgutil PO token plugin and the `pot-provider` image were bumped
+together to 2.0.2, so pull the new image too (`docker compose pull && docker
+compose up -d`).
+
 ### Added
 
-- User documentation on Read the Docs (https://dj-snake.readthedocs.io), built
-  from `docs/source/` with Sphinx, MyST and Furo; CI builds it with warnings as
-  errors.
-- Theme preset `space` (label "Space"), available with `!theme space`, as a
-  `WEB_THEME` default and as a base for the custom theme.
+- Listening stats: a chart button in the clip page header opens the server's
+  stats for the last week, month or all time: top tracks, artists, most skipped
+  track, hours played, tracks, sessions, peak listeners and a day-by-hour
+  heatmap in the viewer's timezone. Plays are recorded in `DATA_DIR/stats.db`
+  (SQLite) without ever blocking playback. New route
+  `GET /api/{sid}/stats?range=week|month|all`.
+- Live viewer count ("👁 N") in the clip page header; the state JSON gains
+  `viewers`.
+- "Downloading" section on the clip page, under "Up next", listing every track
+  asked for but not queued yet (links, playlist and Spotify entries). The state
+  JSON gains `downloading` and `downloading_total`, and the status panel shows
+  the count.
+- Discreet "Now playing" row above "Up next" on the clip page.
 - Idle linger: when the queue runs out the bot stays in voice for
   `IDLE_DISCONNECT_SECONDS` (default 300) before leaving, so a track added
-  meanwhile (web page, `!play`, a playlist) plays at once without a rejoin; the
-  clip page stays usable. It leaves after 30 s if nobody is left in the
-  channel, and `!stop` still leaves at once.
-- Clip page: a discreet "Now playing" row above "Up next" shows the playing
-  track (thumbnail, title, mini equalizer, time left); hidden when idle.
-- Listening stats: a chart button in the clip page header opens the server's
-  stats for the last week, month or all time: top tracks, artists, most skipped track, hours played, tracks, sessions, peak
-  listeners and a day-by-hour heatmap in the viewer's timezone. Every played
-  track is recorded in `DATA_DIR/stats.db` (SQLite) with who asked for it, how
-  long it really played (pauses excluded) and whether it was skipped (left
-  before 30 s). Recording never blocks or breaks playback. New route
-  `GET /api/{sid}/stats?range=week|month|all`.
-- Live viewer count ("👁 N") in the clip page header: each tab sends a random
-  id with its state poll and counts while it polled in the last 30 s. The
-  state JSON gains `viewers`.
-- "Downloading" section on the clip page, under "Up next": every track
-  asked for but not queued yet (single links, playlist and Spotify entries, web
-  adds), with a spinner, until it is queued, fails or is not found on YouTube.
-  A link shows "Reading link…" until yt-dlp reads its title. The state JSON
-  gains `downloading` (first 50) and `downloading_total`; the status panel
-  says "📥 Downloading N tracks…".
+  meanwhile plays at once. It leaves after 30 s if nobody is in the channel,
+  and `!stop` still leaves at once.
+- Theme preset `space` (`!theme space`, `WEB_THEME` default, base for custom).
+- User documentation on Read the Docs (https://dj-snake.readthedocs.io), built
+  with Sphinx, MyST and Furo; CI builds it with warnings as errors.
+- The live demo opens on a simulated Discord channel driving the real clip page.
 
 ### Changed
 
-- Dependencies: discord.py 2.7.1, python-dotenv 1.2.4, aiohttp 3.14.5, PyNaCl
-  1.6.2, davey 0.1.7, audioop-lts 0.2.2, bgutil-ytdlp-pot-provider and its
-  `pot-provider` image 2.0.2; dev tools pytest 9.1.1, pytest-asyncio 1.4.0,
-  black 26.10.1, flake8 7.4.1; GitHub Actions bumped to their latest majors.
-- Docker image now runs on Python 3.15 (`python:3.15-slim`), CI tests Python
-  3.10 to 3.15, and the yt-dlp floor is raised to 2026.10.21.
+- Clip page redesign shared by every theme: video, title, seek bar and controls
+  form one player block, with a soft glow from the artwork; the Minimal theme
+  uses Geist.
+- The web page and errors are now in English. The `nuit`, `vinyle` and `perso`
+  themes are now `night`, `vinyl` and `custom`; saved themes are migrated
+  automatically.
+- Docker image now runs on Python 3.15, CI tests Python 3.10 to 3.15, and the
+  yt-dlp floor is 2026.10.21.
+- Dependencies bumped: discord.py 2.7.1, python-dotenv 1.2.4, aiohttp 3.14.5,
+  PyNaCl 1.6.2, davey 0.1.7, audioop-lts 0.2.2, bgutil-ytdlp-pot-provider and
+  `pot-provider` image 2.0.2, dev tools and GitHub Actions.
 
-- Web page and errors are now in English. The `nuit`, `vinyle` and `perso`
-  themes are now `night`, `vinyl` and `custom` (saved themes are migrated).
-- The live demo opens on a simulated Discord channel: send `!play` with a
-  Spotify playlist, watch the bot join voice and edit its status panel, then
-  open the clip link. Web controls and Discord commands drive one shared fake
-  session, so each side follows the other. The clip page alone is still at
-  `demo/player.html`.
-- Clip page redesign, shared by every theme: the video, title, seek bar and
-  controls form one player block (play/pause centered between previous and
-  next, with a knob on the seek bar), the playing track's artwork glows softly
-  behind it (strength set per theme, off in Terminal), the link box now sits on
-  top of "Up next", queue rows are lighter, and the header is sticky on wide
-  screens. The Minimal theme uses Geist instead of Inter. The "Downloading"
-  list style no longer leaks onto the stats heatmap's day labels.
+### Fixed
+
+- The clip page could stay stuck on a stale track: polls now time out and a
+  watchdog makes the page always converge to the playing track.
+- Stats: listener peak recorded after the write, flush at shutdown, short-track
+  skip rule.
+
+### Removed
+
+- "DJ of the week" and top DJs from the stats panel (the requester is still
+  recorded but never shown).
 
 ## [1.1.0] - 2026-10-17
 
@@ -122,6 +123,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Queued tracks being wiped on routine gateway reconnects.
 - Python 3.13+ compatibility.
 
-[Unreleased]: https://github.com/Theroxat/DJ_Snake/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Theroxat/DJ_Snake/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Theroxat/DJ_Snake/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Theroxat/DJ_Snake/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Theroxat/DJ_Snake/releases/tag/v1.0.0
