@@ -34,7 +34,7 @@
 - Optional crossfade between tracks.
 - Listening stats per server on the clip page: top tracks and artists, the most skipped track, hours played, sessions, peak listeners and a day-by-hour heatmap, for the last week, month or all time.
 - Live viewer count in the clip page header.
-- Themable clip page: seven looks, including a custom one with your colors, name and logo (see [Themes](#themes) below).
+- Themable clip page: eight looks, including a custom one with your colors, name and logo (see [Themes](#themes) below).
 - One live status message per session, edited in place instead of spamming the channel.
 - Radio/mix links ask whether to play the single track or the whole playlist.
 - yt-dlp upgrades itself on start, and a PO token sidecar handles YouTube's bot check.
@@ -132,9 +132,9 @@ Anyone who has the link can control the queue. Treat it as a secret and share it
 
 ### Themes
 
-![The six preset themes](docs/screenshots/themes.png)
+![The seven preset themes](docs/screenshots/themes.png)
 
-The clip page has six preset themes (`arcade`, the default look, plus `minimal`, `night`, `vinyl`, `club` and `terminal`) and a custom one, `custom`, built from three colors (background, text, accent) on top of a preset's fonts and shapes. Viewers can switch theme for themselves with the palette button in the page header; their choice stays in their browser.
+The clip page has seven preset themes (`arcade`, the default look, plus `minimal`, `night`, `vinyl`, `club`, `terminal` and `space`) and a custom one, `custom`, built from three colors (background, text, accent) on top of a preset's fonts and shapes. Viewers can switch theme for themselves with the palette button in the page header; their choice stays in their browser.
 
 Members with the **Manage Server** permission set the server's default:
 

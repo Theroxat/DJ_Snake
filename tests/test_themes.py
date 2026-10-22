@@ -299,6 +299,30 @@ async def test_theme_command_sets_a_preset(theme_ctx, channel):
     assert channel.reactions == ["✅"]
 
 
+async def test_theme_command_accepts_space(theme_ctx, channel):
+    await commands.theme.callback(theme_ctx, "space")
+    assert themes.theme_for(GUILD_ID)["skin"] == "space"
+    assert channel.reactions == ["✅"]
+
+
+async def test_space_is_saved_persisted_and_in_state(
+    client, save, player, token, data_dir
+):
+    body = dict(GOOD, skin="space", base="space")
+    status, res = await save(body, token)
+    assert status == 200 and res["theme"]["skin"] == "space"
+    assert res["theme"]["base"] == "space"
+    assert (await get_theme(client, player))["skin"] == "space"
+    with open(data_dir / "themes.json") as f:
+        assert json.load(f)["1"]["skin"] == "space"
+
+
+async def test_space_works_as_custom_base(client, save, player, token):
+    status, res = await save(dict(GOOD, base="space"), token)
+    assert status == 200 and res["theme"]["skin"] == "custom"
+    assert (await get_theme(client, player))["base"] == "space"
+
+
 async def test_theme_command_rejects_unknown_names(theme_ctx, channel):
     await commands.theme.callback(theme_ctx, "bogus")
     assert "Unknown theme" in channel.log[-1]
@@ -308,6 +332,7 @@ async def test_theme_command_shows_the_current_theme(theme_ctx, channel):
     await commands.theme.callback(theme_ctx, "vinyl")
     await commands.theme.callback(theme_ctx, None)
     assert "vinyl" in channel.log[-1] and "terminal" in channel.log[-1]
+    assert "space" in channel.log[-1]
 
 
 async def test_theme_reset_restores_the_fallback(theme_ctx):
