@@ -65,9 +65,9 @@ Anyone who has the link can control the queue. Treat it as a secret and share it
 
 ## Themes
 
-![The seven preset themes and a custom one](../screenshots/themes.png)
+![The eight preset themes and a custom one](../screenshots/themes.png)
 
-The page has seven preset themes: `arcade` (the default look), `minimal`, `night`, `vinyl`, `club`, `terminal` and `space`. An eighth, `custom`, is built from three colors (background, text, accent) on top of a preset's fonts and shapes.
+The page has eight preset themes: `arcade` (the default look), `minimal`, `night`, `vinyl`, `club`, `terminal`, `space` and `cobalt` (a flat ultramarine page with blush-pink controls and wide type). A ninth, `custom`, is built from three colors (background, text, accent) on top of a preset's fonts and shapes.
 
 Viewers can switch theme for themselves with the palette button in the page header. That choice stays in their browser. The custom theme can only be edited by an admin through the editor.
 

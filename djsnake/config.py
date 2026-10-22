@@ -58,7 +58,16 @@ STATS_CACHE_SECONDS = 15  # The stats route serves a guild's answer this long
 VIEWER_WINDOW_SECONDS = 30
 MAX_VIEWERS_PER_SESSION = 500
 # Clip page themes. "custom" is a custom palette on top of a preset's shapes.
-THEME_PRESETS = ("arcade", "minimal", "night", "vinyl", "club", "terminal", "space")
+THEME_PRESETS = (
+    "arcade",
+    "minimal",
+    "night",
+    "vinyl",
+    "club",
+    "terminal",
+    "space",
+    "cobalt",
+)
 THEME_SKINS = THEME_PRESETS + ("custom",)
 # Fallback theme for guilds that never chose one.
 WEB_THEME = (os.getenv("WEB_THEME") or "arcade").strip().lower()

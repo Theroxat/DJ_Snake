@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Theme preset `cobalt`: a flat ultramarine page with blush-pink and butter-yellow accents, wide Unbounded headings, borderless rounded panels and springy controls (`!theme cobalt`, `WEB_THEME`, base for custom).
+
 ## [1.2.1] - 2026-10-22
 
 Version 1.2.0 was never published as a Docker image or GitHub Release (its

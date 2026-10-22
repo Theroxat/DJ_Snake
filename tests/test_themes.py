@@ -6,7 +6,7 @@ import os
 import pytest
 from discord.ext import commands as ext_commands
 
-from djsnake import commands, state, themes
+from djsnake import commands, config, state, themes
 from djsnake.player import MusicPlayer
 from fakes import FakeAuthor, FakeChannel, make_ctx
 
@@ -323,6 +323,38 @@ async def test_space_works_as_custom_base(client, save, player, token):
     assert (await get_theme(client, player))["base"] == "space"
 
 
+async def test_theme_command_accepts_cobalt(theme_ctx, channel):
+    await commands.theme.callback(theme_ctx, "cobalt")
+    assert themes.theme_for(GUILD_ID)["skin"] == "cobalt"
+    assert channel.reactions == ["✅"]
+
+
+async def test_cobalt_is_saved_persisted_and_in_state(
+    client, save, player, token, data_dir
+):
+    body = dict(GOOD, skin="cobalt", base="cobalt")
+    status, res = await save(body, token)
+    assert status == 200 and res["theme"]["skin"] == "cobalt"
+    assert res["theme"]["base"] == "cobalt"
+    assert (await get_theme(client, player))["skin"] == "cobalt"
+    with open(data_dir / "themes.json") as f:
+        assert json.load(f)["1"]["skin"] == "cobalt"
+
+
+async def test_cobalt_works_as_custom_base(client, save, player, token):
+    status, res = await save(dict(GOOD, base="cobalt"), token)
+    assert status == 200 and res["theme"]["skin"] == "custom"
+    assert (await get_theme(client, player))["base"] == "cobalt"
+
+
+def test_cobalt_is_listed_everywhere_the_page_needs_it():
+    with open(config.WEB_INDEX, encoding="utf-8") as f:
+        page = f.read()
+    assert '[data-skin="cobalt"]' in page
+    assert '["cobalt", "Cobalt"]' in page
+    assert page.count('<option value="cobalt">Cobalt</option>') == 2
+
+
 async def test_theme_command_rejects_unknown_names(theme_ctx, channel):
     await commands.theme.callback(theme_ctx, "bogus")
     assert "Unknown theme" in channel.log[-1]
@@ -332,7 +364,7 @@ async def test_theme_command_shows_the_current_theme(theme_ctx, channel):
     await commands.theme.callback(theme_ctx, "vinyl")
     await commands.theme.callback(theme_ctx, None)
     assert "vinyl" in channel.log[-1] and "terminal" in channel.log[-1]
-    assert "space" in channel.log[-1]
+    assert "space" in channel.log[-1] and "cobalt" in channel.log[-1]
 
 
 async def test_theme_reset_restores_the_fallback(theme_ctx):

@@ -25,7 +25,7 @@
   const DURATION = 25, START = 1, END = 24;
   const BASE_URL = "https://dj.example.com"; // PUBLIC_BASE_URL (fictional)
   const PREFIX = "!";
-  const PRESETS = ["arcade", "minimal", "night", "vinyl", "club", "terminal", "space"];
+  const PRESETS = ["arcade", "minimal", "night", "vinyl", "club", "terminal", "space", "cobalt"];
   const SKINS = PRESETS.concat(["custom"]);
   const PANEL_SHORT = 100;
 

@@ -133,9 +133,9 @@ Anyone who has the link can control the queue. Treat it as a secret and share it
 
 ### Themes
 
-![The seven preset themes and a custom one](docs/screenshots/themes.png)
+![The eight preset themes and a custom one](docs/screenshots/themes.png)
 
-The clip page has seven preset themes (`arcade`, the default look, plus `minimal`, `night`, `vinyl`, `club`, `terminal` and `space`) and a custom one, `custom`, built from three colors (background, text, accent) on top of a preset's fonts and shapes. Viewers can switch theme for themselves with the palette button in the page header; their choice stays in their browser.
+The clip page has eight preset themes (`arcade`, the default look, plus `minimal`, `night`, `vinyl`, `club`, `terminal`, `space` and `cobalt`) and a custom one, `custom`, built from three colors (background, text, accent) on top of a preset's fonts and shapes. Viewers can switch theme for themselves with the palette button in the page header; their choice stays in their browser.
 
 Members with the **Manage Server** permission set the server's default:
 

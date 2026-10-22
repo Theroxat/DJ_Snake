@@ -310,11 +310,14 @@ Module map, lowest layer first (each imports only the ones above it):
   from the request. Theme routes: `POST /api/{sid}/theme`,
   `POST|DELETE /api/{sid}/theme/logo`, `GET /theme-logo/{sid}` (see Themes).
 - **Themes**: the page is fully token-driven: each preset is a `[data-skin]`
-  block of CSS custom properties on `<html>` (Arcade is the original look);
-  `custom` takes `--c-bg/--c-text/--c-accent` and derives the rest with
+  block of CSS custom properties on `<html>` (Arcade is the original look;
+  the presets are `THEME_PRESETS` in `config.py`: arcade, minimal, night,
+  vinyl, club, terminal, space, cobalt); a new preset must also be listed in
+  the page's early `localStorage` check, its `PRESETS` and both editor
+  `<select>`s, and in `docs/demo/backend.js`; `custom` takes `--c-bg/--c-text/--c-accent` and derives the rest with
   `color-mix`, inheriting fonts and shapes from the preset in `data-base`;
-  `data-shape` (the skin, or the base for custom) scopes a few Arcade-only
-  details. Shape tokens also set the play button's radius (`--radius-pp`),
+  `data-shape` (the skin, or the base for custom) scopes the few rules a
+  look needs beyond tokens (Arcade, Terminal, Space, Cobalt). Shape tokens also set the play button's radius (`--radius-pp`),
   the prev/next button border and shadow (`--ghost-border`, `--ghost-shadow`)
   and the opacity of the blurred artwork glow behind the player (`--ambient`,
   0 turns it off). Per-guild defaults live in `guild_themes`, persisted to
