@@ -41,7 +41,7 @@ Controls never choose the next track themselves. They set a pending action under
 
 ### Controls and the web API
 
-Next, previous, pause, resume, remove, move, add, seek, jump and crossfade are shared between Discord and the page. They raise one error type carrying an HTTP status and an English message, shown in Discord and on the page. Added URLs must be YouTube hosts (rebuilt into a canonical URL) or Spotify links, which avoids server-side request forgery through yt-dlp.
+Next, previous, pause, resume, remove, move, add, seek, jump and crossfade are shared between Discord and the page. They raise one error type carrying an HTTP status and an English message, shown in Discord and on the page. Added URLs must be YouTube hosts (rebuilt into a canonical URL) or Spotify links, which avoids server-side request forgery through yt-dlp. Anything that does not look like a link (`media.looks_like_url()`) is a text search instead: `spotify.find_text_match()` scores the YouTube results like a Spotify track with no artist.
 
 The page uses these routes:
 

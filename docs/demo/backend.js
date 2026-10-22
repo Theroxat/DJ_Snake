@@ -51,8 +51,11 @@
   const short = (t, n) => { t = String(t); n = n || PANEL_SHORT; return t.length <= n ? t : t.slice(0, n - 1) + "…"; };
 
   // Link parsing, as spotify.check_url() and media.parse_youtube_url().
+  const URL_LIKE = /^([a-z][a-z0-9+.-]*:|www\.|[\w-]+(\.[\w-]+)+(\/|$))/i;
   function parseLink(raw) {
     const url = String(raw || "").trim();
+    // Anything that is not a link is a text search (media.looks_like_url()).
+    if (url && url.length <= 200 && !URL_LIKE.test(url.split(" ")[0])) return { kind: "search", text: url };
     let m = /^spotify:(playlist|album|track):([A-Za-z0-9]{22})$/.exec(url);
     if (m) return { kind: "spotify", type: m[1], id: m[2] };
     let u;
@@ -272,6 +275,7 @@
     }
     /** Queue whatever a link points to (after parseLink). */
     function queueLink(link) {
+      if (link.kind === "search") return loadOne(rot++, "🔎 Searching YouTube…", "youtube");
       if (link.kind === "spotify") {
         if (link.type === "track") return loadOne(rot++, "🔎 Reading the Spotify link…", "spotify");
         const n = link.type === "playlist" ? 5 : 3;

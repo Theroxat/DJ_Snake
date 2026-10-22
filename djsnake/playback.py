@@ -418,6 +418,44 @@ async def queue_spotify(ctx, player, kind, tracks, from_web=False):
         player.drop_pending(key)
 
 
+async def queue_search(ctx, player, query, from_web=False):
+    """Queue the best YouTube match for a plain text search (`!play daft punk
+    one more time`), scored like a Spotify track. Says so when none fits."""
+    epoch = player.epoch
+    if cancelled(player, epoch):
+        return
+    query = " ".join(query.split())
+    key = player.add_pending(query[:100], "youtube")
+    try:
+        player.single_downloads += 1
+        refresh_panel(player)
+        try:
+            loop = asyncio.get_running_loop()
+            video_url = await loop.run_in_executor(None, spotify.find_text_match, query)
+        finally:
+            player.single_downloads = max(0, player.single_downloads - 1)
+            refresh_panel(player)
+        if cancelled(player, epoch):
+            return
+        if video_url is None:
+            player.drop_pending(key)
+            await ctx.send(
+                f"❌ No YouTube match found for **{query[:100]}**.",
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return
+        await download_and_queue_song(
+            ctx,
+            player,
+            video_url,
+            skip_voice_check=from_web,
+            from_web=from_web,
+            pending_key=key,
+        )
+    finally:
+        player.drop_pending(key)
+
+
 async def play_next(ctx, gen=None, origin=None):
     """Advance playback. Called by the `after` callback (with the generation
     of the track that ended) or to start an idle player (gen=None)."""

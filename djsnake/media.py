@@ -53,6 +53,15 @@ _VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 _LIST_ID_RE = re.compile(r"^[A-Za-z0-9_-]{2,64}$")
 
 
+_URL_LIKE_RE = re.compile(r"^([a-z][a-z0-9+.-]*:|www\.|[\w-]+(\.[\w-]+)+(/|$))", re.I)
+
+
+def looks_like_url(text):
+    """True when `text` is meant as a link (scheme, "www." or a domain), so
+    anything else is searched on YouTube as plain text."""
+    return bool(_URL_LIKE_RE.match((text or "").strip().split(" ")[0]))
+
+
 def parse_youtube_url(url):
     """Validate a URL from the web page and rebuild it canonically.
 

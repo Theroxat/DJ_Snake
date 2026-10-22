@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Search by text: `!play daft punk one more time` (any argument that is not a link) and the clip page's add box search YouTube and queue the best match, scored like Spotify tracks. When nothing scores high enough the bot says so.
+
 ## [1.3.0] - 2026-10-22
 
 ### Added

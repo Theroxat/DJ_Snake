@@ -127,10 +127,10 @@ Module map, lowest layer first (each imports only the ones above it):
   `ytsearchN:`).
 - `spotify.py`: Spotify links: `check_url()`, the embed parser and the
   optional Web API (`get_tracks()`), and YouTube matching (`score_candidate()`,
-  `best_match()`, `find_youtube_match()`).
+  `best_match()`, `find_youtube_match()`, `find_text_match()`).
 - `mixer.py`: `CrossfadeMixer`.
 - `playback.py`: voice connection, `download_and_queue_song()`,
-  `queue_playlist()`, `queue_spotify()`, `play_next()` / `_advance()` / `_start_crossfade()`,
+  `queue_playlist()`, `queue_spotify()`, `queue_search()`, `play_next()` / `_advance()` / `_start_crossfade()`,
   `open_track_source()`.
 - `controls.py`: `ControlError`, the `control_*` functions, `WebContext`.
 - `web.py`: the aiohttp routes and `start_web_server()`.
@@ -251,6 +251,14 @@ Module map, lowest layer first (each imports only the ones above it):
   `queue_spotify()`. Queued items are ordinary YouTube tracks. Tests:
   `tests/test_spotify.py`, fixtures in `tests/fixtures/spotify/`; patch
   `spotify.get_tracks`, `spotify._http` or `media.search_youtube`.
+- **Text search**: `media.looks_like_url()` (scheme, `www.` or a domain in the
+  first word) separates links from text. `!play` takes `url` (first word) plus
+  `rest`; text (<= `MAX_SEARCH_LENGTH` 200) goes to `queue_search()`, and the
+  web `control_add()` does the same when `parse_youtube_url()` fails on
+  non-link text (otherwise `bad_url`, unchanged). `spotify.find_text_match()`
+  scores with `text_track()` (no artists: query words may be in title or
+  channel, flat +20 instead of the artist signal, no duration check) against
+  `MIN_SCORE`; no match posts "No YouTube match found for **text**".
 - **Pending downloads** (`player.pending_downloads`, the page's "Downloading"): an ordered list of `{key, title, source}` (`source`
   `youtube` or `spotify`; `title` None until known, the page then shows "Reading
   link…") for every track asked for but not queued yet. `add_pending()`
@@ -379,7 +387,7 @@ Module map, lowest layer first (each imports only the ones above it):
 - **Voice**: `safe_voice_connect()` cleans up any stale voice client, adds
   delays, and retries. It exists to avoid Discord close code 4006 (invalid
   session). `join_voice_channel()` wraps it. `!reset` forces a reconnect.
-- **Commands**: `!play` (YouTube or Spotify link), `!list`, `!next`, `!pause`, `!resume`, `!seek`
+- **Commands**: `!play` (YouTube or Spotify link, or search text), `!list`, `!next`, `!pause`, `!resume`, `!seek`
   (position relative to the track's automix `start`, as the page shows it),
   `!crossfade on|off`, `!stop`, `!reset`, `!theme [preset|reset|edit]`
   (Manage Server permission via `commands.has_guild_permissions`).

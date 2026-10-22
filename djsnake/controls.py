@@ -5,13 +5,14 @@ import time
 import types
 
 from . import media, spotify, state
-from .config import MAX_PLAYLIST_SIZE, PREVIOUS_RESTART_SECONDS
-from .media import parse_youtube_url
+from .config import MAX_PLAYLIST_SIZE, MAX_SEARCH_LENGTH, PREVIOUS_RESTART_SECONDS
+from .media import looks_like_url, parse_youtube_url
 from .playback import (
     cancelled,
     download_and_queue_song,
     play_next,
     queue_playlist,
+    queue_search,
     queue_spotify,
 )
 from .player import discard_tracks
@@ -253,7 +254,13 @@ async def control_add(player, guild_id, url):
         return
     parsed = parse_youtube_url(url)
     if parsed is None:
-        raise ControlError("bad_url")
+        text = " ".join(url.split()) if isinstance(url, str) else ""
+        if not text or len(text) > MAX_SEARCH_LENGTH or looks_like_url(text):
+            raise ControlError("bad_url")
+        if not player.in_voice():
+            raise ControlError("not_in_voice")
+        _background(_add_search_from_web(player, guild_id, text))
+        return
     if not player.in_voice():
         raise ControlError("not_in_voice")
     kind, clean_url = parsed
@@ -287,6 +294,20 @@ async def _add_spotify_from_web(player, guild_id, kind, tracks):
         await queue_spotify(ctx, player, kind, tracks, from_web=True)
     except Exception as e:
         print(f"Web Spotify add failed: {e}")
+    finally:
+        player.loading_jobs = max(0, player.loading_jobs - 1)
+    if not player.is_playing and not cancelled(player, epoch):
+        await play_next(ctx)
+
+
+async def _add_search_from_web(player, guild_id, query):
+    ctx = WebContext(guild_id, player)
+    epoch = player.epoch
+    player.loading_jobs += 1  # Keeps the bot in voice, as in _add_from_web
+    try:
+        await queue_search(ctx, player, query, from_web=True)
+    except Exception as e:
+        print(f"Web search add failed: {e}")
     finally:
         player.loading_jobs = max(0, player.loading_jobs - 1)
     if not player.is_playing and not cancelled(player, epoch):
