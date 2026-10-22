@@ -167,7 +167,9 @@ _NEXT_DATA_RE = re.compile(
 _ARTIST_SPLIT_RE = re.compile(", ")
 
 
-def _track(title, artists, duration_ms):
+def make_track(title, artists, duration_ms, source=None):
+    """The shape every link provider hands to the YouTube matcher:
+    {title, artists, duration (s)}, plus `source` for non-Spotify providers."""
     title = (title or "").strip()
     if not title:
         return None
@@ -176,7 +178,13 @@ def _track(title, artists, duration_ms):
         duration = float(duration_ms) / 1000 if duration_ms else None
     except (TypeError, ValueError):
         duration = None
-    return {"title": title, "artists": artists, "duration": duration}
+    track = {"title": title, "artists": artists, "duration": duration}
+    if source:
+        track["source"] = source
+    return track
+
+
+_track = make_track
 
 
 def parse_embed_html(html, kind):

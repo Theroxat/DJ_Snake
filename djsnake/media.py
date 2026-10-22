@@ -89,6 +89,118 @@ def parse_youtube_url(url):
     return None
 
 
+SOUNDCLOUD_HOSTS = {"soundcloud.com", "www.soundcloud.com", "m.soundcloud.com"}
+_SC_SEGMENT_RE = re.compile(r"^[A-Za-z0-9_.~%-]{1,200}$")
+# First path parts that are SoundCloud pages, not a user; second parts that are
+# a user's tabs, not a track.
+_SC_RESERVED_USERS = {
+    "discover",
+    "search",
+    "you",
+    "stream",
+    "upload",
+    "charts",
+    "pages",
+    "feed",
+    "settings",
+    "notifications",
+    "messages",
+    "jobs",
+    "terms-of-use",
+}
+_SC_USER_TABS = {
+    "sets",
+    "tracks",
+    "albums",
+    "likes",
+    "reposts",
+    "popular-tracks",
+    "following",
+    "followers",
+    "comments",
+    "spotlight",
+}
+_BANDCAMP_HOST_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}\.bandcamp\.com$")
+_BANDCAMP_PATH_RE = re.compile(r"^/(track|album)/([A-Za-z0-9_%.~-]{1,200})/?$")
+
+
+def _parse_soundcloud(parsed):
+    segments = [seg for seg in parsed.path.split("/") if seg]
+    if not 2 <= len(segments) <= 4 or not all(map(_SC_SEGMENT_RE.match, segments)):
+        return None
+    if segments[0].lower() in _SC_RESERVED_USERS:
+        return None
+    if segments[1] == "sets" and len(segments) >= 3:
+        kind = "playlist"  # /user/sets/name[/secret-token]
+    elif segments[1] not in _SC_USER_TABS and len(segments) <= 3:
+        kind = "single"  # /user/track[/secret-token]
+    else:
+        return None
+    return kind, "https://soundcloud.com/" + "/".join(segments)
+
+
+def _parse_bandcamp(host, parsed):
+    if not _BANDCAMP_HOST_RE.match(host):
+        return None
+    match = _BANDCAMP_PATH_RE.match(parsed.path)
+    if not match:
+        return None
+    kind = "single" if match.group(1) == "track" else "playlist"
+    return kind, f"https://{host}/{match.group(1)}/{match.group(2)}"
+
+
+def parse_media_url(url):
+    """Validate a URL from the web page and rebuild it canonically: a YouTube
+    link (see parse_youtube_url) or a SoundCloud or Bandcamp track, set or
+    album. Returns ("single" | "playlist", url) or None. Short links
+    (on.soundcloud.com) and custom Bandcamp domains are refused: the host
+    has to be known before yt-dlp is given the URL."""
+    parsed_youtube = parse_youtube_url(url)
+    if parsed_youtube is not None:
+        return parsed_youtube
+    if not isinstance(url, str) or len(url) > 2048:
+        return None
+    try:
+        parsed = urlparse(url.strip())
+        host = (parsed.hostname or "").lower()
+        parsed.port  # Raises on a malformed port
+    except ValueError:
+        return None
+    if parsed.scheme not in ("http", "https") or parsed.username or parsed.port:
+        return None
+    if host in SOUNDCLOUD_HOSTS:
+        return _parse_soundcloud(parsed)
+    return _parse_bandcamp(host, parsed)
+
+
+def source_of(url):
+    """Platform of a track URL: youtube, soundcloud or bandcamp (the page
+    labels the download with it)."""
+    host = (urlparse(url or "").hostname or "").lower()
+    if host in SOUNDCLOUD_HOSTS or host.endswith(".soundcloud.com"):
+        return "soundcloud"
+    if host == "bandcamp.com" or host.endswith(".bandcamp.com"):
+        return "bandcamp"
+    return "youtube"
+
+
+def entry_url(entry):
+    """URL of a flat playlist entry. Another platform's entries carry their
+    own page URL (their ids are not YouTube ids); YouTube ones are rebuilt
+    from the id. Returns None when there is nothing to download."""
+    for key in ("url", "webpage_url"):
+        value = entry.get(key)
+        if isinstance(value, str) and value.startswith("http"):
+            if source_of(value) != "youtube":
+                return value
+    video_id = entry.get("id") or entry.get("url") or entry.get("webpage_url")
+    if not video_id:
+        return None
+    if isinstance(video_id, str) and video_id.startswith("http"):
+        return video_id
+    return f"https://www.youtube.com/watch?v={video_id}"
+
+
 def get_playlist_info(url):
     """Extract playlist information without downloading."""
     try:
@@ -315,7 +427,8 @@ def _download_once(url, on_title=None):
         print(f"Downloading: {url}")
         info = ydl.extract_info(url, download=True)
         filepath = _find_download(info)
-        _remove_offtopic(ydl, info, filepath)
+        if source_of(url) == "youtube":  # SponsorBlock only knows YouTube
+            _remove_offtopic(ydl, info, filepath)
 
     analysis = analyse_media(filepath)
     duration = analysis["duration"] or info.get("duration")
@@ -334,11 +447,23 @@ def _download_once(url, on_title=None):
         "end": end,  # File time where it stops (None: unknown, play it all)
         "loudnorm": analysis["loudnorm"],  # Measured values, or None
         "thumbnail": info.get("thumbnail"),
+        # No video stream (SoundCloud, Bandcamp): the page shows the artwork.
+        "audio_only": _is_audio_only(info, filepath),
         "url": info.get("webpage_url") or url,
         # For the stats (stats.artist_of cleans the channel name).
         "video_id": info.get("id"),
         "channel": info.get("channel") or info.get("uploader"),
     }
+
+
+AUDIO_EXTENSIONS = {".mp3", ".m4a", ".aac", ".opus", ".ogg", ".oga", ".wav", ".flac"}
+
+
+def _is_audio_only(info, filepath):
+    for download in info.get("requested_downloads") or [info]:
+        if download.get("vcodec") == "none":
+            return True
+    return os.path.splitext(filepath)[1].lower() in AUDIO_EXTENSIONS
 
 
 def _find_download(info):

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- SoundCloud and Bandcamp links: `!play` and the clip page's add action accept
+  tracks and sets/albums (`soundcloud.com`, `*.bandcamp.com`). Playlists respect
+  `MAX_PLAYLIST_SIZE`; the page shows the artwork for tracks without video
+  (`now_playing.audio_only` in the state), and the "Downloading" list names the
+  platform.
+- Deezer and Apple Music links (tracks, albums, playlists), read without
+  credentials (Deezer's public API, Apple's iTunes lookup API and playlist page)
+  and matched on YouTube like Spotify tracks (new `djsnake/catalog.py`).
+
+### Changed
+
+- The "link not accepted" message lists every supported source.
+
 ## [1.3.0] - 2026-10-22
 
 ### Added

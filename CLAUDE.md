@@ -128,6 +128,8 @@ Module map, lowest layer first (each imports only the ones above it):
 - `spotify.py`: Spotify links: `check_url()`, the embed parser and the
   optional Web API (`get_tracks()`), and YouTube matching (`score_candidate()`,
   `best_match()`, `find_youtube_match()`).
+- `catalog.py`: Deezer and Apple Music links: `check_link()` (every metadata
+  link: Spotify, Deezer, Apple Music), `get_tracks()`, parsers.
 - `mixer.py`: `CrossfadeMixer`.
 - `playback.py`: voice connection, `download_and_queue_song()`,
   `queue_playlist()`, `queue_spotify()`, `play_next()` / `_advance()` / `_start_crossfade()`,
@@ -251,8 +253,32 @@ Module map, lowest layer first (each imports only the ones above it):
   `queue_spotify()`. Queued items are ordinary YouTube tracks. Tests:
   `tests/test_spotify.py`, fixtures in `tests/fixtures/spotify/`; patch
   `spotify.get_tracks`, `spotify._http` or `media.search_youtube`.
+- **More sources**: `media.parse_media_url()` (web add) accepts YouTube plus
+  `soundcloud.com` (`/user/track[/token]` single, `/user/sets/name` playlist)
+  and `*.bandcamp.com` (`/track/x`, `/album/x`), rebuilt canonically; short
+  links and custom Bandcamp domains are refused. `!play` hands any other URL to
+  yt-dlp as before. `media.source_of(url)` names the platform (the pending
+  entry's `source`), `media.entry_url()` keeps non-YouTube flat-playlist URLs
+  (ids are not YouTube ids). Non-YouTube downloads skip SponsorBlock and may be
+  audio only: the track gets `audio_only` (no video stream, from yt-dlp's
+  `vcodec`/the extension), exposed as `now_playing.audio_only`; the page then
+  shows the artwork `<img id="artwork">` over the empty video. Deezer and Apple
+  Music (`catalog.py`): `check_link(url)` returns `(kind, id, provider)`
+  (Apple's id is a `(storefront, slug, id, song_id)` tuple; an album link with
+  `?i=` is a track; short links raise `short_link`). Deezer reads
+  `api.deezer.com` (`track/ID`, `album|playlist/ID/tracks?limit=`); Apple songs
+  and albums use the iTunes Lookup API, playlists the `serialized-server-data`
+  block of the playlist page (schema.org JSON-LD as fallback, no artists). All
+  requests go through `spotify._http` and produce the same `{title, artists,
+  duration}` dicts (plus `source`) as Spotify, matched by
+  `spotify.find_youtube_match` and queued through the same `queue_playlist()` /
+  `queue_spotify()` (entries stay `{"spotify": track}`; `pending_label()` reads
+  `track["source"]`). Errors are `SpotifyError` with the generic codes
+  `link_not_found`, `link_empty`, `link_unreadable`, `short_link`. Tests:
+  `tests/test_sources.py`, fixtures in `tests/fixtures/catalog/`; patch
+  `catalog.get_tracks` or `spotify._http`.
 - **Pending downloads** (`player.pending_downloads`, the page's "Downloading"): an ordered list of `{key, title, source}` (`source`
-  `youtube` or `spotify`; `title` None until known, the page then shows "Reading
+  `youtube`, `spotify`, `deezer`, `apple`, `soundcloud` or `bandcamp`; `title` None until known, the page then shows "Reading
   link…") for every track asked for but not queued yet. `add_pending()`
   returns a key that the caller drops in a `finally` (`drop_pending()`).
   `download_and_queue_song()` lists a link itself unless given `pending_key`,
@@ -283,7 +309,7 @@ Module map, lowest layer first (each imports only the ones above it):
   `GET /` landing text; `GET /{sid}` serves `web/index.html`;
   `GET /api/{sid}/state` returns `{active, in_voice, guild, channel, loading,
   paused, can_previous, crossfade, crossfading, server_time, viewers, now_playing: {id,
-  title, duration, thumbnail, url, video_url, elapsed, start, end} | null, queue: [{id, title, duration,
+  title, duration, thumbnail, url, video_url, audio_only, elapsed, start, end} | null, queue: [{id, title, duration,
   thumbnail, url}], downloading: [{key, title, source}], downloading_total,
   theme: {skin, base, bg, text, accent, name, logo_url}}`
   (404 `{"active": false}` when the sid is unknown or
@@ -379,7 +405,7 @@ Module map, lowest layer first (each imports only the ones above it):
 - **Voice**: `safe_voice_connect()` cleans up any stale voice client, adds
   delays, and retries. It exists to avoid Discord close code 4006 (invalid
   session). `join_voice_channel()` wraps it. `!reset` forces a reconnect.
-- **Commands**: `!play` (YouTube or Spotify link), `!list`, `!next`, `!pause`, `!resume`, `!seek`
+- **Commands**: `!play` (YouTube, SoundCloud, Bandcamp, Spotify, Deezer or Apple Music link), `!list`, `!next`, `!pause`, `!resume`, `!seek`
   (position relative to the track's automix `start`, as the page shows it),
   `!crossfade on|off`, `!stop`, `!reset`, `!theme [preset|reset|edit]`
   (Manage Server permission via `commands.has_guild_permissions`).

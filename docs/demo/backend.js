@@ -36,7 +36,7 @@
     track_not_found: [404, "That track is not in the queue."],
     bad_index: [400, "Invalid position."],
     bad_url: [400,
-      "Only YouTube (video or playlist) and Spotify (track, album or playlist) links are accepted."],
+      "Only YouTube, SoundCloud and Bandcamp links (track or playlist) and Spotify, Deezer and Apple Music (track, album or playlist) links are accepted."],
     spotify_short_link: [400,
       "Short spotify.link links are not supported: open it and copy the open.spotify.com link."],
   };

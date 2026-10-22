@@ -16,6 +16,7 @@ Lowest layer first; each module imports only the ones above it.
 | `themes.py` | Theme storage, logos and `!theme edit` tokens. |
 | `media.py` | YouTube URL parsing, yt-dlp downloads, the SponsorBlock cut, audio analysis and FFmpeg options, YouTube search. |
 | `spotify.py` | Spotify link parsing, track lists, and matching to YouTube. |
+| `catalog.py` | Deezer and Apple Music link parsing and track lists (no credentials); entry point for every metadata link. |
 | `mixer.py` | `CrossfadeMixer`, the audio source wrapping FFmpeg. |
 | `playback.py` | Voice connection, download-and-queue, playlists, and the chain that advances from track to track. |
 | `controls.py` | The `control_*` functions shared by Discord commands and the web page. |
@@ -41,7 +42,7 @@ Controls never choose the next track themselves. They set a pending action under
 
 ### Controls and the web API
 
-Next, previous, pause, resume, remove, move, add, seek, jump and crossfade are shared between Discord and the page. They raise one error type carrying an HTTP status and an English message, shown in Discord and on the page. Added URLs must be YouTube hosts (rebuilt into a canonical URL) or Spotify links, which avoids server-side request forgery through yt-dlp.
+Next, previous, pause, resume, remove, move, add, seek, jump and crossfade are shared between Discord and the page. They raise one error type carrying an HTTP status and an English message, shown in Discord and on the page. Added URLs must be YouTube, SoundCloud or Bandcamp hosts (rebuilt into a canonical URL) or Spotify, Deezer or Apple Music links, which avoids server-side request forgery through yt-dlp.
 
 The page uses these routes:
 

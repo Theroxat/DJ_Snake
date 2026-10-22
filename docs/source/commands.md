@@ -25,7 +25,9 @@ You must be in a voice channel. The bot joins it, posts the clip page link and a
 - **A radio or mix link** (a video inside a playlist) makes the bot ask, with buttons, whether to play the single track or the whole list. If nobody answers in time it plays the single track.
 - **A Spotify link** (`/playlist/`, `/album/` or `/track/`) is matched to YouTube videos. See [Spotify](spotify.md).
 
-Only YouTube and Spotify hosts are accepted. Without a link, the bot answers with a usage message.
+- **A SoundCloud or Bandcamp link** (track, set or album) is downloaded from the platform; **a Deezer or Apple Music link** is matched to YouTube like Spotify. See [More sources](sources.md).
+
+The clip page's add box accepts only YouTube, SoundCloud, Bandcamp, Spotify, Deezer and Apple Music hosts. Without a link, the bot answers with a usage message.
 
 ### `!list`
 

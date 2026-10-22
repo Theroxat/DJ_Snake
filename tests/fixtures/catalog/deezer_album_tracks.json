@@ -1,0 +1,9 @@
+{
+  "data": [
+    {"id": 3135553, "readable": true, "title": "One More Time", "title_short": "One More Time", "duration": 320, "artist": {"id": 27, "name": "Daft Punk", "type": "artist"}, "type": "track"},
+    {"id": 3135554, "readable": false, "title": "Unavailable In Your Country", "duration": 200, "artist": {"id": 27, "name": "Daft Punk", "type": "artist"}, "type": "track"},
+    {"id": 3135555, "readable": true, "title": "Aerodynamic", "title_short": "Aerodynamic", "duration": 212, "artist": {"id": 27, "name": "Daft Punk", "type": "artist"}, "type": "track"},
+    {"id": 3135556, "readable": true, "title": "", "duration": 100, "artist": {"id": 27, "name": "Daft Punk"}, "type": "track"}
+  ],
+  "total": 4
+}

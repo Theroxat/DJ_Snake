@@ -4,9 +4,9 @@ import asyncio
 import time
 import types
 
-from . import media, spotify, state
+from . import catalog, media, spotify, state
 from .config import MAX_PLAYLIST_SIZE, PREVIOUS_RESTART_SECONDS
-from .media import parse_youtube_url
+from .media import parse_media_url
 from .playback import (
     cancelled,
     download_and_queue_song,
@@ -59,8 +59,24 @@ class ControlError(Exception):
         "bad_index": (400, "Invalid position."),
         "bad_url": (
             400,
-            "Only YouTube (video or playlist) and Spotify (track, album or "
-            "playlist) links are accepted.",
+            "Only YouTube, SoundCloud and Bandcamp links (track or playlist) and "
+            "Spotify, Deezer and Apple Music (track, album or playlist) links "
+            "are accepted.",
+        ),
+        "short_link": (
+            400,
+            "Short share links are not supported: open it and copy the full "
+            "address.",
+        ),
+        "link_not_found": (
+            404,
+            "That playlist, album or track was not found (private or deleted?).",
+        ),
+        "link_empty": (400, "That link has no tracks."),
+        "link_unreadable": (
+            502,
+            "Could not read that link right now (the service may be unreachable "
+            "or have changed its page).",
         ),
         "spotify_short_link": (
             400,
@@ -239,19 +255,19 @@ async def control_add(player, guild_id, url):
     """Validate a link and download it in the background. A Spotify link's
     track list is read first, so its errors reach the caller."""
     try:
-        spotify_ref = spotify.check_url(url)
+        link = catalog.check_link(url)
     except spotify.SpotifyError as e:
         raise ControlError(e.code)
-    if spotify_ref is not None:
+    if link is not None:
         if not player.in_voice():
             raise ControlError("not_in_voice")
         epoch = player.epoch
-        tracks = await read_spotify(*spotify_ref)
+        tracks = await read_spotify(*link)
         if player.epoch != epoch:
             return  # Stopped or reset while the link was being read
-        _background(_add_spotify_from_web(player, guild_id, spotify_ref[0], tracks))
+        _background(_add_spotify_from_web(player, guild_id, link[0], tracks))
         return
-    parsed = parse_youtube_url(url)
+    parsed = parse_media_url(url)
     if parsed is None:
         raise ControlError("bad_url")
     if not player.in_voice():
@@ -260,16 +276,16 @@ async def control_add(player, guild_id, url):
     _background(_add_from_web(player, guild_id, kind, clean_url))
 
 
-async def read_spotify(kind, spotify_id):
-    """Track list of a Spotify link (up to MAX_PLAYLIST_SIZE). Raises
-    ControlError with the reason it cannot be read."""
+async def read_spotify(kind, ref, provider="spotify"):
+    """Track list of a Spotify, Deezer or Apple Music link (up to
+    MAX_PLAYLIST_SIZE). Raises ControlError with the reason it cannot be read."""
     loop = asyncio.get_running_loop()
     try:
         return await loop.run_in_executor(
-            None, spotify.get_tracks, kind, spotify_id, MAX_PLAYLIST_SIZE
+            None, catalog.get_tracks, provider, kind, ref, MAX_PLAYLIST_SIZE
         )
     except spotify.SpotifyError as e:
-        print(f"Spotify {kind} {spotify_id}: {e}")
+        print(f"{provider} {kind} {ref}: {e}")
         raise ControlError(e.code)
 
 

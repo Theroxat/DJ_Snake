@@ -6,7 +6,7 @@ import math
 import discord
 from discord.ext import commands
 
-from . import media, spotify, state
+from . import catalog, media, spotify, state
 from .config import (
     COMMAND_PREFIX,
     MAX_PLAYLIST_SIZE,
@@ -94,7 +94,7 @@ async def play(ctx, url: str = None):
         return
 
     try:
-        spotify_ref = spotify.check_url(url)
+        spotify_ref = catalog.check_link(url)  # Spotify, Deezer or Apple Music
     except spotify.SpotifyError as e:
         await ctx.send(f"❌ {ControlError(e.code).message}")
         return
@@ -173,15 +173,16 @@ async def play(ctx, url: str = None):
         await ctx.send(f"❌ An error occurred: {str(e)}")
 
 
-async def _play_spotify(ctx, player, kind, spotify_id):
-    """!play with a Spotify link: read its track list, then queue the
-    YouTube match of each track."""
+async def _play_spotify(ctx, player, kind, ref, provider="spotify"):
+    """!play with a Spotify, Deezer or Apple Music link: read its track list,
+    then queue the YouTube match of each track."""
     try:
         await ack(ctx)
-        player.load_line, player.load_final = "🔎 Reading the Spotify link…", False
+        label = catalog.LABELS[provider]
+        player.load_line, player.load_final = f"🔎 Reading the {label} link…", False
         refresh_panel(player)
         try:
-            tracks = await read_spotify(kind, spotify_id)
+            tracks = await read_spotify(kind, ref, provider)
         finally:
             player.load_line = None
             refresh_panel(player)

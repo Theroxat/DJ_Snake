@@ -27,6 +27,7 @@
 
 ## Features
 
+- **SoundCloud, Bandcamp, Deezer and Apple Music links.** SoundCloud and Bandcamp tracks and sets play directly (the page shows the artwork); Deezer and Apple Music tracks, albums and playlists are matched on YouTube like Spotify, with no account or API key (see [More sources](docs/source/sources.md)).
 - **Spotify playlists, albums and tracks.** Paste a link and the bot finds every song on YouTube, preferring the official music video, with no Spotify account or API key needed (see [Spotify links](#spotify-links)).
 - YouTube URLs and playlists. Tracks are fully downloaded before they play (no streaming).
 - Independent queue per server.
@@ -71,7 +72,7 @@ The prefix is `!` by default (`COMMAND_PREFIX`).
 
 | Command | Description |
 | --- | --- |
-| `!play <YouTube or Spotify link>` | Join your voice channel and queue a YouTube video or playlist, or a Spotify playlist, album or track. |
+| `!play <link>` | Join your voice channel and queue a YouTube video or playlist, a SoundCloud or Bandcamp track or set, or a Spotify, Deezer or Apple Music playlist, album or track. |
 | `!list` | Show the current queue. |
 | `!next` | Skip to the next track. |
 | `!pause` / `!resume` | Pause or resume playback. |
@@ -201,7 +202,7 @@ YouTube breaks yt-dlp extractors every few weeks, usually showing up as `HTTP Er
 
 ## Limits and disclaimer
 
-- YouTube only (Spotify links are matched to YouTube videos), at most 720p, and playlists are capped at `MAX_PLAYLIST_SIZE`.
+- YouTube, SoundCloud and Bandcamp audio only (Spotify, Deezer and Apple Music links are matched to YouTube videos), at most 720p, and playlists are capped at `MAX_PLAYLIST_SIZE`.
 - This project is for personal use. Respect YouTube's Terms of Service and the copyright of the content you play; you are responsible for how you use it.
 
 ## Demo site
