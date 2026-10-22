@@ -54,6 +54,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   open the clip link. Web controls and Discord commands drive one shared fake
   session, so each side follows the other. The clip page alone is still at
   `demo/player.html`.
+- Clip page redesign, shared by every theme: the video, title, seek bar and
+  controls form one player block (play/pause centered between previous and
+  next, with a knob on the seek bar), the playing track's artwork glows softly
+  behind it (strength set per theme, off in Terminal), the link box now sits on
+  top of "Up next", queue rows are lighter, and the header is sticky on wide
+  screens. The Minimal theme uses Geist instead of Inter. The "Downloading"
+  list style no longer leaks onto the stats heatmap's day labels.
 
 ## [1.1.0] - 2026-10-17
 
