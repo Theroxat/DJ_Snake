@@ -48,6 +48,11 @@ THEMES_FILE = os.path.join(DATA_DIR, "themes.json")
 LOGO_DIR = os.path.join(DATA_DIR, "logos")
 # Listening statistics (stats.py): SQLite, written by one background thread.
 STATS_DB = os.path.join(DATA_DIR, "stats.db")
+# Saved playlists (playlists.py): SQLite, per guild. Only links and titles.
+PLAYLISTS_DB = os.path.join(DATA_DIR, "playlists.db")
+MAX_SAVED_PLAYLISTS = 50  # Per guild
+MAX_SAVED_TRACKS = 200  # Per playlist
+SAVED_PLAYLIST_NAME_MAX = 32
 # A track left (next, jump, previous, !stop) before this much actual play
 # counts as skipped.
 SKIP_SECONDS = 30.0

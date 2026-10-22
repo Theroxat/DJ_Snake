@@ -4,8 +4,14 @@ import asyncio
 import time
 import types
 
-from . import media, spotify, state
-from .config import MAX_PLAYLIST_SIZE, PREVIOUS_RESTART_SECONDS
+from . import media, playlists, spotify, state
+from .config import (
+    MAX_PLAYLIST_SIZE,
+    MAX_SAVED_PLAYLISTS,
+    MAX_SAVED_TRACKS,
+    PREVIOUS_RESTART_SECONDS,
+    SAVED_PLAYLIST_NAME_MAX,
+)
 from .media import parse_youtube_url
 from .playback import (
     cancelled,
@@ -78,6 +84,33 @@ class ControlError(Exception):
             "Could not read that Spotify link right now (Spotify may have "
             "changed its page).",
         ),
+        "bad_playlist_name": (
+            400,
+            f"Invalid playlist name: use up to {SAVED_PLAYLIST_NAME_MAX} letters, "
+            "digits, spaces or . ' & ! + ( ) -",
+        ),
+        "playlist_not_found": (404, "No saved playlist has that name."),
+        "playlist_exists": (
+            409,
+            "A playlist with that name already exists. Only its creator or a "
+            "member with Manage Server can replace it.",
+        ),
+        "playlist_forbidden": (
+            403,
+            "Only the creator of a playlist or a member with Manage Server "
+            "can delete it.",
+        ),
+        "playlist_limit": (
+            409,
+            f"This server already has {MAX_SAVED_PLAYLISTS} saved playlists. "
+            "Delete one first.",
+        ),
+        "playlist_full": (
+            409,
+            f"A playlist holds at most {MAX_SAVED_TRACKS} tracks.",
+        ),
+        "playlist_empty": (400, "There is nothing to save: no track is queued."),
+        "playlist_unavailable": (500, "Could not reach the playlist storage."),
     }
 
     def __init__(self, code):
@@ -322,6 +355,95 @@ async def _add_from_web(player, guild_id, kind, url):
                 await queue_playlist(ctx, player, entries, from_web=True)
     except Exception as e:
         print(f"Web add failed: {e}")
+    finally:
+        player.loading_jobs = max(0, player.loading_jobs - 1)
+    if not player.is_playing and not cancelled(player, epoch):
+        await play_next(ctx)
+
+
+# --- Saved playlists (storage in playlists.py) ------------------------------
+
+
+async def _playlist_call(fn, *args, **kwargs):
+    try:
+        return await playlists.run(fn, *args, **kwargs)
+    except playlists.PlaylistError as e:
+        raise ControlError(e.code)
+
+
+def _current_and_queue(player):
+    tracks = [player.now_playing] if player.now_playing else []
+    return tracks + list(player.queue)
+
+
+async def control_playlist_save(player, guild_id, name, author_id=None, is_admin=False):
+    """Save the current track and the queue as a playlist. Returns
+    {name, count}."""
+    return await _playlist_call(
+        playlists.save,
+        guild_id,
+        name,
+        _current_and_queue(player),
+        creator_id=author_id,
+        is_admin=is_admin,
+    )
+
+
+async def control_playlist_add(player, guild_id, name):
+    """Add the current track to a saved playlist. Returns {name, count}."""
+    if not player.now_playing:
+        raise ControlError("nothing_playing")
+    return await _playlist_call(playlists.add_track, guild_id, name, player.now_playing)
+
+
+async def control_playlist_get(guild_id, name):
+    """A saved playlist: {name, creator_id, tracks}."""
+    return await _playlist_call(playlists.get, guild_id, name)
+
+
+async def control_playlist_list(guild_id):
+    return await _playlist_call(playlists.list_all, guild_id)
+
+
+async def control_playlist_delete(guild_id, name, author_id=None, is_admin=False):
+    """Returns the deleted playlist's name."""
+    return await _playlist_call(
+        playlists.delete, guild_id, name, user_id=author_id, is_admin=is_admin
+    )
+
+
+def playlist_entries(playlist):
+    """A saved playlist as the entries queue_playlist() takes. Links are
+    checked again: only YouTube videos are downloaded."""
+    entries = []
+    for track in playlist["tracks"]:
+        parsed = parse_youtube_url(track["url"])
+        if parsed is not None and parsed[0] == "single":
+            entries.append({"url": parsed[1], "title": track["title"]})
+    return entries
+
+
+async def control_playlist_load(player, guild_id, name):
+    """Queue a saved playlist from the web page (the bot must be in voice);
+    its tracks download in the background. Returns the playlist."""
+    if not player.in_voice():
+        raise ControlError("not_in_voice")
+    playlist = await control_playlist_get(guild_id, name)
+    entries = playlist_entries(playlist)
+    if not entries:
+        raise ControlError("playlist_empty")
+    _background(_load_playlist_from_web(player, guild_id, entries))
+    return playlist
+
+
+async def _load_playlist_from_web(player, guild_id, entries):
+    ctx = WebContext(guild_id, player)
+    epoch = player.epoch
+    player.loading_jobs += 1  # Keeps the bot in voice, as in _add_from_web
+    try:
+        await queue_playlist(ctx, player, entries, from_web=True)
+    except Exception as e:
+        print(f"Web playlist load failed: {e}")
     finally:
         player.loading_jobs = max(0, player.loading_jobs - 1)
     if not player.is_playing and not cancelled(player, epoch):

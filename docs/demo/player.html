@@ -711,6 +711,15 @@ ol.dl { background: color-mix(in srgb, var(--surface) 55%, transparent); box-sha
 .addform input::placeholder { color: var(--muted); }
 .addform input:disabled { opacity: .4; }
 .addform button { min-height: 42px; flex: none; padding: 6px 18px; background: var(--accent); color: var(--on-accent); border-color: var(--pp-border); }
+.addform select {
+  flex: 1 1 auto; min-width: 0; min-height: 42px; background: transparent; color: var(--text);
+  border: 0; border-radius: var(--radius-btn); padding: 6px 10px; font: 400 14px var(--font-body);
+}
+.addform select option { background: var(--surface); color: var(--text); }
+.addform select:disabled { opacity: .4; }
+.plform { flex-wrap: wrap; }
+.plform button { padding: 6px 14px; }
+.plform #plsave { background: transparent; color: var(--text); border-color: var(--border); }
 [data-shape="arcade"] .addform { margin-right: 4px; }
 [data-shape="arcade"] .addform button { box-shadow: 4px 4px 0 var(--accent-2); }
 
@@ -1015,6 +1024,11 @@ html.demo-embedded .demo-ribbon { display: none; }
       <form id="addform" class="addform" autocomplete="off">
         <input id="addurl" type="text" inputmode="url" placeholder="Paste a YouTube or Spotify link…" aria-label="YouTube or Spotify link to add" disabled>
         <button id="addbtn" type="submit" aria-label="Add to queue" disabled>Add</button>
+      </form>
+      <form id="plform" class="addform plform" autocomplete="off">
+        <select id="plpick" aria-label="Saved playlist" disabled><option value="">No saved playlists</option></select>
+        <button id="plload" type="submit" aria-label="Load the selected playlist into the queue" disabled>Load</button>
+        <button id="plsave" type="button" aria-label="Save the current track and queue as a playlist" disabled>Save queue</button>
       </form>
       <ol id="queue" aria-label="Queue"></ol>
       <div id="queueempty" class="empty">The queue is empty. Paste a link above to add a track.</div>
@@ -1969,6 +1983,9 @@ html.demo-embedded .demo-ribbon { display: none; }
     dis("addurl", !inVoice);
     dis("addbtn", !inVoice || pending.has("add"));
     dis("xfade", !inVoice || pending.has("crossfade"));
+    dis("plpick", $("plpick").options.length < 2);
+    dis("plload", !inVoice || !$("plpick").value || pending.has("load_playlist"));
+    dis("plsave", !inVoice || !state || pending.has("save_playlist"));
     $("xfade").setAttribute("aria-checked", String(xfade));
     const pp = $("pp");
     pp.setAttribute("aria-label", paused ? "Resume" : "Pause");
@@ -1996,6 +2013,8 @@ html.demo-embedded .demo-ribbon { display: none; }
       if (r.ok && j && j.ok) {
         ok = true;
         if (action === "add") toast("Added \u2014 downloading\u2026", "ok");
+        if (action === "load_playlist") toast("Playlist loading\u2026", "ok");
+        if (action === "save_playlist") { toast("Playlist saved.", "ok"); loadPlaylists(); }
       } else {
         toast((j && j.error) || "Action failed (error " + r.status + ").", "err");
       }
@@ -2025,6 +2044,41 @@ html.demo-embedded .demo-ribbon { display: none; }
     if (!url || !inVoice || pending.has("add")) return;
     if (await send("add", { url })) inp.value = "";
   });
+
+  // ---- saved playlists: a picker (GET .../playlists) plus save/load controls
+  async function loadPlaylists() {
+    try {
+      const r = await fetch("/api/" + encodeURIComponent(sid) + "/playlists", { cache: "no-store" });
+      if (!r.ok) return;
+      const list = (await r.json()).playlists || [];
+      const pick = $("plpick"), keep = pick.value;
+      pick.textContent = "";
+      const first = document.createElement("option");
+      first.value = "";
+      first.textContent = list.length ? "Saved playlists…" : "No saved playlists";
+      pick.appendChild(first);
+      list.forEach((p) => {
+        const o = document.createElement("option");
+        o.value = p.name;
+        o.textContent = p.name + " (" + p.tracks + ")";
+        if (p.name === keep) o.selected = true;
+        pick.appendChild(o);
+      });
+      updateControls();
+    } catch (e) {}
+  }
+  $("plpick").addEventListener("change", updateControls);
+  $("plform").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = $("plpick").value;
+    if (name && inVoice && !pending.has("load_playlist")) send("load_playlist", { name });
+  });
+  $("plsave").addEventListener("click", () => {
+    if (!inVoice || pending.has("save_playlist")) return;
+    const name = (window.prompt("Name for this playlist (current track and queue):") || "").trim();
+    if (name) send("save_playlist", { name });
+  });
+  loadPlaylists();
 
   // ---- live viewers: a random id per tab, kept for the tab's lifetime
   const VIEWER_RE = /^[A-Za-z0-9_-]{8,40}$/;

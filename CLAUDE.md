@@ -115,6 +115,8 @@ Module map, lowest layer first (each imports only the ones above it):
 - `stats.py`: listening stats in SQLite (`record_play()`,
   `record_session()`, `record_listeners()`, `summary()`, `guess_artist()`),
   written by one background thread. Imports only `config`.
+- `playlists.py`: saved playlists in SQLite (`{DATA_DIR}/playlists.db`, see
+  Saved playlists). Imports only `config`.
 - `player.py`: `MusicPlayer`, `discard_tracks()`, `file_in_use()`,
   `push_history()`, `retire_play()`, `guild_of()`.
 - `sessions.py`: session expiry (`touch()`, `session_player()`,
@@ -221,6 +223,25 @@ Module map, lowest layer first (each imports only the ones above it):
   `play_next()` from disconnecting when the queue briefly runs empty during
   that loading. `!stop` sets `should_stop` and bumps `epoch`, which every
   download step checks, and deletes queue, current and history files.
+- **Saved playlists** (`playlists.py`, `{DATA_DIR}/playlists.db`, WAL, schema
+  in `PRAGMA user_version`): tables `playlists` (guild_id, case-folded `key`
+  unique per guild, display `name`, `creator_id` NULL when saved from the
+  page) and `playlist_tracks` (position, url, title, duration; cascade
+  delete). Only links and titles are stored; loading re-downloads through
+  `queue_playlist()`, links re-checked with `parse_youtube_url()`. Unlike
+  stats, a failed write must reach the user, so there is no writer thread:
+  each blocking function opens its own connection and runs through
+  `playlists.run()` in an executor (`BEGIN IMMEDIATE` for writes); storage
+  errors become `ControlError` `playlist_unavailable`. Caps in `config.py`:
+  `MAX_SAVED_PLAYLISTS` 50 per guild, `MAX_SAVED_TRACKS` 200,
+  `SAVED_PLAYLIST_NAME_MAX` 32; names match `^\w[\w .'&!+()-]*$`. Controls:
+  `control_playlist_save/add/get/list/delete/load` (`PlaylistError` codes are
+  `ControlError` codes). Replacing or deleting needs the creator or Manage
+  Server (`!playlist` passes `is_admin`); the page has no identity, so it can
+  only create new names and load. Commands: `!playlist save|add|load|show|
+  delete <name>`, `!playlist list`. Web: `GET /api/{sid}/playlists` ->
+  `{playlists: [{name, tracks, duration}]}`, control actions `save_playlist`
+  and `load_playlist` (`name`; load answers 202). Tests: `tests/test_playlists.py`.
 - **Spotify links** (`spotify.py`): `check_url()` accepts only
   `open.spotify.com` (`play.spotify.com`) paths `[/intl-xx][/embed]/{playlist|album|track}/{id}`
   and `spotify:{kind}:{id}` URIs, with a 22-char base62 id; anything else on
@@ -381,7 +402,7 @@ Module map, lowest layer first (each imports only the ones above it):
   session). `join_voice_channel()` wraps it. `!reset` forces a reconnect.
 - **Commands**: `!play` (YouTube or Spotify link), `!list`, `!next`, `!pause`, `!resume`, `!seek`
   (position relative to the track's automix `start`, as the page shows it),
-  `!crossfade on|off`, `!stop`, `!reset`, `!theme [preset|reset|edit]`
+  `!crossfade on|off`, `!playlist ...`, `!stop`, `!reset`, `!theme [preset|reset|edit]`
   (Manage Server permission via `commands.has_guild_permissions`).
 - Voice needs `PyNaCl`, `davey` (DAVE encryption, required by discord.py 2.7+)
   and, on Python 3.13+, `audioop-lts`. The Docker image uses Python 3.12. CI

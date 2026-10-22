@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Saved playlists per server: `!playlist save|add|load|show|delete <name>` and `!playlist list`, kept in `playlists.db` under `DATA_DIR` (links and titles only, up to 50 playlists of 200 tracks). The clip page can save the queue and load a playlist (`GET /api/{sid}/playlists`, `save_playlist` and `load_playlist` control actions).
+
 ## [1.3.0] - 2026-10-22
 
 ### Added

@@ -44,7 +44,7 @@
   const realFetch = window.fetch.bind(window);
   window.fetch = async (input, init) => {
     const url = typeof input === "string" ? input : input.url;
-    const m = /\/api\/[^/]+\/(state|stats|control|theme(?:\/logo)?)(?:\?|$)/.exec(url);
+    const m = /\/api\/[^/]+\/(state|stats|control|playlists|theme(?:\/logo)?)(?:\?|$)/.exec(url);
     if (!m) return realFetch(input, init);
     const method = ((init && init.method) || "GET").toUpperCase();
     let body = null;

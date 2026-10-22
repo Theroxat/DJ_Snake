@@ -10,6 +10,7 @@ Commands are text messages sent in a server channel. The prefix is `!` by defaul
 | `!pause` / `!resume` | Pause or resume playback. |
 | `!seek <pos>` | Jump to a position in the track, in seconds or `mm:ss`, as the clip page shows it. |
 | `!crossfade on\|off` | Enable or disable crossfade for this session (off by default). |
+| `!playlist save\|add\|load\|show\|delete <name>`, `!playlist list` | Saved playlists for the server: links and titles kept across restarts, downloaded again when loaded. |
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
 | `!theme [preset\|reset\|edit]` | Show or set the clip page's default theme for the server. `edit` DMs you a private editor link. Needs the Manage Server permission. |
@@ -46,6 +47,18 @@ Jumps to a position in seconds (`90`) or as `mm:ss` (`1:30`). The position is re
 ### `!crossfade on|off`
 
 Turns crossfade on or off for the current session. When on, tracks fade out for 6 seconds and the next track fades in over the end of the previous one. It only overlaps when both tracks are long enough (at least 15 seconds of music each); otherwise tracks follow each other as usual. Off by default.
+
+### `!playlist`
+
+Saved playlists belong to the server and survive restarts. Only the YouTube link, title and duration of each track are stored, never the media: loading a playlist downloads its tracks again. Names are case-insensitive, up to 32 characters (letters, digits, spaces and `. ' & ! + ( ) -`). A server holds up to 50 playlists of up to 200 tracks each.
+
+- `!playlist save <name>` saves the current track and the queue. Saving over an existing name replaces it, but only its creator or a member with Manage Server can do that.
+- `!playlist add <name>` appends the current track to an existing playlist.
+- `!playlist load <name>` joins your voice channel and queues every track, loading them one at a time like a YouTube playlist.
+- `!playlist list` shows the server's playlists, and `!playlist show <name>` the tracks of one.
+- `!playlist delete <name>` deletes a playlist. Only its creator or a member with Manage Server can.
+
+The [clip page](clip-page.md) can also save the queue and load a playlist.
 
 ### `!stop`
 

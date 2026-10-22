@@ -21,7 +21,8 @@ The page shows the current video, the queue ("Up next"), a "Now playing" row, tr
 - play a queued track now (jump);
 - remove or reorder queued tracks by dragging;
 - add YouTube or [Spotify](spotify.md) links;
-- toggle crossfade.
+- toggle crossfade;
+- save the current track and queue as a playlist, or load a saved one (see `!playlist` in [Commands](commands.md)).
 
 Web actions are applied exactly like Discord commands and are reflected in the status message. The header shows how many people have the page open and a chart button that opens the server's listening stats.
 
