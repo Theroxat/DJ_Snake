@@ -468,6 +468,8 @@ async def _advance(ctx, player):
         if finished:
             push_history(player, finished)
         next_track = player.next_in_queue()
+        if next_track is None and finished and autoplay_wanted(player):
+            next_track = await _take_autoplay(player, finished)
 
     while next_track is not None and not os.path.exists(next_track["filepath"]):
         await ctx.send(f"❌ File not found for {next_track['title']}")
@@ -520,6 +522,7 @@ async def _advance(ctx, player):
             )
 
     player.cancel_idle()  # Something plays again: no more leaving
+    player.note_played(next_track)
     player.now_playing = next_track
     player.is_playing = True
     offset, audio_source, frames, fade_frames = open_track_source(
@@ -543,7 +546,113 @@ async def _advance(ctx, player):
         player.voice_client.pause()
         player.paused_at = now
     player.last_active = state.clock()
+    prefetch_autoplay(ctx, player)
     refresh_panel(player)
+
+
+def autoplay_wanted(player):
+    """Autoplay may pick the next track: on, no loop mode, not stopping."""
+    return player.autoplay and not player.loop_active() and not player.should_stop
+
+
+def _autoplay_seed(player, finished=None):
+    track = finished or player.now_playing
+    if track and track.get("video_id"):
+        return track["video_id"]
+    return player.recent_ids[-1] if player.recent_ids else None
+
+
+def _autoplay_exclude(player):
+    """Video ids autoplay must not pick: recently played, playing, queued."""
+    ids = set(player.recent_ids)
+    for track in [player.now_playing, *player.queue, *player.history]:
+        if track and track.get("video_id"):
+            ids.add(track["video_id"])
+    return ids
+
+
+async def _find_autoplay(player, seed, epoch):
+    """Pick a track related to video `seed` and download it. Returns the
+    track (marked `autoplay`) or None. Never blocks the event loop."""
+    loop = asyncio.get_running_loop()
+    try:
+        candidates = await loop.run_in_executor(None, media.related_tracks, seed)
+    except Exception as e:
+        print(f"Autoplay: could not read related tracks: {e}")
+        return None
+    picks = media.choose_related(candidates, _autoplay_exclude(player))
+    for entry in picks[: config.AUTOPLAY_TRIES]:
+        if cancelled(player, epoch):
+            return None
+        url = f"https://www.youtube.com/watch?v={entry['id']}"
+        try:
+            track = await loop.run_in_executor(None, media.download_media, url)
+        except Exception as e:
+            print(f"Autoplay: download failed: {e}")
+            continue
+        duration = track.get("duration")
+        if cancelled(player, epoch) or (
+            duration and duration > config.AUTOPLAY_MAX_SECONDS
+        ):
+            discard_tracks([track])  # Unknown length turned out too long
+            continue
+        track["autoplay"] = True
+        track["requester"] = "Autoplay"
+        track.setdefault("video_id", entry["id"])
+        return track
+    return None
+
+
+async def _prefetch_autoplay(player, seed, epoch):
+    track = await _find_autoplay(player, seed, epoch)
+    if track is None:
+        return
+    if cancelled(player, epoch) or not autoplay_wanted(player):
+        discard_tracks([track])
+        return
+    player.drop_autoplay_next()
+    player.autoplay_next = track
+
+
+def prefetch_autoplay(ctx, player):
+    """While the last queued track plays, prepare the autoplay pick so the
+    switch has no gap. A no-op unless autoplay is on and the queue is empty."""
+    task = player.autoplay_task
+    if (
+        not autoplay_wanted(player)
+        or player.queue
+        or player.autoplay_next
+        or (task is not None and not task.done())
+        or not player.in_voice()
+    ):
+        return
+    seed = _autoplay_seed(player)
+    if not seed:
+        return
+    task = asyncio.get_running_loop().create_task(
+        _prefetch_autoplay(player, seed, player.epoch)
+    )
+    player.autoplay_task = task
+    state.background_tasks.add(task)
+    task.add_done_callback(state.background_tasks.discard)
+
+
+async def _take_autoplay(player, finished):
+    """The track autoplay continues with (prepared, being prepared or found
+    now), or None: the caller then lingers idle. Runs under player.lock."""
+    epoch = player.epoch
+    task = player.autoplay_task
+    waited = task is not None and not task.done()
+    if waited:
+        await asyncio.shield(task)
+    track, player.autoplay_next = player.autoplay_next, None
+    if track is None and not waited:
+        seed = _autoplay_seed(player, finished)
+        track = await _find_autoplay(player, seed, epoch) if seed else None
+    if track is not None and (cancelled(player, epoch) or not autoplay_wanted(player)):
+        discard_tracks([track])
+        return None
+    return track
 
 
 def channel_empty(player):
@@ -662,6 +771,7 @@ async def _start_crossfade(player, mixer, gen):
             player.queue.remove(upcoming)
             retire_play(player, guild_of(player), None)
             push_history(player, current)
+            player.note_played(upcoming)
             player.now_playing = upcoming
             player.started_at = time.monotonic() - offset
             player.paused_at = None

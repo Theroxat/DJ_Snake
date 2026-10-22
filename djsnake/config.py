@@ -42,6 +42,13 @@ SESSION_CLEANUP_SECONDS = 600
 # human left) cuts the wait to EMPTY_CHANNEL_GRACE_SECONDS.
 IDLE_DISCONNECT_SECONDS = max(0.0, float(os.getenv("IDLE_DISCONNECT_SECONDS", "300")))
 EMPTY_CHANNEL_GRACE_SECONDS = 30.0
+# Autoplay ("radio"): default of the per-session setting, off unless AUTOPLAY is
+# 1/true/on/yes. When the queue runs out, a related YouTube track plays on.
+AUTOPLAY = os.getenv("AUTOPLAY", "0").strip().lower() in ("1", "true", "on", "yes")
+AUTOPLAY_MAX_SECONDS = 600  # Longer tracks (mixes, albums, podcasts) are skipped
+AUTOPLAY_HISTORY = 50  # Recently played video ids that autoplay never repeats
+AUTOPLAY_CANDIDATES = 30  # Entries read from the related "RD<id>" mix
+AUTOPLAY_TRIES = 3  # Candidates downloaded before giving up
 # Persistent data (survives restarts): per-guild web page themes and logos.
 DATA_DIR = os.getenv("DATA_DIR") or "/app/data"
 THEMES_FILE = os.path.join(DATA_DIR, "themes.json")

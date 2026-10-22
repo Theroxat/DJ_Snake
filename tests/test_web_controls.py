@@ -22,6 +22,7 @@ STATE_KEYS = {
     "paused",
     "can_previous",
     "crossfade",
+    "autoplay",
     "crossfading",
     "server_time",
     "viewers",
@@ -41,8 +42,9 @@ NOW_PLAYING_KEYS = {
     "elapsed",
     "start",
     "end",
+    "autoplay",
 }
-QUEUE_KEYS = {"id", "title", "duration", "thumbnail", "url"}
+QUEUE_KEYS = {"id", "title", "duration", "thumbnail", "url", "autoplay"}
 
 
 @pytest.fixture

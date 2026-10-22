@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Autoplay ("radio"): `!autoplay [on|off]`, a switch on the clip page and the `AUTOPLAY` default. When the queue runs out, a track related to the last one (YouTube's `RD<id>` mix) is prepared during playback and plays next; recent tracks, live streams, tracks over 10 minutes and non-music titles are skipped, and the bot lingers idle when nothing is found. Loop modes take precedence. Autoplay tracks are marked in the status panel and on the page.
+
 ## [1.3.0] - 2026-10-22
 
 ### Added

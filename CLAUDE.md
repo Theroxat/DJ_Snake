@@ -95,7 +95,7 @@ which is no longer read), `TEMP_DIR`, `POT_BASE_URL`, `WEB_PORT` (47823),
 `127.0.0.1`; set a LAN IP or `0.0.0.0` for a reverse proxy or tunnel),
 `PUBLIC_BASE_URL` (e.g. `https://dj.example.com`; empty falls back to
 `http://localhost:WEB_PORT`), `SESSION_IDLE_HOURS` (6), `IDLE_DISCONNECT_SECONDS` (300, the idle linger
-before leaving voice once the queue runs out), `DATA_DIR`
+before leaving voice once the queue runs out), `AUTOPLAY` (0, default of the per-session autoplay), `DATA_DIR`
 (`/app/data`, mounted from `./data` by Compose; the container's UID 1000 must
 be able to write it), `WEB_THEME` (`arcade`, the theme of guilds that never
 chose one), `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` (optional, both
@@ -186,6 +186,25 @@ Module map, lowest layer first (each imports only the ones above it):
   `!stop` (`stop_and_clear()`), `!reset`, a kick and session expiry cancel
   it (`player.cancel_idle()`). The panel shows "💤 Queue empty — leaving in
   …". The demo backend lingers 60 s.
+- **Autoplay** (`player.autoplay`, per session, default `config.AUTOPLAY`; `!autoplay
+  [on|off]` or the web `autoplay` action, `control_autoplay()`): when `_advance()`
+  finds the queue empty after a track that ended or was skipped and
+  `autoplay_wanted()` (on, `player.loop_active()` false, no stop), it continues
+  with `_take_autoplay()` instead of the idle linger. The pick is prepared while
+  the last track plays (`prefetch_autoplay()`, a task in `player.autoplay_task`,
+  result in `player.autoplay_next`, a downloaded track not in the queue and kept by
+  `file_in_use()`/`stop_and_clear()`/expiry/`!reset`); `_take_autoplay()` awaits a
+  running prefetch or picks inline. `_find_autoplay()` reads the `RD<video_id>` mix
+  flat (`media.related_tracks()`, executor), `media.choose_related()` drops ids in
+  `player.recent_ids` (last `AUTOPLAY_HISTORY` 50 started tracks, plus
+  playing/queued/history), live streams, entries over `AUTOPLAY_MAX_SECONDS` (600)
+  and non-music titles, then downloads up to `AUTOPLAY_TRIES` candidates (a
+  download over the cap is discarded). The track gets `autoplay: True` and requester
+  `Autoplay`; nothing found means the idle linger. A queued track always wins and
+  the prepared pick waits. The panel shows "📻 Autoplay on" and "📻 Autoplay" on
+  the current line; the state has `autoplay` and `now_playing.autoplay` (queue
+  items carry `autoplay` too). A crossfade only overlaps queued tracks.
+  Tests: `tests/test_autoplay.py` (patch `media.related_tracks`, `media.download_media`).
 - **Crossfade** (`player.crossfade`, per session, off by default; `!crossfade
   on|off` or the web `crossfade` action): tracks then get a 6 s fade-out. When
   the mixer reaches a track's fade-out it calls `on_tail` on the audio thread,
@@ -201,7 +220,7 @@ Module map, lowest layer first (each imports only the ones above it):
   options are exactly the usual ones (1 s in, 4 s out). The state's
   `crossfading` is true while the old track drains; only then does the page
   cross-dissolve its two stacked `<video>`s (skips stay an instant swap).
-- **Controls** (`control_next/previous/pause/resume/remove/move/add/seek/jump/crossfade`) are shared
+- **Controls** (`control_next/previous/pause/resume/remove/move/add/seek/jump/crossfade/autoplay`) are shared
   by Discord commands and the web page and raise `ControlError` (HTTP status and
   one English message, shown on Discord and on the web page). Previous restarts the track
   after 5 s of play or with empty history. Add accepts only YouTube hosts and
@@ -282,9 +301,9 @@ Module map, lowest layer first (each imports only the ones above it):
   `0.0.0.0:WEB_PORT`. Routes, the contract `web/index.html` relies on:
   `GET /` landing text; `GET /{sid}` serves `web/index.html`;
   `GET /api/{sid}/state` returns `{active, in_voice, guild, channel, loading,
-  paused, can_previous, crossfade, crossfading, server_time, viewers, now_playing: {id,
-  title, duration, thumbnail, url, video_url, elapsed, start, end} | null, queue: [{id, title, duration,
-  thumbnail, url}], downloading: [{key, title, source}], downloading_total,
+  paused, can_previous, crossfade, autoplay, crossfading, server_time, viewers, now_playing: {id,
+  title, duration, thumbnail, url, autoplay, video_url, elapsed, start, end} | null, queue: [{id, title, duration,
+  thumbnail, url, autoplay}], downloading: [{key, title, source}], downloading_total,
   theme: {skin, base, bg, text, accent, name, logo_url}}`
   (404 `{"active": false}` when the sid is unknown or
   expired; out of voice, `now_playing` is null and `queue` and `downloading`
@@ -298,8 +317,8 @@ Module map, lowest layer first (each imports only the ones above it):
   `GET /api/{sid}/stats?range=week|month|all` (default week, 400 otherwise,
   404 for an unknown sid) returns `stats.summary()` for the session's guild,
   cached `STATS_CACHE_SECONDS` (15) per guild and range (see Stats). `POST /api/{sid}/control` takes `{action:
-  next|previous|pause|resume|remove|move|add|seek|jump|crossfade, id?, index?,
-  url?, position?, enabled?}` (body <= 4 KB; crossfade takes a boolean
+  next|previous|pause|resume|remove|move|add|seek|jump|crossfade|autoplay, id?, index?,
+  url?, position?, enabled?}` (body <= 4 KB; crossfade and autoplay take a boolean
   `enabled`; seek restarts the track at `position` seconds (file time),
   clamped, staying paused if it was, unannounced; jump plays a queued `id` now)
   and returns 200 `{"ok": true}` (202 for add, which downloads in the
@@ -381,7 +400,7 @@ Module map, lowest layer first (each imports only the ones above it):
   session). `join_voice_channel()` wraps it. `!reset` forces a reconnect.
 - **Commands**: `!play` (YouTube or Spotify link), `!list`, `!next`, `!pause`, `!resume`, `!seek`
   (position relative to the track's automix `start`, as the page shows it),
-  `!crossfade on|off`, `!stop`, `!reset`, `!theme [preset|reset|edit]`
+  `!crossfade on|off`, `!autoplay [on|off]`, `!stop`, `!reset`, `!theme [preset|reset|edit]`
   (Manage Server permission via `commands.has_guild_permissions`).
 - Voice needs `PyNaCl`, `davey` (DAVE encryption, required by discord.py 2.7+)
   and, on Python 3.13+, `audioop-lts`. The Docker image uses Python 3.12. CI

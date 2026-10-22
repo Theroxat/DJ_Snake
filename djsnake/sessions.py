@@ -42,6 +42,7 @@ def expire_session(player):
         player.history.clear()
         player.now_playing = None
         player.pending_downloads = []
+        player.drop_autoplay_next()
         discard_tracks(tracks)
 
 
@@ -133,6 +134,8 @@ def render_panel(player):
         line = f"🎵 Now playing: **{short(player.now_playing['title'])}**"
         if player.paused_at is not None:
             line += " ⏸️ paused"
+        if player.now_playing.get("autoplay"):
+            line += " 📻 Autoplay"
         lines.append(line)
     else:
         lines.append("🎵 Nothing playing yet")
@@ -143,6 +146,8 @@ def render_panel(player):
         lines.append(line)
     if player.crossfade:
         lines.append("🔀 Crossfade on")
+    if player.autoplay:
+        lines.append("📻 Autoplay on")
     if player.load_line:
         lines.append(player.load_line)
     elif len(player.pending_downloads) > 1:

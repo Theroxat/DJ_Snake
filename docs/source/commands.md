@@ -10,6 +10,7 @@ Commands are text messages sent in a server channel. The prefix is `!` by defaul
 | `!pause` / `!resume` | Pause or resume playback. |
 | `!seek <pos>` | Jump to a position in the track, in seconds or `mm:ss`, as the clip page shows it. |
 | `!crossfade on\|off` | Enable or disable crossfade for this session (off by default). |
+| `!autoplay [on\|off]` | Keep playing related tracks when the queue runs out, or show the current setting (off by default, see `AUTOPLAY`). |
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
 | `!theme [preset\|reset\|edit]` | Show or set the clip page's default theme for the server. `edit` DMs you a private editor link. Needs the Manage Server permission. |
@@ -46,6 +47,10 @@ Jumps to a position in seconds (`90`) or as `mm:ss` (`1:30`). The position is re
 ### `!crossfade on|off`
 
 Turns crossfade on or off for the current session. When on, tracks fade out for 6 seconds and the next track fades in over the end of the previous one. It only overlaps when both tracks are long enough (at least 15 seconds of music each); otherwise tracks follow each other as usual. Off by default.
+
+### `!autoplay [on|off]`
+
+Keeps the music going when the queue runs out. With autoplay on, the bot picks a track related to the last one (from YouTube's mix for that video), downloads it while the current track is still playing so there is no gap, and plays it. Tracks played in the last 50, live streams, anything over 10 minutes and titles that look like podcasts, interviews or compilations are skipped. If nothing suitable is found, the bot lingers in voice as usual. A loop mode, when active, takes precedence over autoplay, and a track you queue always plays before an autoplay pick. Without an argument, shows the current setting. Off by default; `AUTOPLAY=1` changes the default. The status message shows "📻 Autoplay on" and marks autoplay tracks.
 
 ### `!stop`
 

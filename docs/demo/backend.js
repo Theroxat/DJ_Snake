@@ -104,7 +104,7 @@
     const S = {
       sid: null, inVoice: false, current: null, queue: [], history: [],
       startedAt: 0, pausedAt: null, pausedTotal: 0,
-      crossfade: false, epoch: 0, jobs: 0, single: 0,
+      crossfade: false, autoplay: false, epoch: 0, jobs: 0, single: 0,
       pending: [], // pending_downloads: {key, title (null: link not read), source}
       loadLine: null, loadFinal: false, lastAction: null,
       theme: { skin: "arcade", base: "night", bg: "#101820", text: "#f2f2f2", accent: "#ffb703", name: "", logo_url: null },
@@ -169,7 +169,12 @@
       S.history = S.history.slice(-5);
       if (standalone) while (S.queue.length < 4) S.queue.push(mkTrack(rot++));
       if (S.queue.length) play(S.queue.shift());
-      else if (S.jobs > 0) S.current = null; // loading: wait for the next track
+      else if (S.autoplay && S.inVoice && S.jobs === 0 && S.current) {
+        // Autoplay: a related track (here: the next one of the catalog).
+        const t = mkTrack(rot++);
+        t.autoplay = true;
+        play(t);
+      } else if (S.jobs > 0) S.current = null; // loading: wait for the next track
       else startIdle(); // queue ended: linger in voice, then leave
       changed();
     }
@@ -334,6 +339,7 @@
         return p;
       },
       crossfade(on) { S.crossfade = !!on; changed(); },
+      autoplay(on) { S.autoplay = !!on; changed(); },
       add(url) {
         if (!S.inVoice) throw new ControlError("not_in_voice");
         queueLink(parseLink(url));
@@ -357,7 +363,7 @@
       if (S.sid) lines.push(`📺 Watch the clip live: ${BASE_URL}/${S.sid}`);
       if (!S.inVoice) lines.push(`💤 Idle — ${PREFIX}play to resume`);
       else if (!S.current && idleTimer && !S.queue.length) lines.push("💤 Queue empty — leaving in 1 min unless something is added");
-      else if (S.current) lines.push(`🎵 Now playing: **${short(S.current.title)}**` + (paused() ? " ⏸️ paused" : ""));
+      else if (S.current) lines.push(`🎵 Now playing: **${short(S.current.title)}**` + (paused() ? " ⏸️ paused" : "") + (S.current.autoplay ? " 📻 Autoplay" : ""));
       else lines.push("🎵 Nothing playing yet");
       if (S.queue.length) {
         let line = `⏭️ Up next: ${short(S.queue[0].title)}`;
@@ -365,6 +371,7 @@
         lines.push(line);
       }
       if (S.crossfade) lines.push("🔀 Crossfade on");
+      if (S.autoplay) lines.push("📻 Autoplay on");
       if (S.loadLine) lines.push(S.loadLine);
       else if (S.pending.length > 1) lines.push(`📥 Downloading ${S.pending.length} tracks…`);
       else if (S.single || S.pending.length) lines.push("📥 Downloading…");
@@ -373,7 +380,7 @@
     }
 
     // ---- web API (web.py), errors as the real page expects
-    const pub = (t) => ({ id: t.id, title: t.title, duration: t.duration, thumbnail: t.thumbnail, url: t.url });
+    const pub = (t) => ({ id: t.id, title: t.title, duration: t.duration, thumbnail: t.thumbnail, url: t.url, autoplay: !!t.autoplay });
     function state() {
       if (!S.sid) return { status: 404, body: { active: false } };
       const c = S.inVoice ? S.current : null;
@@ -382,7 +389,7 @@
         body: {
           active: true, in_voice: S.inVoice, guild: "Friday Night", channel: "Lounge",
           loading: S.jobs > 0, paused: !!c && paused(), can_previous: !!c,
-          crossfade: S.crossfade, crossfading: false, server_time: Date.now() / 1000,
+          crossfade: S.crossfade, autoplay: S.autoplay, crossfading: false, server_time: Date.now() / 1000,
           viewers: viewers(),
           theme: S.theme,
           now_playing: c ? Object.assign(pub(c), { video_url: c.video_url, elapsed: elapsed(), start: START, end: END }) : null,
@@ -456,6 +463,9 @@
         else if (a === "crossfade") {
           if (typeof d.enabled !== "boolean") return fail(400, "Invalid request.");
           C.crossfade(d.enabled);
+        } else if (a === "autoplay") {
+          if (typeof d.enabled !== "boolean") return fail(400, "Invalid request.");
+          C.autoplay(d.enabled);
         } else if (a === "add") {
           if (typeof d.url !== "string") return fail(400, "Missing link.");
           C.add(d.url);

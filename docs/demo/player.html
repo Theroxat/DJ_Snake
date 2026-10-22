@@ -530,6 +530,8 @@ a.ghub {
 }
 a.ghub:hover { color: var(--text); border-color: var(--accent-3); background: var(--hover-bg); }
 a.ghub:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.qhead #autoplay { margin-left: auto; min-height: 32px; padding: 2px 10px; font-size: 11px; }
+.apbadge { flex: none; color: var(--accent-3); border: var(--bw) solid var(--accent-3); border-radius: var(--radius-sm); padding: 0 6px; font: 400 10px/1.6 var(--font-mono); letter-spacing: var(--hud-ls); text-transform: var(--hud-case); white-space: nowrap; }
 .xfade .box { flex: none; display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-radius: calc(var(--radius-sm) / 2); position: relative; }
 .xfade[aria-checked="true"] { color: var(--accent-3); border-color: var(--accent-3); }
 .xfade[aria-checked="true"] .box { background: var(--accent-2); border-color: var(--accent-2); }
@@ -1011,7 +1013,9 @@ html.demo-embedded .demo-ribbon { display: none; }
       <ol id="nowrow" class="now" aria-label="Now playing"></ol>
     </div>
     <div>
-      <h2 class="display">Up next <span class="count" id="qcount">00</span></h2>
+      <h2 class="display qhead">Up next <span class="count" id="qcount">00</span>
+        <button id="autoplay" class="synctoggle xfade" type="button" role="switch" aria-checked="false" title="Keep playing related tracks when the queue runs out (for everyone in the channel)" disabled><span class="box" aria-hidden="true"></span>Autoplay</button>
+      </h2>
       <form id="addform" class="addform" autocomplete="off">
         <input id="addurl" type="text" inputmode="url" placeholder="Paste a YouTube or Spotify link…" aria-label="YouTube or Spotify link to add" disabled>
         <button id="addbtn" type="submit" aria-label="Add to queue" disabled>Add</button>
@@ -1088,7 +1092,7 @@ html.demo-embedded .demo-ribbon { display: none; }
   let curNp = null;       // now_playing of the clip loaded in `video`
   let loadAt = 0, loadTries = 0, errAt = 0;
   let lastQueueSig = "";
-  let inVoice = true, paused = false, canPrev = false, xfade = false;
+  let inVoice = true, paused = false, canPrev = false, xfade = false, autoplay = false;
   let dissolveTimer = null;
   let queue = [];          // current (possibly optimistic) queue
   let dragging = false, deferredQueue = null;
@@ -1254,7 +1258,7 @@ html.demo-embedded .demo-ribbon { display: none; }
     const wrap = $("nowwrap");
     wrap.hidden = !np;
     if (!np) { lastNowSig = ""; $("nowrow").textContent = ""; setAmbient(null); return; }
-    const sig = JSON.stringify([np.id, np.title, np.thumbnail]);
+    const sig = JSON.stringify([np.id, np.title, np.thumbnail, !!np.autoplay]);
     if (sig !== lastNowSig) {
       lastNowSig = sig;
       setAmbient(np.thumbnail);
@@ -1270,6 +1274,11 @@ html.demo-embedded .demo-ribbon { display: none; }
       n.textContent = np.title;
       n.title = np.title;
       li.appendChild(n);
+      if (np.autoplay) {
+        const ap = mk("span", "apbadge", "📻 Autoplay");
+        ap.title = "Picked by autoplay";
+        li.appendChild(ap);
+      }
       li.appendChild(mk("span", "d"));
       ol.appendChild(li);
     }
@@ -1904,6 +1913,10 @@ html.demo-embedded .demo-ribbon { display: none; }
     paused = !!d.paused && inVoice;
     canPrev = !!d.can_previous;
     if (!pending.has("crossfade")) xfade = !!d.crossfade;
+    if (!pending.has("autoplay")) autoplay = !!d.autoplay;
+    $("queueempty").textContent = autoplay
+      ? "The queue is empty. Autoplay picks a related track when it ends, or paste a link above."
+      : "The queue is empty. Paste a link above to add a track.";
     $("pausebadge").hidden = !(paused && d.now_playing);
     $("guild").textContent = d.guild || "—";
     $("channel").textContent = d.channel ? " # " + d.channel : "";
@@ -1970,6 +1983,8 @@ html.demo-embedded .demo-ribbon { display: none; }
     dis("addbtn", !inVoice || pending.has("add"));
     dis("xfade", !inVoice || pending.has("crossfade"));
     $("xfade").setAttribute("aria-checked", String(xfade));
+    dis("autoplay", !inVoice || pending.has("autoplay"));
+    $("autoplay").setAttribute("aria-checked", String(autoplay));
     const pp = $("pp");
     pp.setAttribute("aria-label", paused ? "Resume" : "Pause");
     pp.title = paused ? "Resume" : "Pause";
@@ -2017,6 +2032,12 @@ html.demo-embedded .demo-ribbon { display: none; }
     const want = !xfade;
     xfade = want; // optimistic; the next poll confirms
     send("crossfade", { enabled: want }).then((ok) => { if (!ok) xfade = !want; updateControls(); });
+  });
+  $("autoplay").addEventListener("click", () => {
+    if (!inVoice || pending.has("autoplay")) return;
+    const want = !autoplay;
+    autoplay = want; // optimistic; the next poll confirms
+    send("autoplay", { enabled: want }).then((ok) => { if (!ok) autoplay = !want; updateControls(); });
   });
   $("addform").addEventListener("submit", async (e) => {
     e.preventDefault();

@@ -11,10 +11,11 @@ from .playback import (
     cancelled,
     download_and_queue_song,
     play_next,
+    prefetch_autoplay,
     queue_playlist,
     queue_spotify,
 )
-from .player import discard_tracks
+from .player import discard_tracks, guild_of
 from .sessions import refresh_panel
 
 
@@ -194,6 +195,20 @@ def control_crossfade(player, enabled):
     transition; an overlap already running finishes."""
     player.crossfade = bool(enabled)
     player.last_active = state.clock()
+    refresh_panel(player)
+
+
+def control_autoplay(player, enabled):
+    """Turn the session's autoplay on or off. On, a related track is
+    prepared at once if the queue is empty; off, the prepared one is dropped."""
+    player.autoplay = bool(enabled)
+    player.last_active = state.clock()
+    if not player.autoplay:
+        player.drop_autoplay_next()
+    elif player.is_playing:
+        guild_id = guild_of(player)
+        if guild_id is not None:
+            prefetch_autoplay(WebContext(guild_id, player), player)
     refresh_panel(player)
 
 

@@ -15,6 +15,8 @@ from yt_dlp.postprocessor import ModifyChaptersPP, SponsorBlockPP
 
 from .config import (
     ANALYSIS_TIMEOUT,
+    AUTOPLAY_CANDIDATES,
+    AUTOPLAY_MAX_SECONDS,
     CROSSFADE_MIN_TRACK,
     DOWNLOAD_ATTEMPTS,
     EXTRACTOR_ARGS,
@@ -184,6 +186,67 @@ def search_youtube(query, count):
             }
         )
     return results
+
+
+_NON_MUSIC_RE = re.compile(
+    r"\b(podcast|interview|reaction|react|tutorial|trailer|news|full album|"
+    r"full episode|livestream|live stream|compilation|hours?|asmr|gameplay|"
+    r"walkthrough|review|documentary)\b",
+    re.IGNORECASE,
+)
+
+
+def related_tracks(video_id):
+    """Videos YouTube relates to `video_id`: its "RD<id>" mix, read flat (no
+    download), as [{id, title, duration, channel, live_status}]. Blocking,
+    raises on failure."""
+    if not _VIDEO_ID_RE.match(video_id or ""):
+        raise ValueError("invalid video id")
+    ydl_opts = {
+        "extract_flat": "in_playlist",
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        "playlistend": AUTOPLAY_CANDIDATES,
+        "remote_components": REMOTE_COMPONENTS,
+        "extractor_args": EXTRACTOR_ARGS,
+    }
+    url = f"https://www.youtube.com/watch?v={video_id}&list=RD{video_id}"
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+    results = []
+    for entry in (info or {}).get("entries") or []:
+        if not entry or not _VIDEO_ID_RE.match(entry.get("id") or ""):
+            continue
+        results.append(
+            {
+                "id": entry["id"],
+                "title": entry.get("title") or "",
+                "duration": entry.get("duration"),
+                "channel": entry.get("channel") or entry.get("uploader") or "",
+                "live_status": entry.get("live_status"),
+            }
+        )
+    return results
+
+
+def choose_related(candidates, exclude):
+    """Candidates autoplay may play, in mix order: not in `exclude` (video ids
+    played recently), no live streams, nothing over AUTOPLAY_MAX_SECONDS and
+    no title that looks like something other than a song."""
+    picks = []
+    for entry in candidates:
+        if entry["id"] in exclude or entry["id"] in (p["id"] for p in picks):
+            continue
+        if entry.get("live_status") in ("is_live", "is_upcoming", "post_live"):
+            continue
+        duration = entry.get("duration")
+        if duration is not None and duration > AUTOPLAY_MAX_SECONDS:
+            continue
+        if _NON_MUSIC_RE.search(entry.get("title") or ""):
+            continue
+        picks.append(entry)
+    return picks
 
 
 def _remove_offtopic(ydl, info, filepath):

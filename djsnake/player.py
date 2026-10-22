@@ -6,6 +6,7 @@ import secrets
 import time
 
 from . import state, stats
+from . import config
 from .config import HISTORY_SIZE
 
 
@@ -62,6 +63,13 @@ class MusicPlayer:
         # run out (see playback.schedule_idle_disconnect), and its delay.
         self.idle_task = None
         self.idle_delay = None
+        # Autoplay: per-session setting, the track picked for when the queue
+        # runs out (downloaded, not queued), the task preparing it, and the
+        # video ids played recently (never picked again).
+        self.autoplay = config.AUTOPLAY
+        self.autoplay_next = None
+        self.autoplay_task = None
+        self.recent_ids = []
 
     @property
     def loading(self):
@@ -76,6 +84,26 @@ class MusicPlayer:
         task, self.idle_task, self.idle_delay = self.idle_task, None, None
         if task is not None and not task.done():
             task.cancel()
+
+    def loop_active(self):
+        """A loop mode is on (it takes precedence over autoplay)."""
+        return getattr(self, "loop", None) not in (None, False, "off")
+
+    def note_played(self, track):
+        """Remember a started track's video id for autoplay's dedupe."""
+        video_id = track.get("video_id") if track else None
+        if not video_id:
+            return
+        if video_id in self.recent_ids:
+            self.recent_ids.remove(video_id)
+        self.recent_ids.append(video_id)
+        del self.recent_ids[: -config.AUTOPLAY_HISTORY]
+
+    def drop_autoplay_next(self):
+        """Forget (and delete the file of) the prepared autoplay track."""
+        track, self.autoplay_next = self.autoplay_next, None
+        if track is not None:
+            discard_tracks([track])
 
     def in_voice(self):
         return bool(self.voice_client and self.voice_client.is_connected())
@@ -131,6 +159,7 @@ class MusicPlayer:
         self.cancel_idle()
         self.should_stop = True
         self.epoch += 1
+        self.drop_autoplay_next()
         self.pending_downloads = []  # Their jobs give up with the epoch
         self.play_gen += 1  # The stopped track's callback must not advance
         self.pending_action = None
@@ -172,6 +201,8 @@ def file_in_use(filepath):
         tracks = list(player.queue) + list(player.history)
         if player.now_playing:
             tracks.append(player.now_playing)
+        if player.autoplay_next:
+            tracks.append(player.autoplay_next)
         if any(t.get("filepath") == filepath for t in tracks):
             return True
     return False
