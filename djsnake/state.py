@@ -26,6 +26,11 @@ def clock():
     return time.time()
 
 
+# Process start (monotonic), for /healthz uptime.
+started_at = time.monotonic()
+# Monotonic counters exposed by /metrics.
+counters = {"tracks_played": 0}
+
 # Guild id -> MusicPlayer
 music_players = {}
 # Web session id -> guild id. The only way a request reaches a player.

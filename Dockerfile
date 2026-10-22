@@ -51,6 +51,17 @@ USER botuser
 # Unbuffered output so logs show up immediately in `docker compose logs`.
 ENV PYTHONUNBUFFERED=1
 
+# Version shown by /healthz (the release workflow passes the tag).
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
+
+# Healthy once the bot is connected to Discord (GET /healthz on WEB_PORT). The
+# slim image has no curl, so use the Python stdlib. start_period covers the
+# yt-dlp upgrade in the entrypoint and the Discord login; failures in that
+# window do not count. urlopen raises on 503, so the exit code is 1 then.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD ["python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/healthz' % os.environ.get('WEB_PORT', '47823'), timeout=4)"]
+
 # The entrypoint refreshes yt-dlp before launching (see docker-entrypoint.sh);
 # `pip install --user` writes here, which is why botuser owns its home.
 ENTRYPOINT ["docker-entrypoint.sh"]

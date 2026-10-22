@@ -99,7 +99,9 @@ before leaving voice once the queue runs out), `DATA_DIR`
 (`/app/data`, mounted from `./data` by Compose; the container's UID 1000 must
 be able to write it), `WEB_THEME` (`arcade`, the theme of guilds that never
 chose one), `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` (optional, both
-needed to use the Spotify Web API), and `YTDLP_AUTO_UPDATE` (entrypoint only).
+needed to use the Spotify Web API), `METRICS` (`0`; `1` enables `GET /metrics`),
+`APP_VERSION` (set by the Dockerfile build arg, `dev` otherwise; shown by
+`/healthz`), and `YTDLP_AUTO_UPDATE` (entrypoint only).
 
 ## Architecture (`djsnake/`)
 
@@ -309,6 +311,17 @@ Module map, lowest layer first (each imports only the ones above it):
   track's mp4 with Range support. Files are found by track id, never by a path
   from the request. Theme routes: `POST /api/{sid}/theme`,
   `POST|DELETE /api/{sid}/theme/logo`, `GET /theme-logo/{sid}` (see Themes).
+  `GET /healthz` returns 200 `{status: "ok", discord: "connected", latency_ms,
+  guilds, players, uptime_s, version}` when the bot is ready and its websocket
+  answers (finite `bot.latency`), else 503 `{status: "unavailable", discord:
+  "closed" | "not ready" | "websocket closed", uptime_s}`; it carries no ids,
+  names or secrets. The Dockerfile `HEALTHCHECK` polls it (urllib, 60 s start
+  period, 3 retries to ride out gateway resumes). `GET /metrics` (Prometheus
+  text written by hand, 404 unless `METRICS` is on) exposes
+  `djsnake_active_players`, `_queued_tracks`, `_downloads_in_progress`,
+  `_web_viewers`, `_discord_latency_seconds` and the counter
+  `djsnake_tracks_played_total` (`state.counters`, bumped by `retire_play()`).
+  Tests: `tests/test_health.py`.
 - **Themes**: the page is fully token-driven: each preset is a `[data-skin]`
   block of CSS custom properties on `<html>` (Arcade is the original look;
   the presets are `THEME_PRESETS` in `config.py`: arcade, minimal, night,

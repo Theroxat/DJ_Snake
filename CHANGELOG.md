@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `GET /healthz`: 200 with status, Discord latency, guild and player counts, uptime and version when the bot is connected, 503 with the reason otherwise.
+- Docker `HEALTHCHECK` on `/healthz` (60 s start period), so `docker compose ps` shows whether the bot is healthy.
+- Optional `GET /metrics` in the Prometheus text format (players, queued tracks, downloads, viewers, Discord latency, tracks played), off unless `METRICS=1`.
+
 ## [1.3.0] - 2026-10-22
 
 ### Added

@@ -66,6 +66,7 @@ def fresh_state(tmp_path, monkeypatch):
             except RuntimeError:
                 pass  # Its loop is already closed
     stats.flush()  # Records of this test go to its own database
+    state.counters["tracks_played"] = 0
     state.music_players.clear()
     state.sessions.clear()
 
