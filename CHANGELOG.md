@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Theme preset `cobalt`: a flat ultramarine page with blush-pink and butter-yellow accents, wide Unbounded headings, borderless rounded panels and springy controls (`!theme cobalt`, `WEB_THEME`, base for custom).
+
 ## [1.2.0] - 2026-10-22
 
 Upgrading: the bgutil PO token plugin and the `pot-provider` image were bumped

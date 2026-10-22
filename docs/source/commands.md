@@ -64,7 +64,7 @@ Needs the **Manage Server** permission.
 | Form | Effect |
 | --- | --- |
 | `!theme` | Shows the current theme, whether it is the server's choice or the fallback, and the available presets. |
-| `!theme <preset>` | Sets the server's default theme: `arcade`, `minimal`, `night`, `vinyl`, `club`, `terminal`, `space` or `custom`. |
+| `!theme <preset>` | Sets the server's default theme: `arcade`, `minimal`, `night`, `vinyl`, `club`, `terminal`, `space`, `cobalt` or `custom`. |
 | `!theme reset` | Goes back to the `WEB_THEME` default and drops the custom colors, name and logo. |
 | `!theme edit` | Sends you a private link to the theme editor by direct message. It is valid for 30 minutes. |
 

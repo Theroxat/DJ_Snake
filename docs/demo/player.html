@@ -12,7 +12,7 @@
 // arrives with the first state poll).
 try {
   const v = localStorage.getItem("djsnake.skin");
-  if (["arcade", "minimal", "night", "vinyl", "club", "terminal", "space"].includes(v)) {
+  if (["arcade", "minimal", "night", "vinyl", "club", "terminal", "space", "cobalt"].includes(v)) {
     document.documentElement.dataset.skin = v;
     document.documentElement.dataset.shape = v;
   }
@@ -20,13 +20,13 @@ try {
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&family=VT323&family=Geist:wght@400;500;600;700&family=Nunito:wght@400;700;800&family=Fredoka:wght@400;600;700&family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&family=Orbitron:wght@500;700&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&family=VT323&family=Geist:wght@400;500;600;700&family=Nunito:wght@400;700;800&family=Fredoka:wght@400;600;700&family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&family=Orbitron:wght@500;700&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&family=IBM+Plex+Mono:wght@400;600;700&family=Unbounded:wght@500;600;700&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ======================================================================
    THEME TOKENS. Each preset is a [data-skin] block of custom properties on
    <html>. "Shape" (fonts, radius, shadows, effects) is split from colors so
    the custom skin (custom) inherits the shape of a preset via data-base.
-   data-shape (= skin, or base for custom) scopes a few Arcade-only details.
+   data-shape (= skin, or base for custom) scopes the few rules beyond tokens.
    The page below only references tokens; Arcade is the original look.
    ====================================================================== */
 
@@ -230,6 +230,32 @@ try {
   --focus: #3fe0ff; --ok: #6ff0c0; --video-bg: #03040d; --pp-border: #c0adff;
 }
 
+/* ---- 6c. Cobalt: a flat ultramarine colour field, blush and butter inks,
+   wide display type, soft squircles, no shadows, springy controls ---- */
+[data-skin="cobalt"], [data-skin="custom"][data-base="cobalt"] {
+  --font-display: "Unbounded", "Arial Black", system-ui, sans-serif;
+  --font-body: "Instrument Sans", system-ui, "Segoe UI", sans-serif;
+  --font-mono: "Instrument Sans", system-ui, "Segoe UI", sans-serif;
+  --fs: 15px; --display-weight: 600; --display-case: none; --display-ls: -0.02em;
+  --hud-size: 14px; --hud-case: none; --hud-ls: 0; --btn-size: 14px; --wordmark-size: 22px;
+  --radius: 30px; --radius-btn: 999px; --radius-sm: 16px; --bw: 0px; --bar-radius: 999px;
+  --shadow-frame: none; --shadow-card: none;
+  --shadow-btn: none; --shadow-btn-hover: none; --shadow-btn-active: none;
+  --shadow-pp: none; --shadow-input: none;
+  --shadow-pop: 0 0 0 1px var(--hair), 0 30px 60px -24px color-mix(in srgb, var(--bg) 35%, black);
+  --hover-transform: scale(1.04); --active-transform: scale(.94);
+  --scanlines: 0; --scan-color: transparent; --scan-blend: normal;
+  --text-glow: none; --display-glow: none; --logo-mark: "";
+  --radius-pp: 24px; --ambient: .5;
+}
+[data-skin="cobalt"] {
+  --bg: #1a26c0; --surface: #2330d2; --text: #ffffff; --muted: #e0e3ff;
+  --accent: #ffc6e8; --accent-2: #ffe27a; --accent-3: #d6daff; --on-accent: #16208f;
+  --border: #4452ef; --hair: #ffffff1f; --track: #ffffff1f;
+  --hover-bg: #2f3de4; --hover-text: #ffffff; --hover-muted: #ffe27a;
+  --focus: #ffffff; --ok: #a6f7cc; --video-bg: #0e1680; --pp-border: #ffc6e8;
+}
+
 /* ---- 7. Custom: colors derived from three picks (--c-*) ---- */
 [data-skin="custom"] {
   --bg: var(--c-bg); --text: var(--c-text); --accent: var(--c-accent); --on-accent: var(--c-on-accent);
@@ -317,6 +343,46 @@ body::after {
   [data-shape="space"] body::before { animation: twinkle 7s ease-in-out infinite alternate; }
   @keyframes twinkle { from { opacity: .45; } to { opacity: .85; } }
 }
+
+/* ---- Cobalt details (also the base of custom): borderless, so quiet
+   controls get a soft fill instead of an outline, and every control springs ---- */
+[data-shape="cobalt"] button, [data-shape="cobalt"] a.ghub {
+  transition-duration: .28s; transition-timing-function: cubic-bezier(.34, 1.56, .64, 1);
+}
+[data-shape="cobalt"] button { background-color: var(--hair); }
+[data-shape="cobalt"] #e-save { background-color: var(--accent); color: var(--on-accent); }
+[data-shape="cobalt"] .badge, [data-shape="cobalt"] .live.off,
+[data-shape="cobalt"] button.synctoggle, [data-shape="cobalt"] button.ghost,
+[data-shape="cobalt"] a.ghub, [data-shape="cobalt"] .tcenter button:not(#pp) { background: var(--hair); }
+[data-shape="cobalt"] .live { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+[data-shape="cobalt"] button.synctoggle:hover, [data-shape="cobalt"] button.ghost:hover,
+[data-shape="cobalt"] a.ghub:hover { background: var(--hover-bg); transform: scale(1.05); }
+[data-shape="cobalt"] button.synctoggle[aria-expanded="true"], [data-shape="cobalt"] button.ghost[aria-expanded="true"],
+[data-shape="cobalt"] .xfade[aria-checked="true"] { background: var(--accent-3); color: var(--on-accent); }
+[data-shape="cobalt"] .xfade[aria-checked="true"] .box { border-color: var(--on-accent); background: var(--on-accent); }
+[data-shape="cobalt"] .where { border-left: 0; padding-left: 0; }
+/* The artwork glow keeps only its light: a monochrome bloom in the page's own colour */
+[data-shape="cobalt"] .ambient { mix-blend-mode: luminosity; }
+/* The video sits inset in the player like a screen in a device */
+[data-shape="cobalt"] .player { padding: 10px 10px 0; }
+[data-shape="cobalt"] .frame { border-radius: calc(var(--radius) - 10px); }
+[data-shape="cobalt"] .frame:fullscreen { border-radius: 0; }
+[data-shape="cobalt"] .title { font-size: clamp(18px, 1.9vw, 26px); line-height: 1.15; }
+[data-shape="cobalt"] .deck { border-top: 0; padding: 20px 26px 18px; }
+[data-shape="cobalt"] .seek .prog, [data-shape="cobalt"] .seek:hover .prog, [data-shape="cobalt"] .seek.active .prog { height: 10px; }
+[data-shape="cobalt"] .prog i::after { box-shadow: 0 0 0 4px var(--surface); }
+[data-shape="cobalt"] .transport #pp:hover { filter: none; border-radius: 999px; }
+[data-shape="cobalt"] .transport #pp { transition-property: transform, border-radius, background-color; }
+[data-shape="cobalt"] .empty, [data-shape="cobalt"] ol.dl, [data-shape="cobalt"] .statempty { background: color-mix(in srgb, var(--surface) 45%, transparent); }
+[data-shape="cobalt"] .tile, [data-shape="cobalt"] .skipcard { background: var(--hair); }
+[data-shape="cobalt"] .rangetabs { background: var(--hair); padding: 3px; gap: 3px; }
+[data-shape="cobalt"] .rangetabs button { border-radius: var(--radius-btn); }
+[data-shape="cobalt"] .editor input[type=color], [data-shape="cobalt"] .editor input[type=text],
+[data-shape="cobalt"] .editor select { background: var(--bg); }
+[data-shape="cobalt"] .drop { border: 2px dashed var(--hair); }
+[data-shape="cobalt"] .menu { padding: 8px; }
+[data-shape="cobalt"] #toast { padding: 8px 18px; border-radius: var(--radius-btn); }
+[data-shape="cobalt"] li.dragging { outline-width: 2px; }
 
 /* Header: a slim bar, sticky and translucent on wide screens */
 header {
@@ -903,7 +969,7 @@ html.demo-embedded .demo-ribbon { display: none; }
         <label for="e-skin">Theme</label>
         <select id="e-skin">
           <option value="arcade">Arcade</option><option value="minimal">Minimal</option><option value="night">Night</option>
-          <option value="vinyl">Vinyl</option><option value="club">Club</option><option value="terminal">Terminal</option><option value="space">Space</option>
+          <option value="vinyl">Vinyl</option><option value="club">Club</option><option value="terminal">Terminal</option><option value="space">Space</option><option value="cobalt">Cobalt</option>
           <option value="custom">Custom colors</option>
         </select>
       </div>
@@ -918,7 +984,7 @@ html.demo-embedded .demo-ribbon { display: none; }
           <label for="e-base">Base style (fonts, shapes, effects)</label>
           <select id="e-base">
             <option value="arcade">Arcade</option><option value="minimal">Minimal</option><option value="night">Night</option>
-            <option value="vinyl">Vinyl</option><option value="club">Club</option><option value="terminal">Terminal</option><option value="space">Space</option>
+            <option value="vinyl">Vinyl</option><option value="club">Club</option><option value="terminal">Terminal</option><option value="space">Space</option><option value="cobalt">Cobalt</option>
           </select>
         </div>
       </div>
@@ -1576,7 +1642,7 @@ html.demo-embedded .demo-ribbon { display: none; }
   const PRESETS = [
     ["arcade", "Arcade"], ["minimal", "Minimal"], ["night", "Night"],
     ["vinyl", "Vinyl"], ["club", "Club"], ["terminal", "Terminal"],
-    ["space", "Space"],
+    ["space", "Space"], ["cobalt", "Cobalt"],
   ];
   const PRESET_IDS = PRESETS.map((p) => p[0]);
   const SKIN_NAMES = Object.fromEntries(PRESETS.concat([["custom", "Custom"]]));

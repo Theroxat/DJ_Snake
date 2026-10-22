@@ -15,7 +15,7 @@
 - **Automix, always on**: SponsorBlock `music_offtopic` segments are cut, loudness is normalised to -14 LUFS, leading and trailing silence is trimmed, and tracks fade in and out.
 - **Optional crossfade** between tracks.
 - **Listening stats** per server on the clip page: top tracks and artists, the most skipped track, hours played, sessions, peak listeners and a day-by-hour heatmap.
-- **Themable clip page**: seven presets plus a custom look with your colors, name and logo.
+- **Themable clip page**: eight presets plus a custom look with your colors, name and logo.
 - **One live status message per session**, edited in place instead of spamming the channel.
 - **Self-healing YouTube access**: yt-dlp upgrades itself on start, and a PO token sidecar handles YouTube's bot check ([details](youtube.md)).
 
