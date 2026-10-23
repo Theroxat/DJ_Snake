@@ -1,11 +1,17 @@
 """Controls shared by Discord commands and the web page."""
 
 import asyncio
+import random
 import time
 import types
 
 from . import media, spotify, state
-from .config import MAX_PLAYLIST_SIZE, MAX_SEARCH_LENGTH, PREVIOUS_RESTART_SECONDS
+from .config import (
+    LOOP_MODES,
+    MAX_PLAYLIST_SIZE,
+    MAX_SEARCH_LENGTH,
+    PREVIOUS_RESTART_SECONDS,
+)
 from .media import looks_like_url, parse_youtube_url
 from .playback import (
     cancelled,
@@ -58,6 +64,8 @@ class ControlError(Exception):
         "nothing_playing": (409, "No music is currently playing."),
         "track_not_found": (404, "That track is not in the queue."),
         "bad_index": (400, "Invalid position."),
+        "bad_loop": (400, "Loop mode must be off, track or queue."),
+        "nothing_to_shuffle": (409, "Not enough queued tracks to shuffle."),
         "bad_url": (
             400,
             "Only YouTube (video or playlist) and Spotify (track, album or "
@@ -196,6 +204,30 @@ def control_crossfade(player, enabled):
     player.crossfade = bool(enabled)
     player.last_active = state.clock()
     refresh_panel(player)
+
+
+def control_loop(player, mode=None):
+    """Set the session's loop mode ("off", "track" or "queue"); None cycles
+    to the next one. Returns the new mode."""
+    if mode is None:
+        mode = LOOP_MODES[(LOOP_MODES.index(player.loop) + 1) % len(LOOP_MODES)]
+    if mode not in LOOP_MODES:
+        raise ControlError("bad_loop")
+    player.loop = mode
+    player.last_active = state.clock()
+    refresh_panel(player)
+    return mode
+
+
+async def control_shuffle(player):
+    """Shuffle the upcoming queue once (the current track stays)."""
+    async with player.lock:
+        if not player.in_voice():
+            raise ControlError("not_in_voice")
+        if len(player.queue) < 2:
+            raise ControlError("nothing_to_shuffle")
+        random.shuffle(player.queue)
+    player.last_active = state.clock()
 
 
 def seek_label(player, applied):

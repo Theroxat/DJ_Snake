@@ -152,6 +152,8 @@ ANALYSIS_TIMEOUT = 180
 LOUDNORM_KEYS = ("input_i", "input_tp", "input_lra", "input_thresh", "target_offset")
 # Optional crossfade (per session, off by default): the last seconds of a track
 # overlap the first ones of the next. Both need an automix window this long.
+LOOP_MODES = ("off", "track", "queue")
+
 CROSSFADE_SECONDS = 6.0
 CROSSFADE_MIN_TRACK = 15.0
 FRAMES_PER_SECOND = 50  # discord.py reads 20 ms PCM frames

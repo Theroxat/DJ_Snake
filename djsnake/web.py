@@ -13,6 +13,7 @@ from . import state, stats
 from .config import (
     APP_VERSION,
     LOGO_TYPES,
+    LOOP_MODES,
     MAX_CONTROL_BODY,
     MAX_LOGO_BYTES,
     MAX_VIEWERS_PER_SESSION,
@@ -31,6 +32,7 @@ from .controls import (
     control_add,
     control_crossfade,
     control_jump,
+    control_loop,
     control_move,
     control_next,
     control_pause,
@@ -38,6 +40,7 @@ from .controls import (
     control_remove,
     control_resume,
     control_seek,
+    control_shuffle,
     seek_label,
 )
 from .sessions import refresh_panel, session_player, set_action, short, touch
@@ -67,7 +70,9 @@ from .themes import (
 #   POST /api/{sid}/control    {"action", "id"?, "index"?, "url"?, "position"?,
 #                              "enabled"?} -> {"ok": ...}; actions: next,
 #                              previous, pause, resume, remove, move, add,
-#                              seek, jump, crossfade ({"enabled": bool})
+#                              seek, jump, crossfade ({"enabled": bool}),
+#                              loop ({"mode": off|track|queue}, none cycles),
+#                              shuffle
 #   GET /media/{sid}/{id}      the mp4 of a playing, queued or history track
 #   POST /api/{sid}/theme      {skin, base, bg, text, accent, name}, with the
 #                              X-Edit-Token header of a `!theme edit` link
@@ -269,6 +274,7 @@ async def web_state(request):
             "paused": now_playing is not None and player.paused_at is not None,
             "can_previous": now_playing is not None and player.pending_action is None,
             "crossfade": player.crossfade,
+            "loop": player.loop,
             # True while the previous track still drains under this one.
             "crossfading": now_playing is not None
             and player.mixer is not None
@@ -392,6 +398,8 @@ async def web_control(request):
         "seek",
         "jump",
         "crossfade",
+        "loop",
+        "shuffle",
     ):
         return _control_error(400, "Unknown action.")
 
@@ -415,6 +423,10 @@ async def web_control(request):
         return _control_error(400, "Missing link.")
     if action == "crossfade" and not isinstance(data.get("enabled"), bool):
         return _control_error(400, "Invalid request.")
+
+    mode = data.get("mode")
+    if action == "loop" and mode is not None and mode not in LOOP_MODES:
+        return _control_error(400, ControlError.MESSAGES["bad_loop"][1])
 
     touch(player)
     if player.sid != sid:  # Expired just now
@@ -446,6 +458,12 @@ async def web_control(request):
             set_action(player, seek_label(player, applied))
         elif action == "crossfade":
             control_crossfade(player, data["enabled"])
+        elif action == "loop":
+            mode = control_loop(player, mode)
+            set_action(player, f"🔁 Loop: {mode} via the web page")
+        elif action == "shuffle":
+            await control_shuffle(player)
+            set_action(player, "🔀 Queue shuffled via the web page")
         elif action == "jump":
             track = await control_jump(player, guild_id, track_id)
             set_action(player, f"▶️ Jumped to: {short(track['title'])}")

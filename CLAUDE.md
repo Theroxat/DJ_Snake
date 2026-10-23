@@ -203,7 +203,7 @@ Module map, lowest layer first (each imports only the ones above it):
   options are exactly the usual ones (1 s in, 4 s out). The state's
   `crossfading` is true while the old track drains; only then does the page
   cross-dissolve its two stacked `<video>`s (skips stay an instant swap).
-- **Controls** (`control_next/previous/pause/resume/remove/move/add/seek/jump/crossfade`) are shared
+- **Controls** (`control_next/previous/pause/resume/remove/move/add/seek/jump/crossfade/loop/shuffle`) are shared
   by Discord commands and the web page and raise `ControlError` (HTTP status and
   one English message, shown on Discord and on the web page). Previous restarts the track
   after 5 s of play or with empty history. Add accepts only YouTube hosts and
@@ -212,6 +212,17 @@ Module map, lowest layer first (each imports only the ones above it):
   means one track, otherwise `list=` loads up to `MAX_PLAYLIST_SIZE` in the
   background with a `WebContext` (no author, so it can never join voice).
   Web actions are announced in the session's text channel.
+- **Loop and shuffle** (`player.loop`, per session, `off` by default; `!loop
+  [off|track|queue]` or the web `loop` action, kept by `!reset`): `_advance()`
+  replays `finished` when the track ended by itself under `track` (a new play
+  in the stats: `retire_play()` records the pass, `mark_started(same_track=
+  False)`); under `queue` a finished or skipped (`None`/"next") track is
+  appended to the queue before the next is popped. A skip under `track`
+  moves on. `_start_crossfade()` overlaps a `track` loop (or a one-track
+  `queue` loop) with itself and, for `queue`, re-queues the old track.
+  `control_shuffle()` shuffles `player.queue` under the lock (the current
+  track stays; fewer than 2 queued raises `nothing_to_shuffle`). The panel
+  shows "🔁 Loop: mode".
 - **Playlists**: `!play` first tries `get_playlist_info()`, a flat extraction
   with no download. If the URL contains both `v=` and a playlist (a radio or
   mix link), `PlaylistChoiceView` asks with buttons whether to play one track
@@ -292,7 +303,7 @@ Module map, lowest layer first (each imports only the ones above it):
   `0.0.0.0:WEB_PORT`. Routes, the contract `web/index.html` relies on:
   `GET /` landing text; `GET /{sid}` serves `web/index.html`;
   `GET /api/{sid}/state` returns `{active, in_voice, guild, channel, loading,
-  paused, can_previous, crossfade, crossfading, server_time, viewers, now_playing: {id,
+  paused, can_previous, crossfade, loop, crossfading, server_time, viewers, now_playing: {id,
   title, duration, thumbnail, url, video_url, elapsed, start, end} | null, queue: [{id, title, duration,
   thumbnail, url}], downloading: [{key, title, source}], downloading_total,
   theme: {skin, base, bg, text, accent, name, logo_url}}`
@@ -308,10 +319,11 @@ Module map, lowest layer first (each imports only the ones above it):
   `GET /api/{sid}/stats?range=week|month|all` (default week, 400 otherwise,
   404 for an unknown sid) returns `stats.summary()` for the session's guild,
   cached `STATS_CACHE_SECONDS` (15) per guild and range (see Stats). `POST /api/{sid}/control` takes `{action:
-  next|previous|pause|resume|remove|move|add|seek|jump|crossfade, id?, index?,
-  url?, position?, enabled?}` (body <= 4 KB; crossfade takes a boolean
+  next|previous|pause|resume|remove|move|add|seek|jump|crossfade|loop|shuffle, id?, index?,
+  url?, position?, enabled?, mode?}` (body <= 4 KB; crossfade takes a boolean
   `enabled`; seek restarts the track at `position` seconds (file time),
-  clamped, staying paused if it was, unannounced; jump plays a queued `id` now)
+  clamped, staying paused if it was, unannounced; jump plays a queued `id` now;
+  loop takes `mode` off|track|queue, none cycles; shuffle needs 2+ queued tracks)
   and returns 200 `{"ok": true}` (202 for add, which downloads in the
   background) or `{"ok": false, "error": "<message>"}` with 400 (bad input,
   non-YouTube URL), 404 (unknown sid or track id) or 409 (not in voice, nothing
@@ -402,7 +414,7 @@ Module map, lowest layer first (each imports only the ones above it):
   session). `join_voice_channel()` wraps it. `!reset` forces a reconnect.
 - **Commands**: `!play` (YouTube or Spotify link, or search text), `!list`, `!next`, `!pause`, `!resume`, `!seek`
   (position relative to the track's automix `start`, as the page shows it),
-  `!crossfade on|off`, `!stop`, `!reset`, `!theme [preset|reset|edit]`
+  `!crossfade on|off`, `!loop [off|track|queue]`, `!shuffle`, `!stop`, `!reset`, `!theme [preset|reset|edit]`
   (Manage Server permission via `commands.has_guild_permissions`).
 - Voice needs `PyNaCl`, `davey` (DAVE encryption, required by discord.py 2.7+)
   and, on Python 3.13+, `audioop-lts`. The Docker image uses Python 3.12. CI

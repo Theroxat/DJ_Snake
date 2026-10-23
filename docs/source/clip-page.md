@@ -21,6 +21,7 @@ The page shows the current video, the queue ("Up next"), a "Now playing" row, tr
 - play a queued track now (jump);
 - remove or reorder queued tracks by dragging;
 - add YouTube or [Spotify](spotify.md) links, or type a song to search on YouTube;
+- shuffle the queue once and cycle the loop mode (off, track, queue) with the two buttons around the transport controls;
 - toggle crossfade.
 
 Web actions are applied exactly like Discord commands and are reflected in the status message. The header shows how many people have the page open and a chart button that opens the server's listening stats.

@@ -38,6 +38,7 @@ class MusicPlayer:
         # Bumped on each track start; a stale `after` callback is ignored.
         self.play_gen = 0
         self.crossfade = False  # Session setting, shared by everyone
+        self.loop = "off"  # Session setting: "off", "track" or "queue"
         self.mixer = None  # CrossfadeMixer handed to the voice client
         # Status panel: the one message of the session that is edited in place.
         self.panel_message = None

@@ -9,6 +9,7 @@ from discord.ext import commands
 from . import media, spotify, state
 from .config import (
     COMMAND_PREFIX,
+    LOOP_MODES,
     MAX_PLAYLIST_SIZE,
     MAX_SEARCH_LENGTH,
     PUBLIC_BASE_URL,
@@ -19,10 +20,12 @@ from .config import (
 from .controls import (
     ControlError,
     control_crossfade,
+    control_loop,
     control_next,
     control_pause,
     control_resume,
     control_seek,
+    control_shuffle,
     read_spotify,
     seek_label,
 )
@@ -259,6 +262,7 @@ async def reset_voice(ctx):
         fresh.panel_text = player.panel_text
         fresh.expired = player.expired
         fresh.crossfade = player.crossfade
+        fresh.loop = player.loop
         if player.panel_task is not None:
             player.panel_task.cancel()
         state.music_players[ctx.guild.id] = fresh
@@ -362,6 +366,25 @@ async def crossfade(ctx, mode: str = None):
     touch(player)
     control_crossfade(player, mode == "on")
     await ack(ctx)
+
+
+@bot.command(name="loop")
+async def loop_command(ctx, mode: str = None):
+    """Set the loop mode (off, track, queue); with no argument, cycle."""
+    mode = mode.lower() if mode else None
+    if mode is not None and mode not in LOOP_MODES:
+        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}loop [off|track|queue]`")
+        return
+    player = state.music_players.setdefault(ctx.guild.id, MusicPlayer())
+    touch(player)
+    control_loop(player, mode)
+    await ack(ctx)
+
+
+@bot.command(name="shuffle")
+async def shuffle(ctx):
+    if await _run_command_control(ctx, control_shuffle) is not _FAILED:
+        set_action(state.music_players[ctx.guild.id], "🔀 Queue shuffled")
 
 
 @bot.command(name="theme")

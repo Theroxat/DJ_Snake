@@ -601,6 +601,12 @@ li:hover .d { color: var(--hover-text); }
 .tcenter button { min-width: 48px; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; padding: 6px 12px; }
 .tcenter button:not(#pp) { background: transparent; border-color: var(--ghost-border, transparent); box-shadow: var(--ghost-shadow, none); border-radius: var(--radius-pp); }
 .tcenter button:not(#pp):hover { background: var(--hover-bg); color: var(--hover-text); }
+.tcenter button.tmode { min-width: 44px; min-height: 44px; padding: 6px 8px; }
+.tcenter button.tmode svg { width: 20px; height: 20px; }
+.tcenter button svg .one { display: none; }
+#loop[data-mode="track"] svg .one { display: block; }
+.tcenter button#loop:not([data-mode="off"]) { color: var(--accent-3); border-color: var(--accent-3); }
+[data-shape="cobalt"] .tcenter button#loop:not([data-mode="off"]) { background: var(--accent-3); color: var(--on-accent); }
 .tcenter button svg { width: 22px; height: 22px; fill: currentColor; display: block; }
 .transport #pp { width: 64px; height: 64px; min-width: 64px; padding: 0; background: var(--accent); border-color: var(--pp-border); color: var(--on-accent); box-shadow: var(--shadow-pp); border-radius: var(--radius-pp); }
 .transport #pp svg { width: 26px; height: 26px; }
@@ -856,6 +862,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
   .credits, [data-shape="arcade"] .credits { display: none; }
   header .badge { padding: 2px 10px; }
   .deck button, .offset button { min-height: 44px; min-width: 44px; }
+  .tcenter { gap: 10px; }
   button.synctoggle, button.ghost, a.ghub { min-height: 44px; min-width: 44px; }
   .offset input[type=range] { min-height: 40px; }
 }
@@ -926,9 +933,11 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
             <button id="xfade" class="synctoggle xfade" type="button" role="switch" aria-checked="false" title="Fade between tracks (for everyone in the channel)" disabled><span class="box" aria-hidden="true"></span>Crossfade</button>
           </div>
           <div class="tcenter">
+            <button id="shuffle" class="tmode" type="button" aria-label="Shuffle the queue" title="Shuffle the queue" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3l4 4-4 4V8h-2.6l-3.2 4.6L14.4 17H17v-3l4 4-4 4v-3h-3.6a1 1 0 0 1-.8-.4L8.8 13.3 5.9 17.4a1 1 0 0 1-.8.4H3v-2h1.6l3.3-4.7L4.6 6H3V4h2.1a1 1 0 0 1 .8.4L9 8.8l2.6-3.9a1 1 0 0 1 .8-.4H17z"/></svg></button>
             <button id="prev" type="button" aria-label="Previous track" title="Previous" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h3v14H5zM20 5v14L9 12z"/></svg></button>
             <button id="pp" type="button" aria-label="Pause" title="Pause" disabled><svg id="ppicon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg></button>
             <button id="next" type="button" aria-label="Next track" title="Next" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h3v14h-3zM4 5v14l11-7z"/></svg></button>
+            <button id="loop" class="tmode" type="button" data-mode="off" aria-label="Loop: off. Switch to loop track" title="Loop: off" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v3l4-4-4-4v3H5v6h2zM17 17H7v-3l-4 4 4 4v-3h12v-6h-2z"/><path class="one" d="M11 9.5h1.6V15h-1.4v-4l-.9.5-.4-1.1z"/></svg></button>
           </div>
           <div class="tside end">
             <button id="synctoggle" class="synctoggle" type="button" aria-expanded="false" aria-controls="syncpanel" title="Video / audio offset"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h9.2a3 3 0 0 1 5.6 0H20v2h-1.2a3 3 0 0 1-5.6 0H4zm12 2a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM4 16h1.2a3 3 0 0 1 5.6 0H20v2h-9.2a3 3 0 0 1-5.6 0H4zm4 2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg><span class="lbl">Sync</span><b id="syncbadge" hidden></b></button>
@@ -1073,7 +1082,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
   let curNp = null;       // now_playing of the clip loaded in `video`
   let loadAt = 0, loadTries = 0, errAt = 0;
   let lastQueueSig = "";
-  let inVoice = true, paused = false, canPrev = false, xfade = false;
+  let inVoice = true, paused = false, canPrev = false, xfade = false, loopMode = "off", queueLen = 0;
   let dissolveTimer = null;
   let queue = [];          // current (possibly optimistic) queue
   let dragging = false, deferredQueue = null;
@@ -1889,6 +1898,8 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     paused = !!d.paused && inVoice;
     canPrev = !!d.can_previous;
     if (!pending.has("crossfade")) xfade = !!d.crossfade;
+    if (!pending.has("loop")) loopMode = ["track", "queue"].includes(d.loop) ? d.loop : "off";
+    queueLen = (d.queue || []).length;
     $("pausebadge").hidden = !(paused && d.now_playing);
     $("guild").textContent = d.guild || "—";
     $("channel").textContent = d.channel ? " # " + d.channel : "";
@@ -1955,6 +1966,12 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     dis("addbtn", !inVoice || pending.has("add"));
     dis("xfade", !inVoice || pending.has("crossfade"));
     $("xfade").setAttribute("aria-checked", String(xfade));
+    dis("shuffle", !inVoice || queueLen < 2 || pending.has("shuffle"));
+    dis("loop", !inVoice || pending.has("loop"));
+    const lp = $("loop");
+    lp.dataset.mode = loopMode;
+    lp.title = "Loop: " + loopMode;
+    lp.setAttribute("aria-label", "Loop: " + loopMode + ". Switch to loop " + LOOP_NEXT[loopMode]);
     const pp = $("pp");
     pp.setAttribute("aria-label", paused ? "Resume" : "Pause");
     pp.title = paused ? "Resume" : "Pause";
@@ -2002,6 +2019,17 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
     const want = !xfade;
     xfade = want; // optimistic; the next poll confirms
     send("crossfade", { enabled: want }).then((ok) => { if (!ok) xfade = !want; updateControls(); });
+  });
+  const LOOP_NEXT = { off: "track", track: "queue", queue: "off" };
+  $("shuffle").addEventListener("click", () => {
+    if (!inVoice || pending.has("shuffle")) return;
+    send("shuffle").then((ok) => { if (ok) toast("Queue shuffled.", "ok"); });
+  });
+  $("loop").addEventListener("click", () => {
+    if (!inVoice || pending.has("loop")) return;
+    const prev = loopMode;
+    loopMode = LOOP_NEXT[prev]; // optimistic; the next poll confirms
+    send("loop", { mode: loopMode }).then((ok) => { if (!ok) loopMode = prev; updateControls(); });
   });
   $("addform").addEventListener("submit", async (e) => {
     e.preventDefault();
