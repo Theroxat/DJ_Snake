@@ -358,7 +358,7 @@ body::after {
 [data-shape="cobalt"] button.synctoggle:hover, [data-shape="cobalt"] button.ghost:hover,
 [data-shape="cobalt"] a.ghub:hover { background: var(--hover-bg); transform: scale(1.05); }
 [data-shape="cobalt"] button.synctoggle[aria-expanded="true"], [data-shape="cobalt"] button.ghost[aria-expanded="true"],
-[data-shape="cobalt"] .xfade[aria-checked="true"] { background: var(--accent-3); color: var(--on-accent); }
+[data-shape="cobalt"] .xfade[aria-checked="true"], [data-shape="cobalt"] .xfade[aria-checked="true"]:hover { background: var(--accent-3); color: var(--on-accent); }
 [data-shape="cobalt"] .xfade[aria-checked="true"] .box { border-color: var(--on-accent); background: var(--on-accent); }
 [data-shape="cobalt"] .where { border-left: 0; padding-left: 0; }
 /* The artwork glow keeps only its light: a monochrome bloom in the page's own colour */
@@ -532,7 +532,7 @@ button.synctoggle, button.ghost {
   box-shadow: none; border-color: var(--hair); color: var(--muted); background: transparent;
   font: 400 var(--hud-size) var(--font-mono); letter-spacing: var(--hud-ls); text-transform: var(--hud-case); padding: 4px 12px; min-height: 40px;
 }
-button.synctoggle:hover, button.ghost:hover { box-shadow: none; transform: none; color: var(--text); border-color: var(--accent-3); background: var(--hover-bg); }
+button.synctoggle:hover, button.ghost:hover { box-shadow: none; transform: none; color: var(--hover-text); border-color: var(--accent-3); background: var(--hover-bg); }
 button.synctoggle:active, button.ghost:active { box-shadow: none; transform: none; }
 button.synctoggle[aria-expanded="true"], button.ghost[aria-expanded="true"] { color: var(--accent-3); border-color: var(--accent-3); }
 button.synctoggle b { color: var(--accent-2); font-weight: 400; }
@@ -545,8 +545,9 @@ a.ghub {
   padding: 4px 9px; border: var(--bw) solid var(--hair); border-radius: var(--radius-btn);
   color: var(--muted); background: transparent; text-decoration: none; cursor: pointer; transition: color .12s ease, border-color .12s ease, background-color .12s ease;
 }
-a.ghub:hover { color: var(--text); border-color: var(--accent-3); background: var(--hover-bg); }
+a.ghub:hover { color: var(--hover-text); border-color: var(--accent-3); background: var(--hover-bg); }
 a.ghub:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+#plsave { white-space: nowrap; }
 .qhead #autoplay { margin-left: auto; min-height: 32px; padding: 2px 10px; font-size: 11px; }
 .apbadge { flex: none; color: var(--accent-3); border: var(--bw) solid var(--accent-3); border-radius: var(--radius-sm); padding: 0 6px; font: 400 10px/1.6 var(--font-mono); letter-spacing: var(--hud-ls); text-transform: var(--hud-case); white-space: nowrap; }
 .xfade .box { flex: none; display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-radius: calc(var(--radius-sm) / 2); position: relative; }
