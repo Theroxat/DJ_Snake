@@ -99,7 +99,9 @@ async def test_play_command_cancels_and_plays(idle, channel, media_dir, monkeypa
         media, "download_media", lambda url, **kw: make_track(media_dir, "P")
     )
     author = types.SimpleNamespace(display_name="Bob", voice=None, id=7)
-    await commands.play.callback(make_ctx(1, channel, author=author), "https://x/P")
+    await commands.play.callback(
+        make_ctx(1, channel, author=author), query="https://x/P"
+    )
     assert idle.now_playing["title"] == "P" and not idle.lingering()
     await asyncio.sleep(DELAY + 0.2)
     assert idle.voice_client.connected

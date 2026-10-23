@@ -25,6 +25,11 @@ NAMES = {
     "reset",
     "crossfade",
     "theme",
+    "loop",
+    "shuffle",
+    "volume",
+    "autoplay",
+    "playlist",
 }
 
 
@@ -46,8 +51,26 @@ def test_crossfade_has_on_off_choices():
     assert [c.value for c in mode.choices] == ["on", "off"]
 
 
+def test_loop_and_autoplay_have_choices():
+    mode = state.bot.tree.get_command("loop")._params["mode"]
+    assert [c.value for c in mode.choices] == ["off", "track", "queue"]
+    mode = state.bot.tree.get_command("autoplay")._params["mode"]
+    assert [c.value for c in mode.choices] == ["on", "off"]
+
+
+def test_playlist_is_a_slash_group():
+    group = state.bot.tree.get_command("playlist")
+    names = {c.name for c in group.commands}
+    assert names == {"save", "add", "load", "list", "show", "delete"}
+
+
 def test_parameters_are_described():
-    for name, param in [("play", "url"), ("seek", "position"), ("theme", "choice")]:
+    for name, param in [
+        ("play", "query"),
+        ("seek", "position"),
+        ("theme", "choice"),
+        ("volume", "level"),
+    ]:
         command = state.bot.tree.get_command(name)
         assert command._params[param].description != "…"
 
@@ -153,13 +176,13 @@ def play_env(monkeypatch):
 
 
 async def test_play_defers_before_joining_voice(slash, play_env):
-    await commands.play.callback(slash, "https://youtu.be/dQw4w9WgXcQ")
+    await commands.play.callback(slash, query="https://youtu.be/dQw4w9WgXcQ")
     assert play_env["order"] == [("join", [True])]  # Deferred when join ran
 
 
 async def test_play_keeps_only_the_channel_for_the_long_job(slash, play_env):
     url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-    await commands.play.callback(slash, url)
+    await commands.play.callback(slash, query=url)
     assert play_env["url"] == url
     ctx = play_env["queue_ctx"]
     assert isinstance(ctx, ChannelContext)
@@ -172,7 +195,7 @@ async def test_play_keeps_only_the_channel_for_the_long_job(slash, play_env):
 
 
 async def test_play_without_a_link_is_a_private_usage(slash, play_env):
-    await commands.play.callback(slash, None)
+    await commands.play.callback(slash, query=None)
     assert slash.interaction.deferred == [True]
     assert slash.replies[-1][1] and "Usage" in slash.replies[-1][0]
     assert "queue_ctx" not in play_env
@@ -190,7 +213,7 @@ async def test_play_with_a_prefix_context_is_unchanged(ctx, channel, monkeypatch
     monkeypatch.setattr(commands, "join_voice_channel", join)
     monkeypatch.setattr(commands, "download_and_queue_song", queue)
     monkeypatch.setattr(media, "get_playlist_info", lambda url: [])
-    await commands.play.callback(ctx, "https://youtu.be/dQw4w9WgXcQ")
+    await commands.play.callback(ctx, query="https://youtu.be/dQw4w9WgXcQ")
     assert channel.reactions == ["✅"]
     assert isinstance(seen["ctx"], ChannelContext)
 

@@ -151,7 +151,7 @@ async def test_play_command_searches_text(player, ctx, search_env, monkeypatch):
 
     monkeypatch.setattr(commands, "join_voice_channel", joined)
     downloads, searched = search_env
-    await commands.play.callback(ctx, "daft", rest="punk one more time")
+    await commands.play.callback(ctx, query="daft punk one more time")
     await settle(0.3)
     assert searched == ["daft punk one more time"]
     assert downloads == [f"https://www.youtube.com/watch?v={DAFT_ID}"]
@@ -164,7 +164,7 @@ async def test_play_command_text_without_match(
         return True
 
     monkeypatch.setattr(commands, "join_voice_channel", joined)
-    await commands.play.callback(ctx, "zzz", rest="nothing")
+    await commands.play.callback(ctx, query="zzz nothing")
     await settle(0.2)
     assert search_env[0] == []
     assert "No YouTube match found for **zzz nothing**" in channel.log[-1]
@@ -173,6 +173,6 @@ async def test_play_command_text_without_match(
 async def test_play_command_usage_and_long_text(player, ctx, channel, search_env):
     await commands.play.callback(ctx)
     assert "Usage" in channel.log[-1]
-    await commands.play.callback(ctx, "a", rest="b" * 250)
+    await commands.play.callback(ctx, query="a " + "b" * 250)
     assert "limited to" in channel.log[-1]
     assert search_env[1] == []
