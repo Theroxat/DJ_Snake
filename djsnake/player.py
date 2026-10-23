@@ -206,6 +206,7 @@ def retire_play(player, guild_id, action):
     if not track or guild_id is None or player.started_at is None:
         return
     played = player.played_seconds()
+    state.counters["tracks_played"] += 1
     stats.record_play(guild_id, track, player.play_wall, played, action)
     player.play_accum = 0.0
 

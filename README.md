@@ -164,6 +164,7 @@ Set these in `.env` (see `.env.example`).
 | `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`. |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | empty | Optional Spotify Web API credentials, for playlists over 100 tracks. Without them, Spotify links are read from the public embed page. |
 | `YTDLP_AUTO_UPDATE` | `1` | Upgrade yt-dlp on container start (`0` to skip). |
+| `METRICS` | `0` | `1` serves Prometheus metrics on `GET /metrics`. `GET /healthz` (used by the Docker health check) is always on. |
 
 ## Running without Docker
 

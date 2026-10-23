@@ -33,6 +33,15 @@ PUBLIC_BASE_URL = (
     os.getenv("PUBLIC_BASE_URL") or f"http://localhost:{WEB_PORT}"
 ).rstrip("/")
 WEB_INDEX = os.path.join(ROOT_DIR, "web", "index.html")
+# Reported by /healthz; the Docker image sets it at build time (release tag).
+APP_VERSION = os.getenv("APP_VERSION") or "dev"
+# GET /metrics (Prometheus text format) is off unless METRICS is truthy.
+METRICS_ENABLED = os.getenv("METRICS", "0").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
 # A web session outlives the bot's stay in voice; it expires after this many
 # hours without activity (playback, a command or a web control).
 SESSION_IDLE_HOURS = float(os.getenv("SESSION_IDLE_HOURS", "6"))

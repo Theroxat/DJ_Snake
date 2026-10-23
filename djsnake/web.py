@@ -11,10 +11,12 @@ from aiohttp import web
 
 from . import state, stats
 from .config import (
+    APP_VERSION,
     LOGO_TYPES,
     MAX_CONTROL_BODY,
     MAX_LOGO_BYTES,
     MAX_VIEWERS_PER_SESSION,
+    METRICS_ENABLED,
     PUBLIC_BASE_URL,
     STATS_CACHE_SECONDS,
     THEME_NAME_MAX,
@@ -71,8 +73,114 @@ from .themes import (
 #                              X-Edit-Token header of a `!theme edit` link
 #   POST|DELETE /api/{sid}/theme/logo   raw PNG/JPEG/WebP/GIF body (same token)
 #   GET /theme-logo/{sid}      the guild's logo (?v= busts caches)
+#   GET /healthz               200 {"status": "ok", ...} when the bot is connected
+#                              to Discord, else 503 {"status": "unavailable",
+#                              ...}; no ids, names or secrets
+#   GET /metrics               Prometheus text; 404 unless METRICS is on
 # Paths are never built from the request: tracks are looked up by id, themes
 # and logos by the session's guild id.
+
+
+def _discord_problem():
+    """Why the bot is not connected to Discord (None when it is). Gateway
+    resumes are routine and briefly close the websocket; the Docker health
+    check retries, so one blip does not mark the container unhealthy."""
+    bot = state.bot
+    if bot.is_closed():
+        return "closed"
+    if not bot.is_ready():
+        return "not ready"
+    if not math.isfinite(bot.latency):  # No websocket, or no heartbeat answer
+        return "websocket closed"
+    return None
+
+
+def _uptime_s():
+    return int(time.monotonic() - state.started_at)
+
+
+async def web_healthz(request):
+    headers = {"Cache-Control": "no-store"}
+    problem = _discord_problem()
+    if problem is not None:
+        body = {"status": "unavailable", "discord": problem, "uptime_s": _uptime_s()}
+        return web.json_response(body, status=503, headers=headers)
+    body = {
+        "status": "ok",
+        "discord": "connected",
+        "latency_ms": round(state.bot.latency * 1000, 1),
+        "guilds": len(state.bot.guilds),
+        "players": sum(1 for p in state.music_players.values() if p.in_voice()),
+        "uptime_s": _uptime_s(),
+        "version": APP_VERSION,
+    }
+    return web.json_response(body, headers=headers)
+
+
+def _metric(lines, name, kind, help_text, value):
+    lines.append(f"# HELP {name} {help_text}")
+    lines.append(f"# TYPE {name} {kind}")
+    lines.append(f"{name} {value}")
+
+
+async def web_metrics(request):
+    if not METRICS_ENABLED:
+        raise web.HTTPNotFound()
+    players = list(state.music_players.values())
+    cutoff = state.clock() - VIEWER_WINDOW_SECONDS
+    viewers = sum(
+        1 for seen in list(state.viewers.values()) for t in seen.values() if t >= cutoff
+    )
+    latency = state.bot.latency
+    lines = []
+    _metric(
+        lines,
+        "djsnake_active_players",
+        "gauge",
+        "Guilds where the bot is in a voice channel.",
+        sum(1 for p in players if p.in_voice()),
+    )
+    _metric(
+        lines,
+        "djsnake_queued_tracks",
+        "gauge",
+        "Tracks waiting in the queues.",
+        sum(len(p.queue) for p in players),
+    )
+    _metric(
+        lines,
+        "djsnake_downloads_in_progress",
+        "gauge",
+        "Tracks asked for but not queued yet.",
+        sum(max(len(p.pending_downloads), p.single_downloads) for p in players),
+    )
+    _metric(
+        lines,
+        "djsnake_web_viewers",
+        "gauge",
+        "Clip page tabs that polled recently.",
+        viewers,
+    )
+    _metric(
+        lines,
+        "djsnake_discord_latency_seconds",
+        "gauge",
+        "Discord gateway heartbeat latency (NaN without a connection).",
+        f"{latency:.6f}" if math.isfinite(latency) else "NaN",
+    )
+    _metric(
+        lines,
+        "djsnake_tracks_played_total",
+        "counter",
+        "Tracks played since the bot started.",
+        state.counters["tracks_played"],
+    )
+    return web.Response(
+        text="\n".join(lines) + "\n",
+        content_type="text/plain",
+        charset="utf-8",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 def _track_summary(track):
@@ -471,6 +579,8 @@ async def web_theme_logo_file(request):
 def build_web_app():
     app = web.Application()
     app.router.add_get("/", web_landing)
+    app.router.add_get("/healthz", web_healthz)
+    app.router.add_get("/metrics", web_metrics)
     app.router.add_get("/api/{sid}/state", web_state)
     app.router.add_post("/api/{sid}/control", web_control)
     app.router.add_get("/api/{sid}/stats", web_stats)

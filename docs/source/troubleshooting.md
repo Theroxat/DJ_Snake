@@ -14,6 +14,9 @@
 **"Sign in to confirm you're not a bot".**
 : Check that `pot-provider` is healthy with `docker compose ps` and that `POT_BASE_URL` points at it. Outside Compose the default URL does not resolve.
 
+**Is the bot healthy?**
+: Run `docker compose ps`: `dj-snake` shows `healthy`, `starting` (the first 60 seconds) or `unhealthy`. See [Health check and metrics](#health-check-and-metrics).
+
 **The clip link does not open.**
 : Check `WEB_BIND` and `WEB_PORT`, that your reverse proxy or tunnel reaches the port, and that `PUBLIC_BASE_URL` matches the public address. See [Exposing the page](clip-page.md#exposing-the-page).
 
@@ -31,6 +34,19 @@
 
 **A Spotify link fails.**
 : Short `spotify.link` URLs are refused; use the `open.spotify.com` address. Private playlists cannot be read. See [Spotify](spotify.md).
+
+## Health check and metrics
+
+The web server answers `GET /healthz` on `WEB_PORT`. It returns `200` with a small JSON body when the bot is connected to Discord, and `503` with the reason otherwise (`not ready`, `websocket closed`, `closed`). It never contains tokens, server names or ids.
+
+```bash
+curl -s http://127.0.0.1:47823/healthz
+# {"status": "ok", "discord": "connected", "latency_ms": 42.0, "guilds": 3, "players": 1, "uptime_s": 5120, "version": "1.3.0"}
+```
+
+The Docker image checks it every 30 seconds (60 seconds of grace at startup, 3 failures in a row to turn `unhealthy`, so a routine Discord reconnect does not trip it). `docker compose ps` shows the result, and `docker inspect --format '{{json .State.Health}}' dj-snake` shows the last probes. An `unhealthy` container usually means a bad `DISCORD_TOKEN`, missing intents or no network to Discord: read `docker compose logs dj-snake`. `restart: unless-stopped` does not restart on `unhealthy`; restart it yourself, or use a tool that does.
+
+Set `METRICS=1` to also serve `GET /metrics` in the Prometheus text format: `djsnake_active_players`, `djsnake_queued_tracks`, `djsnake_downloads_in_progress`, `djsnake_web_viewers`, `djsnake_discord_latency_seconds` and the counter `djsnake_tracks_played_total`. The metrics carry no server data, but they are served on the same port as the clip page, so keep `WEB_BIND` on `127.0.0.1` or block `/metrics` in your reverse proxy if the port is public.
 
 ## FAQ
 
