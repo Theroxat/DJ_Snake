@@ -256,3 +256,34 @@ async def test_state_marks_autoplay_track(api, playing):
     await settle()
     status, s = await api.state()
     assert s["now_playing"]["autoplay"] is True
+
+
+async def test_search_runs_outside_the_lock(playing, yt, monkeypatch):
+    """With no prepared pick, the queue end lingers at once (lock free) and
+    the pick found later restarts the idle player."""
+    import threading
+
+    p = playing
+    p.drop_autoplay_next()
+    gate = threading.Event()
+    seen_locked = []
+    original = media.related_tracks
+
+    def slow_related(video_id):
+        seen_locked.append(p.lock.locked())
+        gate.wait(5)
+        return original(video_id)
+
+    monkeypatch.setattr(media, "related_tracks", slow_related)
+    p.voice_client.finish()
+    await settle()
+    assert not p.lock.locked()
+    assert p.lingering() and not p.is_playing
+    gate.set()
+    for _ in range(50):
+        await settle()
+        if p.is_playing:
+            break
+    assert seen_locked == [False]
+    assert p.is_playing and p.now_playing["video_id"] == vid(1)
+    assert not p.lingering()
