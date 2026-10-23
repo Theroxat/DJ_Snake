@@ -184,6 +184,25 @@ def parse_media_url(url):
     return _parse_bandcamp(host, parsed)
 
 
+def parse_play_url(url):
+    """parse_media_url() for `!play`: the same allowlist and canonical URL,
+    except that a YouTube video link inside a playlist or mix (`v=` and
+    `list=`) keeps both ids, so `!play` can ask which one to play. Returns
+    the rebuilt URL or None."""
+    parsed = parse_media_url(url)
+    if parsed is None:
+        return None
+    kind, clean = parsed
+    if kind == "single" and clean.startswith("https://www.youtube.com/watch?v="):
+        try:
+            list_id = parse_qs(urlparse(url.strip()).query).get("list", [""])[0]
+        except ValueError:
+            list_id = ""
+        if _LIST_ID_RE.match(list_id):
+            clean = f"{clean}&list={list_id}"
+    return clean
+
+
 def source_of(url):
     """Platform of a track URL: youtube, soundcloud or bandcamp (the page
     labels the download with it)."""

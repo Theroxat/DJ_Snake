@@ -233,6 +233,13 @@ async def play(ctx, *, query: str = None):
     except spotify.SpotifyError as e:
         await fail(ctx, ControlError(e.code).text(lang))
         return
+    if not text_search and spotify_ref is None:
+        # As the page's add: only allowlisted hosts, rebuilt canonically,
+        # ever reach yt-dlp.
+        url = media.parse_play_url(url)
+        if url is None:
+            await fail(ctx, ControlError("bad_url").text(lang))
+            return
 
     if not await join_voice_channel(ctx):
         return

@@ -176,3 +176,46 @@ async def test_play_command_usage_and_long_text(player, ctx, channel, search_env
     await commands.play.callback(ctx, query="a " + "b" * 250)
     assert "limited to" in channel.log[-1]
     assert search_env[1] == []
+
+
+async def test_play_refuses_other_hosts_and_canonicalises(ctx, channel, monkeypatch):
+    from djsnake import media
+
+    joined, seen = [], []
+
+    async def join(c):
+        joined.append(c)
+        return True
+
+    monkeypatch.setattr(commands, "join_voice_channel", join)
+    await commands.play.callback(ctx, query="http://169.254.169.254/latest/meta")
+    assert joined == [] and "Only YouTube" in channel.log[-1]
+    await commands.play.callback(ctx, query="https://evil.example/watch?v=x")
+    assert joined == []
+
+    monkeypatch.setattr(media, "get_playlist_info", lambda url: seen.append(url))
+
+    async def fake_download(c, player, url, **kwargs):
+        seen.append(url)
+
+    monkeypatch.setattr(commands, "download_and_queue_song", fake_download)
+    await commands.play.callback(
+        ctx, query="https://m.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&x=1"
+    )
+    assert seen == [
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ",
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ",
+    ]
+
+
+def test_parse_play_url():
+    from djsnake.media import parse_play_url
+
+    assert parse_play_url("https://youtu.be/dQw4w9WgXcQ?t=3") == (
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    )
+    assert parse_play_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=x y") == (
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    )
+    assert parse_play_url("file:///etc/passwd") is None
+    assert parse_play_url("https://soundcloud.com/a/b").startswith("https://")
