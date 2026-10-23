@@ -10,6 +10,7 @@ from . import media, spotify, state
 from .config import (
     COMMAND_PREFIX,
     MAX_PLAYLIST_SIZE,
+    MAX_SEARCH_LENGTH,
     PUBLIC_BASE_URL,
     THEME_EDIT_SECONDS,
     THEME_SKINS,
@@ -25,11 +26,12 @@ from .controls import (
     read_spotify,
     seek_label,
 )
-from .media import get_video_id_from_url
+from .media import get_video_id_from_url, looks_like_url
 from .playback import (
     download_and_queue_song,
     join_voice_channel,
     queue_playlist,
+    queue_search,
     queue_spotify,
 )
 from .player import MusicPlayer, discard_tracks, retire_play
@@ -88,13 +90,25 @@ async def record_command_activity(ctx):
 
 
 @bot.command(name="play")
-async def play(ctx, url: str = None):
-    if url is None:
-        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}play <YouTube or Spotify link>`")
+async def play(ctx, url: str = None, *, rest: str = ""):
+    # `url` is the first word, `rest` the other words (a text search).
+    query = f"{url or ''} {rest}".strip()
+    if not query:
+        await ctx.send(
+            f"❌ Usage: `{COMMAND_PREFIX}play <YouTube or Spotify link or search text>`"
+        )
+        return
+
+    query = query.strip()
+    text_search = not looks_like_url(query)
+    # A link is read up to the first space, as before.
+    url = query if text_search else query.split()[0]
+    if text_search and len(query) > MAX_SEARCH_LENGTH:
+        await ctx.send(f"❌ Search text is limited to {MAX_SEARCH_LENGTH} characters.")
         return
 
     try:
-        spotify_ref = spotify.check_url(url)
+        spotify_ref = None if text_search else spotify.check_url(url)
     except spotify.SpotifyError as e:
         await ctx.send(f"❌ {ControlError(e.code).message}")
         return
@@ -110,6 +124,14 @@ async def play(ctx, url: str = None):
 
     if spotify_ref is not None:
         await _play_spotify(ctx, player, *spotify_ref)
+        return
+
+    if text_search:
+        await ack(ctx)
+        try:
+            await queue_search(ctx, player, query)
+        except Exception as e:
+            await ctx.send(f"❌ An error occurred: {str(e)}")
         return
 
     try:

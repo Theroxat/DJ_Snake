@@ -448,11 +448,15 @@ def score_candidate(track, candidate, rank=0):
     both_text = f"{cand_text} {channel_text}"
     channel_tokens = _tokens(channel) - _CHANNEL_WORDS
     artists = track["artists"]
+    # A text search has no separate artist: its words may be in the title or
+    # the channel name.
+    text_search = not artists
 
     # Title words: most of the song's own words must be in the video title.
     song_tokens = _tokens(base_title(track["title"])) or _tokens(track["title"])
     if song_tokens:
-        overlap = len(song_tokens & set(cand_text.split())) / len(song_tokens)
+        words = set((both_text if text_search else cand_text).split())
+        overlap = len(song_tokens & words) / len(song_tokens)
     else:
         overlap = 0.0
     if overlap < 0.5:
@@ -460,12 +464,15 @@ def score_candidate(track, candidate, rank=0):
     score = 30 * overlap
 
     # Artist: in the title or the channel name.
-    artist_hits = 0
-    for artist in track["artists"]:
-        artist_tokens = _tokens(artist)
-        if artist_tokens and artist_tokens <= set(both_text.split()):
-            artist_hits += 1
-    score += 20 if artist_hits else -15
+    if text_search:
+        score += 20
+    else:
+        artist_hits = 0
+        for artist in artists:
+            artist_tokens = _tokens(artist)
+            if artist_tokens and artist_tokens <= set(both_text.split()):
+                artist_hits += 1
+        score += 20 if artist_hits else -15
 
     official_video = bool(_OFFICIAL_VIDEO_RE.search(cand_text))
     if official_video:
@@ -520,10 +527,9 @@ def best_match(track, candidates):
     return best
 
 
-def find_youtube_match(track):
-    """Canonical YouTube URL of the best match for a Spotify track, or None.
-    Blocking: run it in an executor."""
-    query = search_query(track)
+def _search_and_match(track, query):
+    """Search YouTube for `query` and return the best match for `track`
+    (a candidate dict), or None. Blocking."""
     try:
         candidates = media.search_youtube(query, YOUTUBE_SEARCH_RESULTS)
     except Exception as e:
@@ -533,7 +539,32 @@ def find_youtube_match(track):
     if match is None:
         print(f"No YouTube match for {query!r}")
         return None
-    print(f"Spotify {query!r} -> {match['title']!r} ({match.get('duration')}s)")
+    print(f"Search {query!r} -> {match['title']!r} ({match.get('duration')}s)")
+    return match
+
+
+def find_youtube_match(track):
+    """Canonical YouTube URL of the best match for a Spotify track, or None.
+    Blocking: run it in an executor."""
+    match = _search_and_match(track, search_query(track))
+    if match is None:
+        return None
+    return f"https://www.youtube.com/watch?v={match['id']}"
+
+
+def text_track(query):
+    """A track for a plain text search: the whole text is the title, with no
+    artist and no known duration."""
+    return {"title": " ".join(str(query).split()), "artists": [], "duration": None}
+
+
+def find_text_match(query):
+    """Canonical YouTube URL of the best match for a text search, or None.
+    Blocking: run it in an executor."""
+    track = text_track(query)
+    match = _search_and_match(track, track["title"])
+    if match is None:
+        return None
     return f"https://www.youtube.com/watch?v={match['id']}"
 
 

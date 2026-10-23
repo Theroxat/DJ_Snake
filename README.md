@@ -71,7 +71,7 @@ The prefix is `!` by default (`COMMAND_PREFIX`).
 
 | Command | Description |
 | --- | --- |
-| `!play <YouTube or Spotify link>` | Join your voice channel and queue a YouTube video or playlist, or a Spotify playlist, album or track. |
+| `!play <YouTube or Spotify link, or search text>` | Join your voice channel and queue a YouTube video or playlist, a Spotify playlist, album or track, or the best YouTube match for the text. |
 | `!list` | Show the current queue. |
 | `!next` | Skip to the next track. |
 | `!pause` / `!resume` | Pause or resume playback. |
@@ -109,7 +109,7 @@ DJ Snake is not affiliated with or endorsed by Spotify.
 
 ## Clip page
 
-When the bot joins voice it posts a link such as `https://dj.example.com/<session>` and keeps a status message in that text channel. The page shows the video of the current track, the queue, and a progress bar, and lets you skip, go back, pause, resume, seek, play a queued track now, remove, reorder and add YouTube or Spotify links.
+When the bot joins voice it posts a link such as `https://dj.example.com/<session>` and keeps a status message in that text channel. The page shows the video of the current track, the queue, and a progress bar, and lets you skip, go back, pause, resume, seek, play a queued track now, remove, reorder and add YouTube or Spotify links, or search by text.
 
 The header shows how many people have the page open (👁) and a chart button that opens the server's listening stats (week, month or all time). Stats are kept in `DATA_DIR/stats.db`: each played track with who asked for it (the Discord display name, or "page web" for links added on the page), how long it played and whether it was skipped (left before 30 s of play), plus voice sessions and the peak number of listeners.
 

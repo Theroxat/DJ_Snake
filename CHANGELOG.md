@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `GET /healthz`: 200 with status, Discord latency, guild and player counts, uptime and version when the bot is connected, 503 with the reason otherwise.
 - Docker `HEALTHCHECK` on `/healthz` (60 s start period), so `docker compose ps` shows whether the bot is healthy.
 - Optional `GET /metrics` in the Prometheus text format (players, queued tracks, downloads, viewers, Discord latency, tracks played), off unless `METRICS=1`.
+- Search by text: `!play daft punk one more time` (any argument that is not a link) and the clip page's add box search YouTube and queue the best match, scored like Spotify tracks. When nothing scores high enough the bot says so.
 
 ## [1.3.0] - 2026-10-22
 

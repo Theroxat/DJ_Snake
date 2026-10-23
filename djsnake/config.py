@@ -165,6 +165,7 @@ SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID", "").strip()
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", "").strip()
 SPOTIFY_TIMEOUT = 10  # Seconds per HTTP request
 SPOTIFY_MAX_BYTES = 4 * 1024 * 1024  # Larger responses are refused
+MAX_SEARCH_LENGTH = 200  # Characters of a plain text search
 YOUTUBE_SEARCH_RESULTS = 5  # Candidates compared per Spotify track
 
 # Only create a temp directory if one wasn't provided. Using tempfile.mkdtemp()

@@ -4,7 +4,7 @@ Commands are text messages sent in a server channel. The prefix is `!` by defaul
 
 | Command | Description |
 | --- | --- |
-| `!play <YouTube or Spotify link>` | Join your voice channel and queue a YouTube video or playlist, or a Spotify playlist, album or track. |
+| `!play <YouTube or Spotify link, or search text>` | Join your voice channel and queue a YouTube video or playlist, a Spotify playlist, album or track, or the best YouTube match for the text. |
 | `!list` | Show the current queue. |
 | `!next` | Skip to the next track. |
 | `!pause` / `!resume` | Pause or resume playback. |
@@ -16,13 +16,14 @@ Commands are text messages sent in a server channel. The prefix is `!` by defaul
 
 ## Playing music
 
-### `!play <link>`
+### `!play <link or text>`
 
 You must be in a voice channel. The bot joins it, posts the clip page link and a status message, and downloads the track.
 
 - **A YouTube video link** queues that track.
 - **A YouTube playlist link** queues up to `MAX_PLAYLIST_SIZE` tracks. They download one at a time while the earlier ones play. A single message shows the progress and is edited at the end.
 - **A radio or mix link** (a video inside a playlist) makes the bot ask, with buttons, whether to play the single track or the whole list. If nobody answers in time it plays the single track.
+- **Plain text** (anything that is not a link, e.g. `!play daft punk one more time`, up to 200 characters) searches YouTube and queues the best match, using the same scoring as Spotify tracks. If nothing scores high enough the bot replies that no match was found.
 - **A Spotify link** (`/playlist/`, `/album/` or `/track/`) is matched to YouTube videos. See [Spotify](spotify.md).
 
 Only YouTube and Spotify hosts are accepted. Without a link, the bot answers with a usage message.
