@@ -176,9 +176,12 @@ async def test_loop_takes_precedence(playing, yt):
     p.loop = "track"
     p.drop_autoplay_next()
     yt.related_calls.clear()
+    current = p.now_playing["id"]
     p.voice_client.finish()
     await settle()
-    assert yt.related_calls == [] and p.lingering()
+    # The track replays: no related search, no idle linger
+    assert yt.related_calls == [] and not p.lingering()
+    assert p.now_playing["id"] == current and p.autoplay_next is None
 
 
 async def test_queued_track_wins_over_prepared_pick(playing, media_dir, yt):
