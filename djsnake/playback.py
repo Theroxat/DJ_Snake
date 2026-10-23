@@ -462,7 +462,7 @@ async def queue_search(ctx, player, query, from_web=False):
         if video_url is None:
             player.drop_pending(key)
             await ctx.send(
-                f"❌ No YouTube match found for **{query[:100]}**.",
+                t("play.no_match", ctx_lang(ctx), track=query[:100]),
                 allowed_mentions=discord.AllowedMentions.none(),
             )
             return

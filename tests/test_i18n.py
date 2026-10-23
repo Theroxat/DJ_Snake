@@ -192,3 +192,49 @@ def test_page_dictionaries_match():
         assert set(re.findall(r"{(\w+)}", text)) == set(
             re.findall(r"{(\w+)}", french[key])
         ), key
+
+
+# --- Strings of the features merged alongside the translation -----------------
+
+
+async def test_french_panel_for_loop_volume_autoplay(player):
+    state.guild_languages[GUILD_ID] = "fr"
+    player.loop = "queue"
+    player.autoplay = True
+    state.guild_volumes[GUILD_ID] = 80
+    text = render_panel(player)
+    assert "🔁 Boucle : file d’attente" in text
+    assert "🔊 Volume 80 %" in text
+    assert "📻 Lecture automatique activée" in text
+
+
+async def test_french_volume_and_autoplay_replies(ctx, channel):
+    state.guild_languages[GUILD_ID] = "fr"
+    await commands.volume.callback(ctx, None)
+    assert channel.log[-1].startswith("🔊 Volume : **100 %**")
+    await commands.volume.callback(ctx, "loud")
+    assert channel.log[-1].startswith("❌ Utilisation")
+    await commands.autoplay.callback(ctx, None)
+    assert "lecture automatique est désactivée" in channel.log[-1]
+
+
+def test_french_dj_and_control_errors():
+    message = commands.error_message(commands.NotDJ(), "loop", slash=True)
+    assert message.startswith("❌ Only DJs can use `/loop`")
+    state.guild_languages[GUILD_ID] = "fr"
+    guild = type("G", (), {"id": GUILD_ID, "get_role": lambda self, rid: None})()
+    message = commands.error_message(commands.NotDJ(), "loop", guild=guild)
+    assert message.startswith("❌ Seuls les DJ peuvent utiliser `!loop`")
+    from djsnake.controls import ControlError
+
+    assert ControlError("bad_volume").text("fr").startswith("Le volume")
+    assert "50" in ControlError("playlist_limit").text("en")
+
+
+async def test_text_search_no_match_is_translated(player, ctx, channel, monkeypatch):
+    from djsnake import playback, spotify
+
+    state.guild_languages[GUILD_ID] = "fr"
+    monkeypatch.setattr(spotify, "find_text_match", lambda q: None)
+    await playback.queue_search(ctx, player, "zzz nothing")
+    assert channel.log[-1].startswith("❌ Aucune correspondance YouTube")
