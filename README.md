@@ -74,7 +74,7 @@ docker compose up -d --build
 
 The prefix is `!` by default (`COMMAND_PREFIX`).
 
-Every command also works as a slash command (`/play`, `/next`, ...); the table shows the `!` form.
+Every command is both a `!` command and a slash command (`/play`, `/playlist save`, ...); the table shows the `!` form. `/play` takes one `query` option: a link or search text.
 
 | Command | Description |
 | --- | --- |
@@ -95,8 +95,9 @@ Every command also works as a slash command (`/play`, `/next`, ...); the table s
 | `!weblink` | DM you the clip page's control link (and the view-only link). DJs only when control is limited. |
 | `!djrole [role\|off]` | Show, set or remove the DJ role. Needs the Manage Server permission. |
 
-When a server has a DJ role, `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!stop` and `!reset` need that role or the Manage Server permission; whoever queued the playing track may still skip it with `!next`. `!play` and `!list` stay open to everyone. See [Who controls the music](#who-controls-the-music).
 | `!language [code\|reset]` | Show or set the language of the bot and the clip page for the server (`en`, `fr`). Needs the Manage Server permission. |
+
+When a server has a DJ role, `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!volume`, `!autoplay`, `!stop` and `!reset` need that role or the Manage Server permission; whoever queued the playing track may still skip it with `!next`. `!play` and `!list` stay open to everyone. See [Who controls the music](#who-controls-the-music).
 
 ## Language
 
@@ -164,9 +165,10 @@ location / {
 }
 ```
 
-The page gets live updates as a Server-Sent Events stream (`/api/<session>/events`), and falls back to polling if the stream cannot get through. Caddy and Cloudflare Tunnel work as is. With nginx, turn off `proxy_buffering` for the bot (the bot also sends `X-Accel-Buffering: no`) and raise `proxy_read_timeout` above the 15 s heartbeat. Behind any proxy, pass the client address in `X-Forwarded-For`: the bot caps open streams per client.
+The page gets live updates as a Server-Sent Events stream (`/api/<session>/events`), and falls back to polling if the stream cannot get through. Caddy and Cloudflare Tunnel work as is. With nginx, turn off `proxy_buffering` for the bot (the bot also sends `X-Accel-Buffering: no`) and raise `proxy_read_timeout` above the 10 s heartbeat. Behind any proxy, pass the client address in `X-Forwarded-For`: the bot caps open streams per client.
 
 Anyone who has the link can control the queue. Treat it as a secret and share it only with people you trust.
+
 ### Who controls the music
 
 Each session has two links, both long random ids:
@@ -176,7 +178,7 @@ Each session has two links, both long random ids:
 
 By default (`WEB_CONTROL=everyone`, no DJ role) the status message shows both links, as before: anyone in the channel can control the music. To limit control:
 
-- `!djrole <role>` (Manage Server) makes a role the DJ role. The status message then shows only the view-only link, and the control link that was posted before stops working (a new one is made). DJs, and members with Manage Server, get the control link by DM with `!weblink`. The DJ role also gates the Discord commands above. `!djrole off` opens everything again.
+- `!djrole <role>` (Manage Server) makes a role the DJ role. The status message then shows only the view-only link, and the control link that was posted before stops working (a new one is made, and the server's `!theme edit` links stop working too). DJs, and members with Manage Server, get the control link by DM with `!weblink`. The DJ role also gates the Discord commands above. `!djrole off` opens everything again.
 - `WEB_CONTROL=dj` does the same for the links on every server, even without a DJ role: then only members with Manage Server can get the control link.
 
 Anyone who has the control link can control the queue: treat it as a secret.
@@ -212,14 +214,10 @@ Set these in `.env` (see `.env.example`).
 | `SESSION_IDLE_HOURS` | `6` | Idle hours before a clip link expires. |
 | `AUTOPLAY` | `0` | Default of the per-session autoplay setting (`1` to start with it on). |
 | `SLASH_SYNC_GUILD` | empty | Server ID to publish slash commands to instantly (development). Empty: global sync. |
-| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), volumes (`volume.json`), logos, listening stats (`stats.db`) and cached lyrics (`lyrics/`). Compose mounts `./data` there. |
+| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), languages (`languages.json`), volumes (`volume.json`), DJ roles (`permissions.json`), saved playlists (`playlists.db`), logos (`logos/`), listening stats (`stats.db`) and cached lyrics (`lyrics/`). Compose mounts `./data` there. |
 | `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`. |
 | `LYRICS` | `1` | Synced lyrics on the clip page, from lrclib.net (`0` turns them off: no lookups, no button). |
-| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), logos, DJ roles (`permissions.json`) and listening stats (`stats.db`). Compose mounts `./data` there. |
-| `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`. |
 | `WEB_CONTROL` | `everyone` | `everyone`: the status message shows the control link and the view-only link. `dj`: only the view-only link; DJs get the control link with `!weblink`. A server with a DJ role always behaves as `dj`. |
-| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`) and languages (`languages.json`), logos and listening stats (`stats.db`). Compose mounts `./data` there. |
-| `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`. |
 | `BOT_LANGUAGE` | `en` | Language of the bot's messages and the clip page for servers that never ran `!language`: `en` or `fr`. |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | empty | Optional Spotify Web API credentials, for playlists over 100 tracks. Without them, Spotify links are read from the public embed page. |
 | `YTDLP_AUTO_UPDATE` | `1` | Upgrade yt-dlp on container start (`0` to skip). |

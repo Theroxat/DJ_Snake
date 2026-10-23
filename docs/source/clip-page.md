@@ -38,7 +38,7 @@ The bot pushes every change to the page as it happens (a Server-Sent Events stre
 
 The Lyrics button (next to Sync) shows the words of the current track over the bottom of the clip, and follows the clip into fullscreen. With synced lyrics, the line being sung is highlighted and scrolled into place, with a thin bar under it that runs out when the next line starts. Lyrics follow the same clock as the video, your Sync offset included, so if the clip matches what you hear, so do the words. When only plain lyrics exist they appear in a scrollable sheet; when none are found the page says so quietly. Your choice is remembered in your browser.
 
-Lyrics come from [LRCLIB](https://lrclib.net), a free lyrics database that needs no account or key. The bot looks them up in the background as soon as a track is queued, so playback never waits. It searches for the artist and title from Spotify when the track came from a Spotify link, and otherwise parses the YouTube title ("Artist - Title", dropping tags such as "(Official Video)" or "ft. …", or using the channel name as the artist); the track's duration picks the right version. Found lyrics are cached in `DATA_DIR/lyrics/`. Set `LYRICS=0` to turn the feature off.
+Lyrics come from [LRCLIB](https://lrclib.net), a free lyrics database that needs no account or key. The bot looks them up in the background as soon as a track is queued, so playback never waits. It searches for the artist and title from Spotify when the track came from a Spotify link, and otherwise parses the YouTube title ("Artist - Title", dropping tags such as "(Official Video)" or "ft. …", or using the channel name as the artist); the track's duration picks the right version. Found lyrics are cached in `DATA_DIR/lyrics/`. At most two lookups run at once, and when LRCLIB cannot be reached the page asks again later instead of concluding there are none. Set `LYRICS=0` to turn the feature off.
 
 Timing can be off for music videos with a long intro that SponsorBlock does not cut, or for a different edit of the song than the one LRCLIB has.
 
@@ -74,10 +74,10 @@ cloudflared tunnel --url http://127.0.0.1:47823
 
 ### Live updates through a proxy
 
-The page receives its state over a long-lived Server-Sent Events stream, `GET /api/<session>/events`, with a heartbeat comment every 15 seconds. A proxy that buffers responses holds those events back, so:
+The page receives its state over a long-lived Server-Sent Events stream, `GET /api/<session>/events`, with a `ping` event after 10 seconds of silence. The server answers 429 beyond 100 streams per session, 10 per client or 500 in total, and the page then polls. The page also drops a stream that stays silent for 25 seconds, or when its tab comes back after more than 10 seconds, and polls again. A proxy that buffers responses holds those events back, so:
 
 - **Caddy** and **Cloudflare Tunnel** need no settings.
-- **nginx** must not buffer the stream. The bot sends `X-Accel-Buffering: no`, which nginx honours, but set it explicitly anyway and keep the connection open longer than the heartbeat:
+- **nginx** must not buffer the stream. The bot sends `X-Accel-Buffering: no`, which nginx honours, but set it explicitly anyway and keep the connection open longer than the 10-second heartbeat:
 
 ```nginx
 # nginx: the page's live updates are a long-lived stream, so no buffering
@@ -91,9 +91,10 @@ location / {
 }
 ```
 
-- Pass the client address in `X-Forwarded-For` (as above). The bot caps open streams per client (10) and per session (100); behind a local proxy without that header, every visitor would share one address.
+- Pass the client address in `X-Forwarded-For` (as above). The bot caps open streams per client (10), per session (100) and overall (500); behind a local proxy without that header, every visitor would share one address.
 
 If the stream still cannot get through, the page falls back to polling on its own, so it keeps working, only with up to 2 seconds of delay.
+
 ## Who controls the music
 
 Each session has two links, both long random ids that cannot be guessed:
@@ -109,7 +110,7 @@ How the bot hands them out:
 | A DJ role set with `!djrole <role>` | View-only link only | DJs and members with Manage Server get it by DM with `!weblink`. |
 | `WEB_CONTROL=dj` | View-only link only | Members with Manage Server, or the DJ role if one is set, get it with `!weblink`. |
 
-Setting a DJ role while a session is live replaces its control link: the one that was posted publicly stops working, and the view-only link keeps working. The DJ role also gates the Discord commands that change playback; see `!djrole` in [Commands](commands.md#server-settings).
+Every change of the DJ role (set, replaced or removed) while a session is live replaces its control link and retires the server's pending `!theme edit` links: the control link that was posted before stops working, and the view-only link keeps working. A view-only page follows the new control link on its own. The DJ role also gates the Discord commands that change playback; see `!djrole` in [Commands](commands.md#server-settings).
 
 ```{warning}
 Anyone who has the control link can control the queue. Treat it as a secret and share the view-only link instead.

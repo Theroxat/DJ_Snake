@@ -56,7 +56,7 @@ pytest -q                                                            # test suit
 
 The tests (`tests/`, settings in `pytest.ini`) need no network, Discord or
 YouTube: `tests/fakes.py` fakes the voice client, channels and
-`discord.FFmpegPCMAudio`, and `tests/conftest.py` sets `TEMP_DIR`, `DATA_DIR`
+`discord.FFmpegPCMAudio`, and `tests/conftest.py` sets `TEMP_DIR`, `DATA_DIR`,
 `WEB_THEME` and `BOT_LANGUAGE=en` before `djsnake` is imported, points
 `i18n.LANGUAGES_FILE` at the test's directory and empties the shared state
 between tests. The web API runs through aiohttp's `TestClient`. Tests that need
@@ -96,24 +96,22 @@ which is no longer read), `TEMP_DIR`, `POT_BASE_URL`, `WEB_PORT` (47823),
 `WEB_BIND` (host IP the web port is published on, compose only, default
 `127.0.0.1`; set a LAN IP or `0.0.0.0` for a reverse proxy or tunnel),
 `PUBLIC_BASE_URL` (e.g. `https://dj.example.com`; empty falls back to
-`http://localhost:WEB_PORT`), `SESSION_IDLE_HOURS` (6), `IDLE_DISCONNECT_SECONDS` (300, the idle linger
-before leaving voice once the queue runs out), `AUTOPLAY` (0, default of the per-session autoplay), `DATA_DIR`
-(`/app/data`, mounted from `./data` by Compose; the container's UID 1000 must
-be able to write it), `SLASH_SYNC_GUILD` (empty: slash commands sync globally at startup; a server
-ID syncs to it only, at once, for development), `WEB_THEME` (`arcade`, the theme of guilds that never
-chose one), `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` (optional, both
-needed to use the Spotify Web API), `METRICS` (`0`; `1` enables `GET /metrics`),
-`APP_VERSION` (set by the Dockerfile build arg, `dev` otherwise; shown by
-`/healthz`), `LYRICS` (`1`; `0`, `false`, `no` or `off` turns the LRCLIB
-lyrics off), and `YTDLP_AUTO_UPDATE` (entrypoint only).
-be able to write it), `WEB_THEME` (`arcade`, the theme of guilds that never
-chose one), `WEB_CONTROL` (`everyone`, or `dj`: the control link is never
-posted publicly, see Permissions; anything else falls back to `everyone`),
-`SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` (optional, both
-be able to write it), `WEB_THEME` (`arcade`, the theme of guilds that never
-chose one), `BOT_LANGUAGE` (`en`, the language of guilds that never ran
-`!language`; `en` or `fr`), `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` (optional, both
-needed to use the Spotify Web API), and `YTDLP_AUTO_UPDATE` (entrypoint only).
+`http://localhost:WEB_PORT`), `SESSION_IDLE_HOURS` (6), `IDLE_DISCONNECT_SECONDS`
+(300, the idle linger before leaving voice once the queue runs out), `AUTOPLAY`
+(0, default of the per-session autoplay), `DATA_DIR` (`/app/data`, mounted from
+`./data` by Compose; the container's UID 1000 must be able to write it; it
+holds `themes.json`, `logos/`, `languages.json`, `volume.json`,
+`permissions.json`, `playlists.db`, `stats.db` and `lyrics/`),
+`SLASH_SYNC_GUILD` (empty: slash commands sync globally at startup; a server ID
+syncs to it only, at once, for development), `WEB_THEME` (`arcade`, the theme of
+guilds that never chose one), `WEB_CONTROL` (`everyone`, or `dj`: the control
+link is never posted publicly, see Permissions; anything else falls back to
+`everyone`), `BOT_LANGUAGE` (`en`, the language of guilds that never ran
+`!language`; `en` or `fr`), `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET`
+(optional, both needed to use the Spotify Web API), `METRICS` (`0`; `1` enables
+`GET /metrics`), `APP_VERSION` (set by the Dockerfile build arg, `dev`
+otherwise; shown by `/healthz`), `LYRICS` (`1`; `0`, `false`, `no` or `off`
+turns the LRCLIB lyrics off), and `YTDLP_AUTO_UPDATE` (entrypoint only).
 
 ## Architecture (`djsnake/`)
 
@@ -122,13 +120,9 @@ Module map, lowest layer first (each imports only the ones above it):
 - `config.py`: environment variables and constants, read once at import
   (`WEB_INDEX` resolves `web/index.html` from the repository root).
 - `state.py`: shared mutable state: the `bot` instance, `music_players`,
-  `sessions`, `guild_themes`, `guild_volumes`, `edit_tokens`, `viewers`,
-  `streams` (open live update streams per sid), `background_tasks` and
-  `clock()`.
-  `sessions`, `watch_ids`, `guild_perms`, `guild_themes`, `edit_tokens`,
-  `viewers`, `background_tasks` and `clock()`.
-  `sessions`, `guild_themes`, `guild_languages`, `edit_tokens`, `viewers`,
-  `background_tasks` and `clock()`.
+  `sessions`, `watch_ids`, `guild_perms`, `guild_themes`, `guild_languages`,
+  `guild_volumes`, `edit_tokens`, `viewers`, `streams` (open live update
+  streams per sid), `counters`, `background_tasks` and `clock()`.
   Always use it as `state.music_players` (never `from .state import ...`), so
   every module and test sees the same objects.
 - `i18n.py`: translations (see Translations): `t()`, `lang_for()`,
@@ -140,17 +134,12 @@ Module map, lowest layer first (each imports only the ones above it):
   Saved playlists). Imports only `config`.
 - `lyrics.py`: LRCLIB lyrics (`parse_lrc()`, `parse_title()`,
   `lookup_fields()`, `fetch()`, `prefetch()`, `get()`). Imports `config`,
-  `state` and `stats.clean_artist`.
+  `state`, `stats.clean_artist` and `spotify`'s HTTP helpers.
 - `player.py`: `MusicPlayer`, `notify_state()`, `discard_tracks()`,
   `file_in_use()`, `push_history()`, `retire_play()`, `guild_of()`.
-- `sessions.py`: session expiry (`touch()`, `session_player()`,
-  `session_cleanup_loop()`, `open_session()`) and the status panel
-  (`refresh_panel()`, `set_action()`, `ack()`, `short()`).
 - `themes.py`: theme storage, logos and `!theme edit` tokens.
-- `volume.py`: per-server volume storage (`{DATA_DIR}/volume.json`) and `percent_to_gain()`.
-- `player.py`: `MusicPlayer`, `discard_tracks()`, `file_in_use()`,
-  `push_history()`, `retire_play()`, `guild_of()`.
-- `themes.py`: theme storage, logos and `!theme edit` tokens.
+- `volume.py`: per-server volume storage (`{DATA_DIR}/volume.json`) and
+  `percent_to_gain()`.
 - `permissions.py`: the DJ role (`load_perms()`, `set_dj_role()`,
   `dj_role()`), `is_dj()`, `web_control_restricted()` and the Discord gate
   (`DJ_COMMANDS`, `REQUESTER_COMMANDS`, `can_run_dj_command()`).
@@ -158,25 +147,30 @@ Module map, lowest layer first (each imports only the ones above it):
   `session_cleanup_loop()`, `open_session()`), link ids (`resolve_link()`,
   `rotate_control_link()`) and the status panel (`refresh_panel()`,
   `set_action()`, `ack()`, `short()`).
-- `media.py`: YouTube URL parsing, yt-dlp (`download_media()`,
+- `media.py`: URL parsing (`parse_media_url()`, `parse_play_url()`,
+  `looks_like_url()`, `source_of()`), yt-dlp (`download_media()`,
   `get_playlist_info()`), the SponsorBlock cut, `analyse_media()`,
-  `playback_options()`, `crossfade_eligible()`, and `search_youtube()` (flat
-  `ytsearchN:`).
+  `playback_options()`, `crossfade_eligible()`, `search_youtube()` (flat
+  `ytsearchN:`) and the autoplay helpers (`related_tracks()`,
+  `choose_related()`).
 - `spotify.py`: Spotify links: `check_url()`, the embed parser and the
-  optional Web API (`get_tracks()`), and YouTube matching (`score_candidate()`,
-  `best_match()`, `find_youtube_match()`, `find_text_match()`).
+  optional Web API (`get_tracks()`), the shared no-redirect HTTP helpers
+  (`_http()`, `_opener`, `_read_capped()`), and YouTube matching
+  (`score_candidate()`, `best_match()`, `find_youtube_match()`,
+  `find_text_match()`).
 - `catalog.py`: Deezer and Apple Music links: `check_link()` (every metadata
   link: Spotify, Deezer, Apple Music), `get_tracks()`, parsers.
 - `mixer.py`: `CrossfadeMixer`.
 - `playback.py`: voice connection, `download_and_queue_song()`,
-  `queue_playlist()`, `queue_spotify()`, `queue_search()`, `play_next()` / `_advance()` / `_start_crossfade()`,
-  `open_track_source()`.
+  `queue_playlist()`, `queue_spotify()`, `queue_search()`, `play_next()` /
+  `_advance()` / `_start_crossfade()`, `open_track_source()`.
 - `controls.py`: `ControlError`, the `control_*` functions, `WebContext`.
 - `web.py`: the aiohttp routes and `start_web_server()`.
 - `commands.py`: the Discord commands (all hybrid, see "Adding a command"),
   `before_invoke`, `on_command_error`, `on_app_command_error`.
-- `app.py`: `on_ready`, `on_voice_state_update`, `setup_hook` (starts the web server and `sync_commands()`), `main()`;
-  importing it registers the commands. `bot.py` calls `main()`.
+- `app.py`: `on_ready`, `on_voice_state_update`, `setup_hook` (starts the web
+  server and `sync_commands()`), `main()`; importing it registers the
+  commands. `bot.py` calls `main()`.
 
 - **Per-guild state**: `music_players` maps guild ID to a `MusicPlayer` holding
   the voice client, the queue of `{id, filepath, title, duration, thumbnail,
@@ -233,8 +227,12 @@ Module map, lowest layer first (each imports only the ones above it):
   with `_take_autoplay()` instead of the idle linger. The pick is prepared while
   the last track plays (`prefetch_autoplay()`, a task in `player.autoplay_task`,
   result in `player.autoplay_next`, a downloaded track not in the queue and kept by
-  `file_in_use()`/`stop_and_clear()`/expiry/`!reset`); `_take_autoplay()` awaits a
-  running prefetch or picks inline. `_find_autoplay()` reads the `RD<video_id>` mix
+  `file_in_use()`/`stop_and_clear()`/expiry/`!reset`). `_take_autoplay()` runs
+  under the lock and never waits for a search or download: it takes the ready
+  pick, else starts a prefetch and the bot lingers idle until the prefetch
+  lands and restarts the idle player. `autoplay_wanted()` also needs a human
+  in the channel (`channel_empty()`): no autoplay into an empty channel.
+  `_find_autoplay()` reads the `RD<video_id>` mix
   flat (`media.related_tracks()`, executor), `media.choose_related()` drops ids in
   `player.recent_ids` (last `AUTOPLAY_HISTORY` 50 started tracks, plus
   playing/queued/history), live streams, entries over `AUTOPLAY_MAX_SECONDS` (600)
@@ -275,20 +273,22 @@ Module map, lowest layer first (each imports only the ones above it):
   (`play_next()`). The web action panel line ("Volume set to N% via the web
   page") goes through `set_action()`, so dragging coalesces to one edit per
   `PANEL_MIN_INTERVAL`; the panel also shows "Volume N%" when not 100.
-- **Controls** (`control_next/previous/pause/resume/remove/move/add/seek/jump/crossfade/loop/shuffle/volume/autoplay`) are shared
-  by Discord commands and the web page and raise `ControlError` (HTTP status and
-  one English message, shown on Discord and on the web page). Previous restarts the track
-- **Controls** (`control_next/previous/pause/resume/remove/move/add/seek/jump/crossfade`) are shared
-  by Discord commands and the web page and raise `ControlError` (a stable
-  `code`, its HTTP status in `ControlError.STATUS` and the message
-  `control.<code>`, `e.text(lang)`, shown on Discord and on the web page in the
-  guild's language). Previous restarts the track
-  after 5 s of play or with empty history. Add accepts only YouTube hosts and
-  rebuilds a canonical URL (`parse_youtube_url()`, no SSRF via yt-dlp), or a
-  Spotify link (see Spotify links; `control_add()` is async); `v=`
-  means one track, otherwise `list=` loads up to `MAX_PLAYLIST_SIZE` in the
-  background with a `WebContext` (no author, so it can never join voice).
-  Web actions are announced in the session's text channel.
+- **Controls** (`control_next/previous/pause/resume/remove/move/add/seek/jump/crossfade/loop/shuffle/volume/autoplay`,
+  plus the `control_playlist_*` family) are shared by Discord commands and the
+  web page and raise `ControlError` (a stable `code`, its HTTP status in
+  `ControlError.STATUS` and the message `control.<code>`, `e.text(lang)`, shown
+  on Discord and on the web page in the guild's language). Previous restarts
+  the track after 5 s of play or with empty history. Add accepts only the
+  hosts of `media.parse_media_url()` (YouTube, SoundCloud, Bandcamp; see More
+  sources) and rebuilds a canonical URL (no SSRF via yt-dlp), or a Spotify,
+  Deezer or Apple Music link (see Spotify links; `control_add()` is async), or
+  non-link text (see Text search). For YouTube, `v=` means one track,
+  otherwise `list=` loads up to `MAX_PLAYLIST_SIZE` in the background with a
+  `WebContext` (no author, so it can never join voice). `!play` uses
+  `media.parse_play_url()`: the same allowlist and canonical URL, except that
+  a YouTube `v=` link also keeps its `list=` id for the playlist prompt; any
+  other host gets the `bad_url` error. Web actions are announced in the
+  session's text channel.
 - **Loop and shuffle** (`player.loop`, per session, `off` by default; `!loop
   [off|track|queue]` or the web `loop` action, kept by `!reset`): `_advance()`
   replays `finished` when the track ended by itself under `track` (a new play
@@ -389,7 +389,8 @@ Module map, lowest layer first (each imports only the ones above it):
   `spotify.find_youtube_match` and queued through the same `queue_playlist()` /
   `queue_spotify()` (entries stay `{"spotify": track}`; `pending_label()` reads
   `track["source"]`). Errors are `SpotifyError` with the generic codes
-  `link_not_found`, `link_empty`, `link_unreadable`, `short_link`. Tests:
+  `link_not_found`, `link_empty`, `link_unreadable` (also for any network
+  failure or bad payload), `short_link`. Tests:
   `tests/test_sources.py`, fixtures in `tests/fixtures/catalog/`; patch
   `catalog.get_tracks` or `spotify._http`.
 - **Pending downloads** (`player.pending_downloads`, the page's "Downloading"): an ordered list of `{key, title, source}` (`source`
@@ -436,7 +437,7 @@ Module map, lowest layer first (each imports only the ones above it):
     request used, so a view-only page never sees the control id.
   - Discord: the global `bot.check` `dj_gate()` calls
     `can_run_dj_command()`: a command named in `DJ_COMMANDS` (next, pause,
-    resume, seek, stop, reset, crossfade) needs `is_dj()` (Manage Server, or
+    resume, seek, stop, reset, crossfade, loop, shuffle, volume, autoplay) needs `is_dj()` (Manage Server, or
     the guild's DJ role; no role set = everyone), except that
     `REQUESTER_COMMANDS` (next) is allowed to `track["requester_id"]` (set by
     `download_and_queue_song()`) on the playing track. A new mutating command
@@ -449,30 +450,29 @@ Module map, lowest layer first (each imports only the ones above it):
     a hint to `!weblink`, which DMs both links to `is_dj(strict=True)`
     members (without a role: Manage Server only). Unrestricted, the panel
     shows the control link and the view-only link in `<>` (no second
-    preview), and `!weblink` DMs anyone. Setting a role that newly restricts
-    a live session calls `rotate_control_link()`: a new sid, same view-only
-    id, so the publicly posted control link stops working.
+    preview), and `!weblink` DMs anyone. Every `!djrole` change (set, replace
+    or `off`) on a live session calls `rotate_control_link()`: a new sid, same
+    view-only id, so the control link posted or held before stops working,
+    and the guild's `!theme edit` tokens are retired (they point at the old
+    sid).
 - **Web server**: aiohttp, started in `setup_hook` on the bot's loop, bound to
   `0.0.0.0:WEB_PORT`. Routes, the contract `web/index.html` relies on:
   `GET /` landing text; `GET /{sid}` serves `web/index.html`;
   `GET /api/{sid}/state` returns `{active, in_voice, guild, channel, loading,
-  paused, can_previous, crossfade, loop, volume, autoplay, crossfading, server_time, viewers, now_playing: {id,
-  title, duration, thumbnail, url, autoplay, video_url, audio_only, elapsed, start, end} | null, queue: [{id, title, duration,
-  thumbnail, url, autoplay}], downloading: [{key, title, source}], downloading_total,
-  theme: {skin, base, bg, text, accent, name, logo_url}, lyrics}` (`lyrics`:
-  the `LYRICS` setting; the page hides its Lyrics button when false)
-  paused, can_previous, crossfade, crossfading, server_time, viewers, now_playing: {id,
-  title, duration, thumbnail, url, video_url, elapsed, start, end} | null, queue: [{id, title, duration,
-  thumbnail, url}], downloading: [{key, title, source}], downloading_total,
-  theme: {skin, base, bg, text, accent, name, logo_url}, can_control}`
-  (`can_control` false for a view-only id: the page sets `data-viewonly` on
-  `<html>`, shows the "View only" header pill and hides the transport
-  buttons, crossfade, add form, grips and remove buttons; its `active()`
-  guard stops every control call)
-  theme: {skin, base, bg, text, accent, name, logo_url}, lang}`
+  paused, can_previous, can_control, crossfade, loop, volume, autoplay,
+  crossfading, server_time, viewers, lang, lyrics, now_playing: {id, title,
+  duration, thumbnail, url, autoplay, video_url, audio_only, elapsed, start,
+  end} | null, queue: [{id, title, duration, thumbnail, url, autoplay}],
+  downloading: [{key, title, source}], downloading_total, theme: {skin, base,
+  bg, text, accent, name, logo_url}}`
   (404 `{"active": false}` when the sid is unknown or
   expired; out of voice, `now_playing` is null and `queue` and `downloading`
-  empty; `elapsed` freezes while paused; `downloading` is the first
+  empty; `elapsed` freezes while paused; `can_control` is false for a
+  view-only id: the page sets `data-viewonly` on `<html>`, shows the "View
+  only" header pill and hides the transport buttons, crossfade, add form,
+  grips and remove buttons, and its `active()` guard stops every control
+  call; `lang` is the guild's language; `lyrics` is the `LYRICS` setting, the
+  page hides its Lyrics button when false; `downloading` is the first
   `MAX_DOWNLOADING` (50) entries of `player.pending_downloads`, see Pending
   downloads, and `downloading_total` counts them all; `viewers` counts the tabs that polled with an
   `X-Viewer` header, a random id `[A-Za-z0-9_-]{8,40}` each tab keeps in
@@ -486,25 +486,28 @@ Module map, lowest layer first (each imports only the ones above it):
   Server-Sent Events, see Live updates.
   `GET /api/{sid}/stats?range=week|month|all` (default week, 400 otherwise,
   404 for an unknown sid) returns `stats.summary()` for the session's guild,
-  cached `STATS_CACHE_SECONDS` (15) per guild and range (see Stats). `POST /api/{sid}/control` takes `{action:
-  next|previous|pause|resume|remove|move|add|seek|jump|crossfade|loop|shuffle|volume|autoplay, id?, index?,
-  url?, position?, enabled?, mode?, value?}` (body <= 4 KB; crossfade and autoplay take a boolean
-  `enabled`; volume an integer `value` 0-150, valid out of voice too; seek restarts the track at `position` seconds (file time),
-  clamped, staying paused if it was, unannounced; jump plays a queued `id` now;
-  loop takes `mode` off|track|queue, none cycles; shuffle needs 2+ queued tracks)
-  and returns 200 `{"ok": true}` (202 for add, which downloads in the
-  background) or `{"ok": false, "error": "<message>"}` with 400 (bad input,
-  non-YouTube URL), 403 (view-only id, see Permissions), 404 (unknown sid or
-  track id) or 409 (not in voice, nothing playing). `GET /media/{sid}/{id}` streams the playing, a queued or a history
-  background) or `{"ok": false, "error": "<message>"}` (in the session's
-  language, `_fail(request, status, key)`) with 400 (bad input,
-  non-YouTube URL), 404 (unknown sid or track id) or 409 (not in voice, nothing
-  playing). `GET /media/{sid}/{id}` streams the playing, a queued or a history
+  cached `STATS_CACHE_SECONDS` (15) per guild and range (see Stats).
+  `GET /api/{sid}/playlists` lists the saved playlists (see Saved playlists).
+  `POST /api/{sid}/control` takes `{action:
+  next|previous|pause|resume|remove|move|add|seek|jump|crossfade|loop|shuffle|volume|autoplay|save_playlist|load_playlist,
+  id?, index?, url?, position?, enabled?, mode?, value?, name?}` (body <= 4 KB;
+  crossfade and autoplay take a boolean `enabled`; volume an integer `value`
+  0-150, valid out of voice too; seek restarts the track at `position` seconds
+  (file time), clamped, staying paused if it was, unannounced; jump plays a
+  queued `id` now; loop takes `mode` off|track|queue, none cycles; shuffle
+  needs 2+ queued tracks; `save_playlist` and `load_playlist` take a `name`)
+  and returns 200 `{"ok": true}` (202 for add and load_playlist, which
+  download in the background) or `{"ok": false, "error": "<message>"}` (in
+  the session's language, `_fail(request, status, key)`) with 400 (bad input,
+  unsupported link), 403 (view-only id, see Permissions), 404 (unknown sid or
+  track id) or 409 (not in voice, nothing playing).
+  `GET /media/{sid}/{id}` streams the playing, a queued or a history
   track's mp4 with Range support. Files are found by track id, never by a path
   from the request. `GET /api/{sid}/lyrics/{id}` (same tracks, see Lyrics)
   returns `{synced: [[ms, line]...] | null, plain: str | null}`, 202
   `{"pending": true}` while the lookup still runs after `LYRICS_WAIT_SECONDS`
-  (4), or 404 (unknown sid or track, nothing found, LRCLIB down, `LYRICS=0`).
+  (4), 503 when LRCLIB is unreachable (not cached: the page asks again later),
+  or 404 (unknown sid or track, nothing found, `LYRICS=0`).
   Theme routes: `POST /api/{sid}/theme`,
   `POST|DELETE /api/{sid}/theme/logo`, `GET /theme-logo/{sid}` (see Themes).
   `GET /healthz` returns 200 `{status: "ok", discord: "connected", latency_ms,
@@ -521,16 +524,20 @@ Module map, lowest layer first (each imports only the ones above it):
 - **Live updates** (`web_events()`, `state_body()` builds the JSON shared with
   `/state`): one `data:` event with the full state on connect, then one per
   wake-up, coalesced to one per `SSE_MIN_INTERVAL` (0.1 s, last state wins);
-  a `: ping` comment after `SSE_HEARTBEAT_SECONDS` (15) of silence; and every
+  a real `event: ping` (data `{}`, which the page's `EventSource` sees, unlike a
+  comment) after `SSE_HEARTBEAT_SECONDS` (10) of silence; and every
   `SSE_CHECK_SECONDS` (2) a diff of the state (clock fields excluded) that
   sends anything nobody notified (a crossfade drain ending, polling viewers).
-  Headers `Cache-Control: no-cache` and `X-Accel-Buffering: no`. When the
-  session ends it sends `{"active": false}` and closes; a closed transport
+  Headers `Cache-Control: no-cache, no-transform` and `X-Accel-Buffering: no`.
+  The route resolves the id like `/state` (control or view-only; URLs in the
+  body are built from the id used) and again on each wake-up: a view-only
+  stream follows a control-link rotation, a control stream ends with
+  `{"active": false}`, as does a session that ends, and then it closes; a closed transport
   ends the stream within a check period; the app's `on_shutdown`
   (`_close_streams`, run by `stop_web_server()` from `bot.close`) ends them
-  all. Caps: `MAX_STREAMS_PER_SESSION` (100) and `MAX_STREAMS_PER_CLIENT`
+  all. Caps: `MAX_STREAMS_PER_SESSION` (100), `MAX_STREAMS_PER_CLIENT`
   (10, by `_client_key()`: the peer, or the last `X-Forwarded-For` hop when
-  the peer is loopback or private), 429 beyond. Each stream puts an
+  the peer is loopback or private) and `MAX_STREAMS_TOTAL` (500), 429 beyond. Each stream puts an
   `asyncio.Event` in `player.watchers` (moved to the new player after
   `!reset`). **The rule: after any change the page shows, call
   `notify_state(player)`** (on the loop; it bumps `player.state_version` and
@@ -541,7 +548,8 @@ Module map, lowest layer first (each imports only the ones above it):
   wrapper in `build_web_app()`), so a new control action or state field
   needs nothing more; anything missed still lands within
   `SSE_CHECK_SECONDS`. The page uses `EventSource` after its first poll and
-  stops polling once a state arrives; on an error it closes the stream, polls
+  stops polling once a state arrives; on an error, a stream silent for `SSE_STALE_MS` (25 s) or a tab coming
+  back after more than `SSE_RESUME_MS` (10 s) it closes the stream, polls
   (2 s, backing off to 10 s on failures) and retries the stream after 15 s,
   doubling to 2 min. A pushed state's delay is `Date.now()` minus the
   client-server clock offset (measured by the polls) minus `server_time`,
@@ -624,10 +632,13 @@ Module map, lowest layer first (each imports only the ones above it):
   duration (exact match), then `/api/search` by artist and title, then a free
   `q=` search, keeping the result closest in duration (synced first, within
   `MAX_DURATION_GAP` 30 s). Instrumental records and stubs (under `MIN_LINES`
-  3 lines of text) count as nothing. `_http()` is urllib with
-  `LYRICS_TIMEOUT` (6 s) and `LYRICS_MAX_BYTES`; a 404 is "none" (cached in
+  3 lines of text) count as nothing. `_http()` reuses Spotify's
+  no-redirect urllib opener and capped read (`spotify._opener`,
+  `_read_capped()`) with `LYRICS_TIMEOUT` (6 s) and `LYRICS_MAX_BYTES`; at
+  most `MAX_CONCURRENT` (2) lookups run at once (a semaphore per loop); a 404 is "none" (cached in
   memory, LRU `CACHE_SIZE` 256), anything else raises `LyricsUnavailable`
-  (logged, not cached, retried by the next request). `parse_lrc()` reads
+  (logged, not cached, answered by the route as 503, retried by the next
+  request). `parse_lrc()` reads
   `[mm:ss.xx]` tags (several per line), applies `[offset:±ms]` and keeps
   empty lines (instrumental breaks). Timestamps are song time and the page
   compares them with file time: SponsorBlock already cut talking intros out
@@ -651,16 +662,17 @@ Module map, lowest layer first (each imports only the ones above it):
 - **Voice**: `safe_voice_connect()` cleans up any stale voice client, adds
   delays, and retries. It exists to avoid Discord close code 4006 (invalid
   session). `join_voice_channel()` wraps it. `!reset` forces a reconnect.
-- **Commands**: `!play` (YouTube, SoundCloud, Bandcamp, Spotify, Deezer or Apple Music link, or search text), `!list`, `!next`, `!pause`, `!resume`, `!seek`
-  (position relative to the track's automix `start`, as the page shows it),
-  `!crossfade on|off`, `!loop [off|track|queue]`, `!shuffle`, `!volume [0-150]`, `!autoplay [on|off]`, `!playlist ...`, `!stop`, `!reset`, `!theme [preset|reset|edit]`
-  (Manage Server permission via `commands.has_guild_permissions`).
-  `!crossfade on|off`, `!stop`, `!reset`, `!theme [preset|reset|edit]`
-  and `!djrole [role|off]` (Manage Server permission via
-  `commands.has_guild_permissions`), `!weblink` (see Permissions).
-  `!crossfade on|off`, `!stop`, `!reset`, `!theme [preset|reset|edit]` and
-  `!language [code|reset]` (both need Manage Server, via
-  `commands.has_guild_permissions`). `!help` is `HelpCommand`, one
+- **Commands** (all hybrid, `!name` and `/name`; `/play` has one `query`
+  option, a link or search text): `!play` (YouTube, SoundCloud, Bandcamp,
+  Spotify, Deezer or Apple Music link, or search text), `!list`, `!next`,
+  `!pause`, `!resume`, `!seek` (position relative to the track's automix
+  `start`, as the page shows it), `!crossfade on|off`, `!loop
+  [off|track|queue]`, `!shuffle`, `!volume [0-150]`, `!autoplay [on|off]`,
+  `!playlist save|add|load|show|delete <name>` and `!playlist list` (a
+  `hybrid_group`: `/playlist save`, ...), `!stop`, `!reset`, `!weblink` (see
+  Permissions), and the Manage Server ones (`commands.has_guild_permissions`):
+  `!theme [preset|reset|edit]`, `!djrole [role|off]` and `!language
+  [code|reset]` (aliases `!lang`, `!langue`). `!help` is `HelpCommand`, one
   `help.cmd.<name>` line per command in `HELP_ORDER`.
 - **Translations** (`i18n.py`): every user-facing text is a key in
   `djsnake/locales/en.json` and `fr.json` (flat, same keys and same

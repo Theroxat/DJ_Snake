@@ -18,35 +18,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Clip page: a volume button with a slider popover next to Sync, a `volume` control action and a `volume` field in `/api/{sid}/state`. The status panel shows the volume only when it is not 100%.
 - Autoplay ("radio"): `!autoplay [on|off]`, a switch on the clip page and the `AUTOPLAY` default. When the queue runs out, a track related to the last one (YouTube's `RD<id>` mix) is prepared during playback and plays next; recent tracks, live streams, tracks over 10 minutes and non-music titles are skipped, and the bot lingers idle when nothing is found. Loop modes take precedence. Autoplay tracks are marked in the status panel and on the page.
 - Saved playlists per server: `!playlist save|add|load|show|delete <name>` and `!playlist list`, kept in `playlists.db` under `DATA_DIR` (links and titles only, up to 50 playlists of 200 tracks). The clip page can save the queue and load a playlist (`GET /api/{sid}/playlists`, `save_playlist` and `load_playlist` control actions).
-- SoundCloud and Bandcamp links: `!play` and the clip page's add action accept
-  tracks and sets/albums (`soundcloud.com`, `*.bandcamp.com`). Playlists respect
-  `MAX_PLAYLIST_SIZE`; the page shows the artwork for tracks without video
-  (`now_playing.audio_only` in the state), and the "Downloading" list names the
-  platform.
-- Deezer and Apple Music links (tracks, albums, playlists), read without
-  credentials (Deezer's public API, Apple's iTunes lookup API and playlist page)
-  and matched on YouTube like Spotify tracks (new `djsnake/catalog.py`).
+- SoundCloud and Bandcamp links: `!play` and the clip page's add action accept tracks and sets/albums (`soundcloud.com`, `*.bandcamp.com`). Playlists respect `MAX_PLAYLIST_SIZE`; the page shows the artwork for tracks without video (`now_playing.audio_only` in the state), and the "Downloading" list names the platform.
+- Deezer and Apple Music links (tracks, albums, playlists), read without credentials (Deezer's public API, Apple's iTunes lookup API and playlist page) and matched on YouTube like Spotify tracks (new `djsnake/catalog.py`).
+- Synced lyrics on the clip page: a Lyrics button shows the words over the clip, the sung line highlighted and scrolled in time, or plain lyrics when no timing exists. Lyrics come from [LRCLIB](https://lrclib.net) (free, no key), are looked up in the background when a track is queued and cached in `DATA_DIR/lyrics/`. `LYRICS=0` turns them off.
+- Slash commands: every command also works as a slash command (`/play`, `/next`, `/list`, `/seek`, `/pause`, `/resume`, `/stop`, `/reset`, `/crossfade`, `/theme`, `/loop`, `/shuffle`, `/volume`, `/autoplay`, `/playlist`, `/djrole`, `/weblink`, `/language`), with suggestions for the preset and playlist names. The `!` versions are unchanged. Re-invite the bot with the `applications.commands` scope if the commands do not show up. `SLASH_SYNC_GUILD` publishes them to one server at once, for development, and the number of synced commands is logged at startup.
+- Live updates: the clip page gets each change pushed by the bot over a Server-Sent Events stream (`GET /api/{sid}/events`) instead of polling every 2 seconds, and falls back to polling when the stream cannot get through. Behind nginx, turn off `proxy_buffering` (see "Exposing the page").
+- View-only clip page link: every session also has a second unguessable link that shows the same page with the controls hidden and a "View only" badge; the server refuses controls sent with it (403).
+- DJ role: `!djrole <role>|off` (Manage Server, saved in `DATA_DIR/permissions.json`). When set, `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!volume`, `!autoplay`, `!stop` and `!reset` need the role or Manage Server (whoever queued the playing track may still skip it), and the status message shows only the view-only link. Changing the role gives a live session a new control link and retires the server's `!theme edit` links.
+- `!weblink` DMs the control link and the view-only link (DJs only when control is limited).
+- `WEB_CONTROL=everyone|dj` (default `everyone`): with `dj`, the control link is never posted publicly.
+- French translation, and a framework for more languages: `!language en|fr` (Manage Server) switches a server's command replies, errors, `!help`, status message and web API error messages; the clip page follows it (or the browser's language) and has a language picker in its settings menu. `BOT_LANGUAGE` sets the default (`en`). Messages live in `djsnake/locales/{en,fr}.json`.
 
 ### Changed
 
 - The "link not accepted" message lists every supported source.
-- Synced lyrics on the clip page: a Lyrics button shows the words over the clip, the sung line highlighted and scrolled in time, or plain lyrics when no timing exists. Lyrics come from [LRCLIB](https://lrclib.net) (free, no key), are looked up in the background when a track is queued and cached in `DATA_DIR/lyrics/`. `LYRICS=0` turns them off.
-- Slash commands: every command also works as `/play`, `/next`, `/list`, `/seek`, `/pause`, `/resume`, `/stop`, `/reset`, `/crossfade` and `/theme` (with suggestions for the preset). The `!` versions are unchanged. Re-invite the bot with the `applications.commands` scope if the commands do not show up.
-- `SLASH_SYNC_GUILD` publishes the slash commands to one server at once, for development. The number of synced commands is logged at startup.
-- Live updates: the clip page now gets each change pushed by the bot over a
-  Server-Sent Events stream (`GET /api/{sid}/events`) instead of polling every
-  2 seconds, and falls back to polling when the stream cannot get through.
-  Behind nginx, turn off `proxy_buffering` (see "Exposing the page").
-- View-only clip page link: every session also has a second unguessable link that shows the same page with the controls hidden and a "View only" badge; the server refuses controls sent with it (403).
-- DJ role: `!djrole <role>|off` (Manage Server, saved in `DATA_DIR/permissions.json`). When set, `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!stop` and `!reset` need the role or Manage Server (whoever queued the playing track may still skip it), and the status message shows only the view-only link.
-- `!weblink` DMs the control link and the view-only link (DJs only when control is limited).
-- `WEB_CONTROL=everyone|dj` (default `everyone`): with `dj`, the control link is never posted publicly.
-
-### Changed
-
+- `!play` now rebuilds links like the clip page's add action (same host allowlist, canonical URL); links from other hosts are refused with the "link not accepted" message.
 - The status message now shows the view-only link next to the control link. With the defaults, everyone can still control the music as before.
+
+### Security
+
 - Session ids are no longer written to the logs.
-- French translation, and a framework for more languages: `!language en|fr` (Manage Server) switches a server's command replies, errors, `!help`, status message and web API error messages; the clip page follows it (or the browser's language) and has a language picker in its settings menu. `BOT_LANGUAGE` sets the default (`en`). Messages live in `djsnake/locales/{en,fr}.json`.
 
 ## [1.3.0] - 2026-10-22
 
