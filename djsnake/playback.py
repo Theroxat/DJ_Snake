@@ -627,7 +627,12 @@ async def _advance(ctx, player):
 def autoplay_wanted(player):
     """Autoplay may pick the next track: on, no loop mode, not stopping, and
     someone is listening (an empty channel leaves after the grace instead)."""
-    return player.autoplay and not player.loop_active() and not player.should_stop
+    return (
+        player.autoplay
+        and not player.loop_active()
+        and not player.should_stop
+        and not channel_empty(player)
+    )
 
 
 def _autoplay_seed(player, finished=None):

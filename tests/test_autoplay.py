@@ -287,3 +287,18 @@ async def test_search_runs_outside_the_lock(playing, yt, monkeypatch):
     assert seen_locked == [False]
     assert p.is_playing and p.now_playing["video_id"] == vid(1)
     assert not p.lingering()
+
+
+async def test_no_autoplay_into_an_empty_channel(player, ctx, media_dir, yt):
+    player.autoplay = True
+    yt.related = [entry(1)]
+    player.add_to_queue(make_track(media_dir, "seed", video_id=SEED))
+    await play_next(ctx)
+    await settle()
+    player.voice_client.channel.members = []  # Everyone left
+    player.drop_autoplay_next()
+    yt.related_calls.clear()
+    player.voice_client.finish()
+    await settle()
+    assert yt.related_calls == [] and not player.is_playing
+    assert player.lingering()
