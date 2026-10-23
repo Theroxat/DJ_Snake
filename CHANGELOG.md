@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - The "link not accepted" message lists every supported source.
+- Synced lyrics on the clip page: a Lyrics button shows the words over the clip, the sung line highlighted and scrolled in time, or plain lyrics when no timing exists. Lyrics come from [LRCLIB](https://lrclib.net) (free, no key), are looked up in the background when a track is queued and cached in `DATA_DIR/lyrics/`. `LYRICS=0` turns them off.
 
 ## [1.3.0] - 2026-10-22
 

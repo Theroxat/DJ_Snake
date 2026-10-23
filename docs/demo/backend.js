@@ -23,6 +23,24 @@
   // Directors of the films, as the "artist" in the fake stats.
   const ARTISTS = ["Pablo Vazquez", "Mathieu Auvray", "Sacha Goedegebure", "Ian Hubert", "Colin Levy"];
   const DURATION = 25, START = 1, END = 24;
+  // Lyrics shown by the page's lyrics panel, per catalog entry (made-up
+  // placeholder lines, in file time: the clips play from START to END).
+  // Synced as [seconds, line] (an empty line is an instrumental break), a
+  // string for plain (unsynced) lyrics, null for "No lyrics found".
+  const LYRICS = [
+    [[1.5, "Up on the ridge where the cold wind blows"], [4.5, "Three of us waiting for the berry to fall"], [7.5, "Hold the rope, don't look below"],
+      [10.5, ""], [12.5, "One small step and a long way down"], [15.5, "Laughing all the way to the snow"], [18.5, "We'll get it next time, we'll get it all"], [21.5, "Llamas on the mountain, standing tall"]],
+    [[1.5, "Round and round in the laundromat light"], [4.5, "A sheep on a cliff at the edge of the night"], [7.5, "Sign on the dotted line, change your life"],
+      [10.5, "Every cycle starts again"], [13.5, ""], [15.5, "Spin me out of this skin"], [18.5, "Wash me up on another shore"], [21.5, "First cycle, never the last"]],
+    "Morning in the meadow, the dew is on the grass\n" +
+      "A big old rabbit yawning while the butterflies pass\n\n" +
+      "Three little troublemakers hiding in the tree\n" +
+      "Should have left the bunny be\n\n" +
+      "(These lines are placeholder text for the demo.)",
+    [[1.5, "Rain on the bridge in the Amsterdam dark"], [4.5, "Steel in the sky and a spark in the heart"], [7.5, "Run the old scene back, frame by frame"],
+      [10.5, "Change the memory, keep the name"], [13.5, "Tears of steel won't rust tonight"], [16.5, ""], [18.5, "One more take before the light"], [21.5, "Fade to black, then fade to white"]],
+    null,
+  ];
   const BASE_URL = "https://dj.example.com"; // PUBLIC_BASE_URL (fictional)
   const PREFIX = "!";
   const PRESETS = ["arcade", "minimal", "night", "vinyl", "club", "terminal", "space", "cobalt"];
@@ -104,7 +122,7 @@
       return {
         id: "demo" + seq, title: CATALOG[k][0], duration: DURATION,
         thumbnail: thumb(k), url: "https://www.youtube.com/watch?v=" + CATALOG[k][1],
-        video_url: media(k),
+        video_url: media(k), k,
       };
     };
     const trackFor = (videoId) => {
@@ -448,6 +466,7 @@
           crossfade: S.crossfade, loop: S.loop, volume: S.volume, autoplay: S.autoplay, crossfading: false, server_time: Date.now() / 1000,
           viewers: viewers(),
           theme: S.theme,
+          lyrics: true,
           now_playing: c ? Object.assign(pub(c), { video_url: c.video_url, elapsed: elapsed(), start: START, end: END }) : null,
           queue: S.inVoice ? S.queue.map(pub) : [],
           downloading: S.inVoice ? S.pending.slice(0, 50).map((p) => Object.assign({}, p)) : [],
@@ -562,9 +581,21 @@
       setAction("🎨 Clip page theme updated via the web page");
       return { status: 200, body: { ok: true, theme: S.theme } };
     }
-    /** Fake HTTP: `route` is state | stats | control | theme | theme/logo. */
+    // GET /api/{sid}/lyrics/{id}: a playing, queued or history track's lyrics.
+    function lyrics(id) {
+      if (!S.sid) return { status: 404, body: { active: false } };
+      const t = [S.current].concat(S.queue, S.history).find((x) => x && x.id === id);
+      if (!t) return fail(404, "Unknown track.");
+      const l = LYRICS[t.k];
+      if (Array.isArray(l)) return { status: 200, body: { synced: l.map(([s, line]) => [Math.round(s * 1000), line]), plain: l.map((e) => e[1]).join("\n") } };
+      if (typeof l === "string") return { status: 200, body: { synced: null, plain: l } };
+      return fail(404, "No lyrics found.");
+    }
+    /** Fake HTTP: `route` is state | stats | control | theme | theme/logo |
+     * lyrics/{track id}. */
     function http(route, method, body) {
       if (route === "state") return state();
+      if (route.startsWith("lyrics/")) return lyrics(decodeURIComponent(route.slice(7)));
       if (route === "stats") {
         if (!S.sid) return { status: 404, body: { active: false } };
         const range = body && body.range;

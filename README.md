@@ -38,6 +38,7 @@
 - Optional autoplay ("radio"): when the queue runs out, a related YouTube track plays on.
 - Listening stats per server on the clip page: top tracks and artists, the most skipped track, hours played, sessions, peak listeners and a day-by-hour heatmap, for the last week, month or all time.
 - Live viewer count in the clip page header.
+- Synced lyrics over the clip, from [LRCLIB](https://lrclib.net) (free, no key; `LYRICS=0` turns them off).
 - Themable clip page: eight looks, including a custom one with your colors, name and logo (see [Themes](#themes) below).
 - One live status message per session, edited in place instead of spamming the channel.
 - Radio/mix links ask whether to play the single track or the whole playlist.
@@ -121,6 +122,8 @@ When the bot joins voice it posts a link such as `https://dj.example.com/<sessio
 
 The header shows how many people have the page open (👁) and a chart button that opens the server's listening stats (week, month or all time). Stats are kept in `DATA_DIR/stats.db`: each played track with who asked for it (the Discord display name, or "page web" for links added on the page), how long it played and whether it was skipped (left before 30 s of play), plus voice sessions and the peak number of listeners.
 
+The Lyrics button (next to Sync) shows the words of the current track over the clip: the sung line is highlighted and scrolls in time, following the same clock as the video (your Sync offset included). Tracks with only plain lyrics show them in a scrollable sheet, and tracks LRCLIB doesn't know show "No lyrics found". The bot looks lyrics up on [LRCLIB](https://lrclib.net) in the background as soon as a track is queued: the artist and title come from Spotify for Spotify links, else from the YouTube title ("Artist - Title", or the channel name), and the duration picks the right version. Found lyrics are cached in `DATA_DIR/lyrics/`. The button's state is remembered in your browser.
+
 A session belongs to the server and survives the bot leaving voice. It expires after `SESSION_IDLE_HOURS` (6 by default) without playback, voice presence, commands or web actions; its files are then deleted.
 
 **Exposing it.** The container listens on `WEB_PORT`. Compose publishes it on `WEB_BIND`, which defaults to `127.0.0.1` (this machine only). To reach it from elsewhere, put a reverse proxy or a tunnel in front, and set `PUBLIC_BASE_URL` to the public address so the posted link is correct.
@@ -169,8 +172,9 @@ Set these in `.env` (see `.env.example`).
 | `PUBLIC_BASE_URL` | empty (`http://localhost:WEB_PORT`) | Public address used in the posted clip link. |
 | `SESSION_IDLE_HOURS` | `6` | Idle hours before a clip link expires. |
 | `AUTOPLAY` | `0` | Default of the per-session autoplay setting (`1` to start with it on). |
-| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), volumes (`volume.json`), logos and listening stats (`stats.db`). Compose mounts `./data` there. |
+| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), volumes (`volume.json`), logos, listening stats (`stats.db`) and cached lyrics (`lyrics/`). Compose mounts `./data` there. |
 | `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`. |
+| `LYRICS` | `1` | Synced lyrics on the clip page, from lrclib.net (`0` turns them off: no lookups, no button). |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | empty | Optional Spotify Web API credentials, for playlists over 100 tracks. Without them, Spotify links are read from the public embed page. |
 | `YTDLP_AUTO_UPDATE` | `1` | Upgrade yt-dlp on container start (`0` to skip). |
 | `METRICS` | `0` | `1` serves Prometheus metrics on `GET /metrics`. `GET /healthz` (used by the Docker health check) is always on. |

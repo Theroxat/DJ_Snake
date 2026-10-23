@@ -7,7 +7,7 @@ import time
 
 import discord
 
-from . import media, spotify, state, stats
+from . import lyrics, media, spotify, state, stats
 from . import config
 from .config import CROSSFADE_SECONDS, FADE_OUT_SECONDS, FRAMES_PER_SECOND
 from .media import crossfade_eligible, playback_options
@@ -156,9 +156,16 @@ def cancelled(player, epoch):
 
 
 def spotify_fields(spotify_track):
-    """What a Spotify link tells about the YouTube track found for it."""
+    """What a Spotify link tells about the YouTube track found for it: the
+    artist (stats, lyrics), and the title and duration the lyrics lookup
+    prefers to the video's."""
     artists = spotify_track.get("artists") or []
-    return {"artist": artists[0]} if artists and artists[0] else {}
+    fields = {"artist": artists[0]} if artists and artists[0] else {}
+    if spotify_track.get("title"):
+        fields["lyrics_title"] = spotify_track["title"]
+    if spotify_track.get("duration"):
+        fields["lyrics_duration"] = spotify_track["duration"]
+    return fields
 
 
 def pending_label(entry):
@@ -261,6 +268,7 @@ async def _download_and_queue(
             track.update(extra)
         player.add_to_queue(track)
         player.drop_pending(pending_key)  # Never listed twice on the page
+        lyrics.prefetch(track)  # Background, ready before the track plays
         if quiet:
             refresh_panel(player)
         else:

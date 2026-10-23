@@ -9,7 +9,7 @@ import time
 
 from aiohttp import web
 
-from . import state, stats
+from . import lyrics, state, stats
 from .config import (
     APP_VERSION,
     LOGO_TYPES,
@@ -85,6 +85,9 @@ from .volume import valid_volume, volume_for
 #   GET /api/{sid}/playlists   the guild's saved playlists, {"playlists":
 #                              [{name, tracks, duration}]}
 #   GET /media/{sid}/{id}      the mp4 of a playing, queued or history track
+#   GET /api/{sid}/lyrics/{id} {synced: [[ms, line]...] | null, plain} of such a
+#                              track (LRCLIB), 202 {"pending": true} while the
+#                              lookup runs, 404 when none (or lyrics are off)
 #   POST /api/{sid}/theme      {skin, base, bg, text, accent, name}, with the
 #                              X-Edit-Token header of a `!theme edit` link
 #   POST|DELETE /api/{sid}/theme/logo   raw PNG/JPEG/WebP/GIF body (same token)
@@ -303,9 +306,20 @@ async def web_state(request):
             "downloading": [dict(item) for item in downloading[:MAX_DOWNLOADING]],
             "downloading_total": len(downloading),
             "theme": theme_state(sid, state.sessions[sid]),
+            "lyrics": lyrics.ENABLED,
         },
         headers=headers,
     )
+
+
+def _find_track(player, track_id):
+    """The playing, a queued or a history track with this id, or None."""
+    tracks = ([player.now_playing] if player.now_playing else []) + list(player.queue)
+    tracks += list(player.history)
+    for track in tracks:
+        if track.get("id") == track_id:
+            return track
+    return None
 
 
 async def web_media(request):
@@ -314,19 +328,35 @@ async def web_media(request):
     player = session_player(sid)
     if player is None:
         raise web.HTTPNotFound()
-    tracks = ([player.now_playing] if player.now_playing else []) + list(player.queue)
-    tracks += list(player.history)
-    for track in tracks:
-        if track.get("id") == track_id:
-            filepath = track["filepath"]
-            if os.path.isfile(filepath):
-                # Never stored by a proxy or tunnel in front (private), and
-                # revalidated by the browser (no-cache): a clip URL must
-                # always serve the file of that track.
-                headers = {"Cache-Control": "private, no-cache"}
-                return web.FileResponse(filepath, headers=headers)
-            break
+    track = _find_track(player, track_id)
+    if track is not None and os.path.isfile(track["filepath"]):
+        # Never stored by a proxy or tunnel in front (private), and
+        # revalidated by the browser (no-cache): a clip URL must always
+        # serve the file of that track.
+        headers = {"Cache-Control": "private, no-cache"}
+        return web.FileResponse(track["filepath"], headers=headers)
     raise web.HTTPNotFound()
+
+
+async def web_lyrics(request):
+    sid = request.match_info["sid"]
+    headers = {"Cache-Control": "no-store"}
+    player = session_player(sid)
+    if player is None:
+        return web.json_response({"active": False}, status=404, headers=headers)
+    track = _find_track(player, request.match_info["track_id"])
+    if track is None:
+        return _control_error(404, "Unknown track.")
+    result = await lyrics.get(track)
+    if result == lyrics.PENDING:
+        return web.json_response({"pending": True}, status=202, headers=headers)
+    if not result:
+        return web.json_response(
+            {"ok": False, "error": "No lyrics found."}, status=404, headers=headers
+        )
+    return web.json_response(
+        {"synced": result["synced"], "plain": result["plain"]}, headers=headers
+    )
 
 
 # (guild id, range) -> (time.monotonic() expiry, summary): bounds the work a
@@ -664,6 +694,7 @@ def build_web_app():
     app.router.add_post("/api/{sid}/control", web_control)
     app.router.add_get("/api/{sid}/stats", web_stats)
     app.router.add_get("/api/{sid}/playlists", web_playlists)
+    app.router.add_get("/api/{sid}/lyrics/{track_id}", web_lyrics)
     app.router.add_post("/api/{sid}/theme", web_theme)
     app.router.add_post("/api/{sid}/theme/logo", web_theme_logo)
     app.router.add_delete("/api/{sid}/theme/logo", web_theme_logo)
