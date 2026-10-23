@@ -524,6 +524,9 @@ async def _advance(ctx, player):
     elif action == "previous" and finished and player.history:
         player.queue.insert(0, finished)
         next_track = player.history.pop()
+        # Loop queue put that track back at the end of the queue when it
+        # ended: it plays now, so drop that copy (no duplicate entries).
+        player.queue = [q for q in player.queue if q is not next_track]
     elif action is None and player.loop == "track" and finished:
         # Loop track: replay it as a new play (stats count each pass)
         next_track = finished

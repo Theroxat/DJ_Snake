@@ -271,3 +271,21 @@ async def test_web_shuffle_conflicts(client, player):
     player.voice_client.connected = False
     status, _ = await post(client, player, action="shuffle")
     assert status == 409
+
+
+async def test_loop_queue_previous_leaves_no_duplicate(player, ctx, media_dir):
+    from djsnake.controls import control_previous
+
+    a, b = await start(player, ctx, media_dir, "A", "B")
+    control_loop(player, "queue")
+    player.voice_client.finish()  # A ends: back to the end of the queue
+    await settle()
+    assert player.now_playing is b and titles(player.queue) == ["A"]
+    await control_previous(player)
+    await settle()
+    assert player.now_playing is a
+    player.voice_client.finish()
+    await settle()
+    ids = [t["id"] for t in player.queue] + [player.now_playing["id"]]
+    assert len(ids) == len(set(ids))
+    assert sorted(titles(player.queue) + [player.now_playing["title"]]) == ["A", "B"]
