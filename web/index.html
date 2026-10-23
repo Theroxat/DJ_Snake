@@ -1010,9 +1010,9 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
         <video id="video" class="front" muted playsinline preload="auto"></video>
         <video id="video2" muted playsinline preload="auto" aria-hidden="true"></video>
         <img class="artwork" id="artwork" alt="" hidden referrerpolicy="no-referrer">
-        <div class="lyrics" id="lyrics" role="region" aria-label="Lyrics" hidden>
+        <div class="lyrics" id="lyrics" role="region" aria-label="Lyrics" data-i18n-aria="lyr" hidden>
           <div class="band" id="lyrband" hidden><ol id="lyrlines" aria-live="off"></ol></div>
-          <div class="sheet" id="lyrsheet" tabindex="0" aria-label="Lyrics, not synced" hidden><div class="in"><p class="note">These lyrics aren't synced to the track.</p><p id="lyrplain"></p></div></div>
+          <div class="sheet" id="lyrsheet" tabindex="0" aria-label="Lyrics, not synced" data-i18n-aria="lyr_plain_aria" hidden><div class="in"><p class="note" data-i18n="lyr_plain_note">These lyrics aren't synced to the track.</p><p id="lyrplain"></p></div></div>
           <div class="pill hud" id="lyrpill" hidden></div>
         </div>
         <div class="pausebadge hud" id="pausebadge" hidden><i>❚❚</i> <span data-i18n="paused_badge">PAUSED</span></div>
@@ -1039,25 +1039,25 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
             <button id="xfade" class="synctoggle xfade" type="button" role="switch" aria-checked="false" title="Fade between tracks (for everyone in the channel)" data-i18n-title="xfade_title" disabled><span class="box" aria-hidden="true"></span><span class="xl" data-i18n="xfade">Crossfade</span></button>
           </div>
           <div class="tcenter">
-            <button id="shuffle" class="tmode" type="button" aria-label="Shuffle the queue" title="Shuffle the queue" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3l4 4-4 4V8h-2.6l-3.2 4.6L14.4 17H17v-3l4 4-4 4v-3h-3.6a1 1 0 0 1-.8-.4L8.8 13.3 5.9 17.4a1 1 0 0 1-.8.4H3v-2h1.6l3.3-4.7L4.6 6H3V4h2.1a1 1 0 0 1 .8.4L9 8.8l2.6-3.9a1 1 0 0 1 .8-.4H17z"/></svg></button>
+            <button id="shuffle" class="tmode" type="button" aria-label="Shuffle the queue" title="Shuffle the queue" data-i18n-aria="shuffle" data-i18n-title="shuffle" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3l4 4-4 4V8h-2.6l-3.2 4.6L14.4 17H17v-3l4 4-4 4v-3h-3.6a1 1 0 0 1-.8-.4L8.8 13.3 5.9 17.4a1 1 0 0 1-.8.4H3v-2h1.6l3.3-4.7L4.6 6H3V4h2.1a1 1 0 0 1 .8.4L9 8.8l2.6-3.9a1 1 0 0 1 .8-.4H17z"/></svg></button>
             <button id="prev" type="button" aria-label="Previous track" title="Previous" data-i18n-aria="prev_aria" data-i18n-title="prev" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h3v14H5zM20 5v14L9 12z"/></svg></button>
             <button id="pp" type="button" aria-label="Pause" title="Pause" disabled><svg id="ppicon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg></button>
             <button id="next" type="button" aria-label="Next track" title="Next" data-i18n-aria="next_aria" data-i18n-title="next" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h3v14h-3zM4 5v14l11-7z"/></svg></button>
             <button id="loop" class="tmode" type="button" data-mode="off" aria-label="Loop: off. Switch to loop track" title="Loop: off" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v3l4-4-4-4v3H5v6h2zM17 17H7v-3l-4 4 4 4v-3h12v-6h-2z"/><path class="one" d="M11 9.5h1.6V15h-1.4v-4l-.9.5-.4-1.1z"/></svg></button>
           </div>
           <div class="tside end">
-            <button id="voltoggle" class="synctoggle" type="button" aria-expanded="false" aria-controls="volpanel" title="Volume (for everyone in the channel)"><svg id="volicon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9zm11.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"/></svg><span class="lbl">Volume</span><b id="volbadge" hidden></b></button>
+            <button id="voltoggle" class="synctoggle" type="button" aria-expanded="false" aria-controls="volpanel" title="Volume (for everyone in the channel)" data-i18n-title="vol_title"><svg id="volicon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9zm11.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"/></svg><span class="lbl" data-i18n="volume">Volume</span><b id="volbadge" hidden></b></button>
             <button id="synctoggle" class="synctoggle" type="button" aria-expanded="false" aria-controls="syncpanel" title="Video / audio offset" data-i18n-title="sync_title"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h9.2a3 3 0 0 1 5.6 0H20v2h-1.2a3 3 0 0 1-5.6 0H4zm12 2a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM4 16h1.2a3 3 0 0 1 5.6 0H20v2h-9.2a3 3 0 0 1-5.6 0H4zm4 2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg><span class="lbl" data-i18n="sync">Sync</span><b id="syncbadge" hidden></b></button>
-            <button id="lyrbtn" class="synctoggle" type="button" aria-pressed="false" aria-controls="lyrics" title="Show lyrics" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h14v2H3zm0 4h10v2H3zm0 4h7v2H3zm14-3.6 4-1.4v2.2l-2 .7v6.6a2.6 2.6 0 1 1-2-2.5z"/></svg><span class="lbl">Lyrics</span></button>
+            <button id="lyrbtn" class="synctoggle" type="button" aria-pressed="false" aria-controls="lyrics" title="Show lyrics" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h14v2H3zm0 4h10v2H3zm0 4h7v2H3zm14-3.6 4-1.4v2.2l-2 .7v6.6a2.6 2.6 0 1 1-2-2.5z"/></svg><span class="lbl" data-i18n="lyr">Lyrics</span></button>
             <button id="fs" class="synctoggle" type="button" aria-label="Fullscreen" title="Fullscreen" data-i18n-aria="fullscreen" data-i18n-title="fullscreen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v2H6v4H4zm10 0h6v6h-2V6h-4zM4 14h2v4h4v2H4zm14 0h2v6h-6v-2h4z"/></svg></button>
           </div>
         </div>
-        <div class="offset volpanel" id="volpanel" role="group" aria-label="Volume" hidden>
-          <span class="hud" style="color:var(--accent-3)">Volume</span>
-          <input id="volume" type="range" min="0" max="150" step="1" value="100" aria-label="Volume in percent" aria-valuetext="100 percent, normal level">
+        <div class="offset volpanel" id="volpanel" role="group" aria-label="Volume" data-i18n-aria="volume" hidden>
+          <span class="hud" style="color:var(--accent-3)" data-i18n="volume">Volume</span>
+          <input id="volume" type="range" min="0" max="150" step="1" value="100" aria-label="Volume in percent" data-i18n-aria="vol_aria" aria-valuetext="100 percent, normal level">
           <output id="volval" for="volume">100%</output>
-          <button id="volreset" type="button" aria-label="Reset volume to 100 percent">100</button>
-          <p class="hint">Volume of the bot for everyone in the channel, saved for this server. 100% is the normal level; above it, loud tracks are softly limited.</p>
+          <button id="volreset" type="button" aria-label="Reset volume to 100 percent" data-i18n-aria="vol_reset">100</button>
+          <p class="hint" data-i18n="vol_hint">Volume of the bot for everyone in the channel, saved for this server. 100% is the normal level; above it, loud tracks are softly limited.</p>
         </div>
         <div class="offset" id="syncpanel" role="group" aria-label="Sync offset" data-i18n-aria="sync_panel" hidden>
           <span class="hud" style="color:var(--accent-3)" data-i18n="offset">Offset</span>
@@ -1121,16 +1121,16 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     </div>
     <div>
       <h2 class="display qhead"><span data-i18n="upnext">Up next</span> <span class="count" id="qcount">00</span>
-        <button id="autoplay" class="synctoggle xfade" type="button" role="switch" aria-checked="false" title="Keep playing related tracks when the queue runs out (for everyone in the channel)" disabled><span class="box" aria-hidden="true"></span>Autoplay</button>
+        <button id="autoplay" class="synctoggle xfade" type="button" role="switch" aria-checked="false" title="Keep playing related tracks when the queue runs out (for everyone in the channel)" data-i18n-title="autoplay_title" disabled><span class="box" aria-hidden="true"></span><span class="xl" data-i18n="autoplay">Autoplay</span></button>
       </h2>
       <form id="addform" class="addform" autocomplete="off">
         <input id="addurl" type="text" placeholder="Paste a music link (YouTube, Spotify, SoundCloud…) or type a song…" aria-label="Music link, or song to search, to add" data-i18n-ph="add_ph" data-i18n-aria="add_aria" disabled>
         <button id="addbtn" type="submit" aria-label="Add to queue" data-i18n-aria="add_btn_aria" data-i18n="add_btn" disabled>Add</button>
       </form>
       <form id="plform" class="addform plform" autocomplete="off">
-        <select id="plpick" aria-label="Saved playlist" disabled><option value="">No saved playlists</option></select>
-        <button id="plload" type="submit" aria-label="Load the selected playlist into the queue" disabled>Load</button>
-        <button id="plsave" type="button" aria-label="Save the current track and queue as a playlist" disabled>Save queue</button>
+        <select id="plpick" aria-label="Saved playlist" data-i18n-aria="pl_pick_aria" disabled><option value="" data-i18n="pl_none">No saved playlists</option></select>
+        <button id="plload" type="submit" aria-label="Load the selected playlist into the queue" data-i18n-aria="pl_load_aria" data-i18n="pl_load" disabled>Load</button>
+        <button id="plsave" type="button" aria-label="Save the current track and queue as a playlist" data-i18n-aria="pl_save_aria" data-i18n="pl_save" disabled>Save queue</button>
       </form>
       <ol id="queue" aria-label="Queue" data-i18n-aria="queue"></ol>
       <div id="queueempty" class="empty">The queue is empty. Paste a link above to add a track.</div>
@@ -1253,8 +1253,8 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
       lang_auto: "Automatic",
       now: "Now playing",
       upnext: "Up next",
-      add_ph: "Paste a YouTube or Spotify link…",
-      add_aria: "YouTube or Spotify link to add",
+      add_ph: "Paste a music link (YouTube, Spotify, SoundCloud…) or type a song…",
+      add_aria: "Music link, or song to search, to add",
       add_btn_aria: "Add to queue",
       add_btn: "Add",
       queue: "Queue",
@@ -1313,6 +1313,48 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
       end_title: "Session ended",
       end_p1: "The bot has left the voice channel.",
       end_p2: "When DJ Snake comes back, use the new link posted in Discord.",
+      viewonly_title: "This link can watch but not control the music. Ask a DJ for the control link.",
+      viewonly: "View only",
+      shuffle: "Shuffle the queue",
+      shuffled: "Queue shuffled.",
+      loop_title: "Loop: {mode}",
+      loop_off: "off",
+      loop_track: "track",
+      loop_queue: "queue",
+      loop_aria_off: "Loop: off. Switch to loop track",
+      loop_aria_track: "Loop: track. Switch to loop queue",
+      loop_aria_queue: "Loop: queue. Switch to loop off",
+      volume: "Volume",
+      vol_title: "Volume (for everyone in the channel)",
+      vol_aria: "Volume in percent",
+      vol_muted: "Muted",
+      vol_normal: "100 percent, normal level",
+      vol_pct: "{n} percent",
+      vol_reset: "Reset volume to 100 percent",
+      vol_hint: "Volume of the bot for everyone in the channel, saved for this server. 100% is the normal level; above it, loud tracks are softly limited.",
+      autoplay: "Autoplay",
+      autoplay_title: "Keep playing related tracks when the queue runs out (for everyone in the channel)",
+      ap_badge: "📻 Autoplay",
+      ap_picked: "Picked by autoplay",
+      queue_empty_autoplay: "The queue is empty. Autoplay picks a related track when it ends, or paste a link above.",
+      queue_empty_view: "The queue is empty.",
+      pl_none: "No saved playlists",
+      pl_pick: "Saved playlists…",
+      pl_pick_aria: "Saved playlist",
+      pl_load: "Load",
+      pl_load_aria: "Load the selected playlist into the queue",
+      pl_save: "Save queue",
+      pl_save_aria: "Save the current track and queue as a playlist",
+      pl_prompt: "Name for this playlist (current track and queue):",
+      pl_loading: "Loading playlist…",
+      pl_saved: "Playlist saved.",
+      lyr_show: "Show lyrics",
+      lyr_hide: "Hide lyrics",
+      lyr: "Lyrics",
+      lyr_plain_aria: "Lyrics, not synced",
+      lyr_plain_note: "These lyrics aren't synced to the track.",
+      lyr_loading: "Looking for lyrics…",
+      lyr_none: "No lyrics found",
     },
     fr: {
       doc_title: "DJ Snake — Soirée clips",
@@ -1388,8 +1430,8 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
       lang_auto: "Automatique",
       now: "En cours de lecture",
       upnext: "À suivre",
-      add_ph: "Coller un lien YouTube ou Spotify…",
-      add_aria: "Lien YouTube ou Spotify à ajouter",
+      add_ph: "Coller un lien musical (YouTube, Spotify, SoundCloud…) ou taper un titre…",
+      add_aria: "Lien musical, ou titre à rechercher, à ajouter",
       add_btn_aria: "Ajouter à la file d’attente",
       add_btn: "Ajouter",
       queue: "File d’attente",
@@ -1448,6 +1490,48 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
       end_title: "Session terminée",
       end_p1: "Le bot a quitté le salon vocal.",
       end_p2: "Au retour de DJ Snake, utiliser le nouveau lien publié sur Discord.",
+      viewonly_title: "Ce lien permet de regarder mais pas de contrôler la musique. Demander le lien de contrôle à un DJ.",
+      viewonly: "Lecture seule",
+      shuffle: "Mélanger la file d’attente",
+      shuffled: "File d’attente mélangée.",
+      loop_title: "Boucle : {mode}",
+      loop_off: "désactivée",
+      loop_track: "titre",
+      loop_queue: "file d’attente",
+      loop_aria_off: "Boucle : désactivée. Passer à la boucle sur le titre",
+      loop_aria_track: "Boucle : titre. Passer à la boucle sur la file d’attente",
+      loop_aria_queue: "Boucle : file d’attente. Désactiver la boucle",
+      volume: "Volume",
+      vol_title: "Volume (pour tout le salon)",
+      vol_aria: "Volume en pourcentage",
+      vol_muted: "Coupé",
+      vol_normal: "100 pour cent, niveau normal",
+      vol_pct: "{n} pour cent",
+      vol_reset: "Remettre le volume à 100 pour cent",
+      vol_hint: "Volume du bot pour tout le salon, enregistré pour ce serveur. 100 % est le niveau normal ; au-delà, les titres forts sont légèrement limités.",
+      autoplay: "Lecture automatique",
+      autoplay_title: "Continuer avec des titres similaires quand la file d’attente est vide (pour tout le salon)",
+      ap_badge: "📻 Lecture automatique",
+      ap_picked: "Choisi par la lecture automatique",
+      queue_empty_autoplay: "La file d’attente est vide. La lecture automatique choisit un titre similaire à la fin, ou coller un lien ci-dessus.",
+      queue_empty_view: "La file d’attente est vide.",
+      pl_none: "Aucune playlist enregistrée",
+      pl_pick: "Playlists enregistrées…",
+      pl_pick_aria: "Playlist enregistrée",
+      pl_load: "Charger",
+      pl_load_aria: "Charger la playlist choisie dans la file d’attente",
+      pl_save: "Enregistrer la file",
+      pl_save_aria: "Enregistrer le titre en cours et la file d’attente comme playlist",
+      pl_prompt: "Nom de cette playlist (titre en cours et file d’attente) :",
+      pl_loading: "Chargement de la playlist…",
+      pl_saved: "Playlist enregistrée.",
+      lyr_show: "Afficher les paroles",
+      lyr_hide: "Masquer les paroles",
+      lyr: "Paroles",
+      lyr_plain_aria: "Paroles, non synchronisées",
+      lyr_plain_note: "Ces paroles ne sont pas synchronisées avec le titre.",
+      lyr_loading: "Recherche des paroles…",
+      lyr_none: "Aucune parole trouvée",
     },
   };
   const LANGS = Object.keys(I18N);
@@ -1469,8 +1553,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     return t(key + (cat === "one" ? "_one" : "_other"), Object.assign({ n: nf(n) }, params || {}));
   }
   const nf = (n, opts) => Number(n || 0).toLocaleString(lang, opts);
-  const i18n = t; // for code where `t` names something else (a theme, a track)
-  function pickLang() {
+    function pickLang() {
     if (langPref !== "auto") return langPref;
     if (serverLang) return serverLang;
     let nav = "";
@@ -1541,11 +1624,10 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
   // never sent (the server would refuse them with 403 anyway).
   let canControl = true;
   const active = () => inVoice && canControl;
-  const EMPTY_QUEUE = {
-    control: "The queue is empty. Paste a link above to add a track.",
-    autoplay: "The queue is empty. Autoplay picks a related track when it ends, or paste a link above.",
-    view: "The queue is empty.",
-  };
+  const EMPTY_QUEUE = { control: "queue_empty", autoplay: "queue_empty_autoplay", view: "queue_empty_view" };
+  function showEmptyQueue() {
+    $("queueempty").textContent = t(!canControl ? EMPTY_QUEUE.view : autoplay ? EMPTY_QUEUE.autoplay : EMPTY_QUEUE.control);
+  }
   let dissolveTimer = null;
   let queue = [];          // current (possibly optimistic) queue
   let dragging = false, deferredQueue = null;
@@ -1596,7 +1678,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     const v = vol, slider = $("volume");
     if (+slider.value !== v) slider.value = v;
     $("volval").textContent = v + "%";
-    slider.setAttribute("aria-valuetext", v === 0 ? "Muted" : v === 100 ? "100 percent, normal level" : v + " percent");
+    slider.setAttribute("aria-valuetext", v === 0 ? t("vol_muted") : v === 100 ? t("vol_normal") : t("vol_pct", { n: v }));
     $("volbadge").textContent = " " + v + "%";
     $("volbadge").hidden = v === 100;
     $("volicon").innerHTML = v === 0
@@ -1635,6 +1717,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     if (e.key === "Escape" && !$("volpanel").hidden) { setVolPanel(false); $("voltoggle").focus(); }
   });
   showVolume();
+  langListeners.push(showVolume);
 
   // ---- fullscreen
   $("fs").addEventListener("click", () => {
@@ -1671,12 +1754,12 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
   });
   let toastTimer = null;
   function toast(msg, kind) {
-    const t = $("toast");
-    t.textContent = msg;
-    t.className = kind || "";
-    t.hidden = false;
+    const el = $("toast");
+    el.textContent = msg;
+    el.className = kind || "";
+    el.hidden = false;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { t.hidden = true; }, kind === "err" ? 5000 : 3000);
+    toastTimer = setTimeout(() => { el.hidden = true; }, kind === "err" ? 5000 : 3000);
   }
   const YT = '<svg viewBox="0 0 24 17" aria-hidden="true"><path d="M23.5 2.7A3 3 0 0 0 21.4.5C19.5 0 12 0 12 0S4.5 0 2.6.5A3 3 0 0 0 .5 2.7C0 4.6 0 8.5 0 8.5s0 3.9.5 5.8a3 3 0 0 0 2.1 2.2C4.5 17 12 17 12 17s7.500 0 9.400-.5a3 3 0 0 0 2.100-2.200c.5-1.900.5-5.800.5-5.800s0-3.900-.5-5.800zM9.600 12.100V4.900l6.200 3.600z"/></svg>';
   function ytLink(url) {
@@ -1711,7 +1794,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
   function renderQueue(q) {
     queue = q;
     if (dragging) { deferredQueue = q; return; }
-    const sig = JSON.stringify([canControl, q.map((t) => [t.id, t.title, t.duration, t.url, t.thumbnail])]);
+    const sig = JSON.stringify([canControl, q.map((x) => [x.id, x.title, x.duration, x.url, x.thumbnail])]);
     if (sig === lastQueueSig) return;
     lastQueueSig = sig;
     const ol = $("queue");
@@ -1774,7 +1857,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     const wrap = $("nowwrap");
     wrap.hidden = !np;
     if (!np) { lastNowSig = ""; $("nowrow").textContent = ""; setAmbient(null); return; }
-    const sig = JSON.stringify([np.id, np.title, np.thumbnail, !!np.autoplay]);
+    const sig = JSON.stringify([np.id, np.title, np.thumbnail, !!np.autoplay, lang]);
     if (sig !== lastNowSig) {
       lastNowSig = sig;
       setAmbient(np.thumbnail);
@@ -1791,8 +1874,8 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
       n.title = np.title;
       li.appendChild(n);
       if (np.autoplay) {
-        const ap = mk("span", "apbadge", "📻 Autoplay");
-        ap.title = "Picked by autoplay";
+        const ap = mk("span", "apbadge", t("ap_badge"));
+        ap.title = t("ap_picked");
         li.appendChild(ap);
       }
       li.appendChild(mk("span", "d"));
@@ -1814,7 +1897,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
   function renderDownloading(list, total) {
     const items = Array.isArray(list) ? list : [];
     total = Math.max(Number.isInteger(total) ? total : 0, items.length);
-    const sig = JSON.stringify([total, items.map((t) => [t.key, t.title, t.source])]);
+    const sig = JSON.stringify([total, items.map((x) => [x.key, x.title, x.source])]);
     if (sig === lastDlSig) return;
     lastDlSig = sig;
     const ol = $("dl");
@@ -1861,7 +1944,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
       if (!active()) return;
       const id = rm.closest("li").dataset.id;
       rm.disabled = true;
-      renderQueue(queue.filter((t) => t.id !== id));
+      renderQueue(queue.filter((x) => x.id !== id));
       send("remove", { id });
       return;
     }
@@ -1883,7 +1966,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     const g = e.target.closest && e.target.closest("button.grip");
     if (!g || !active() || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
     e.preventDefault();
-    const from = queue.findIndex((t) => t.id === g.dataset.id);
+    const from = queue.findIndex((x) => x.id === g.dataset.id);
     doMove(from, from + (e.key === "ArrowUp" ? -1 : 1), true);
   });
 
@@ -1965,9 +2048,9 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
   // ---- sync
   function targetPos() {
     if (!state) return 0;
-    let t = baseElapsed + (paused ? 0 : (performance.now() - anchor) / 1000 + offset);
-    if (state.end) t = Math.min(t, state.end);
-    return Math.max(0, t);
+    let pos = baseElapsed + (paused ? 0 : (performance.now() - anchor) / 1000 + offset);
+    if (state.end) pos = Math.min(pos, state.end);
+    return Math.max(0, pos);
   }
 
   function clearVideo(v) {
@@ -2123,17 +2206,17 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
   }
   function showPreview(f) {
     seekFrac = f;
-    const t = f * (state.end - state.start); // shown relative to start
+    const secs = f * (state.end - state.start); // shown relative to start
     $("seekghost").hidden = false;
     $("seektip").hidden = false;
     $("seekghost").style.left = f * 100 + "%";
     $("seektip").style.left = f * 100 + "%";
-    $("seektip").textContent = fmt(t);
+    $("seektip").textContent = fmt(secs);
     if (seeking) {
       $("progfill").style.width = f * 100 + "%";
-      $("tcur").textContent = fmt(t);
-      seekEl.setAttribute("aria-valuenow", String(Math.floor(t)));
-      seekEl.setAttribute("aria-valuetext", fmt(t));
+      $("tcur").textContent = fmt(secs);
+      seekEl.setAttribute("aria-valuenow", String(Math.floor(secs)));
+      seekEl.setAttribute("aria-valuetext", fmt(secs));
     }
   }
   function hidePreview() { $("seekghost").hidden = true; $("seektip").hidden = true; }
@@ -2237,7 +2320,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     $("lyrband").hidden = k !== "synced";
     $("lyrsheet").hidden = k !== "plain";
     $("lyrpill").hidden = k !== "loading" && k !== "none";
-    $("lyrpill").textContent = k === "loading" ? "Looking for lyrics…" : "No lyrics found";
+    $("lyrpill").textContent = t(k === "loading" ? "lyr_loading" : "lyr_none");
     if (lyrShown !== lyr) {
       lyrShown = lyr;
       lyrIdx = -2;
@@ -2263,9 +2346,9 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
   function lyrStep() {
     lyrFrame = 0;
     if (!lyr || lyr.kind !== "synced" || $("lyrics").hidden || !state) return;
-    const t = targetPos() * 1000, L = lyr.lines, ol = $("lyrlines");
-    let lo = 0, hi = L.length - 1, i = -1; // last line at or before t
-    while (lo <= hi) { const m = (lo + hi) >> 1; if (L[m][0] <= t) { i = m; lo = m + 1; } else hi = m - 1; }
+    const ms = targetPos() * 1000, L = lyr.lines, ol = $("lyrlines");
+    let lo = 0, hi = L.length - 1, i = -1; // last line at or before ms
+    while (lo <= hi) { const m = (lo + hi) >> 1; if (L[m][0] <= ms) { i = m; lo = m + 1; } else hi = m - 1; }
     if (i !== lyrIdx) {
       const old = ol.children[lyrIdx];
       if (old) { old.classList.remove("cur"); old.style.removeProperty("--left"); }
@@ -2276,7 +2359,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     const cur = ol.children[i];
     if (cur) {
       const until = i + 1 < L.length ? L[i + 1][0] : Math.max(L[i][0] + 1, (state.end || 0) * 1000);
-      const left = 1 - (t - L[i][0]) / Math.max(1, until - L[i][0]);
+      const left = 1 - (ms - L[i][0]) / Math.max(1, until - L[i][0]);
       cur.style.setProperty("--left", Math.max(0, Math.min(1, left)).toFixed(3));
     }
     lyrFrame = requestAnimationFrame(lyrStep);
@@ -2284,11 +2367,12 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
   function setLyrics(on, save) {
     lyrOn = on;
     $("lyrbtn").setAttribute("aria-pressed", String(on));
-    $("lyrbtn").title = on ? "Hide lyrics" : "Show lyrics";
+    $("lyrbtn").title = t(on ? "lyr_hide" : "lyr_show");
     if (save) { try { localStorage.setItem(LYR_KEY, on ? "1" : "0"); } catch (e) {} }
     lyricsFor(lyrId);
   }
   setLyrics(lyrOn, false);
+  langListeners.push(() => { setLyrics(lyrOn, false); });
   $("lyrbtn").addEventListener("click", () => setLyrics(!lyrOn, true));
   window.addEventListener("resize", () => { if (lyrShown && lyrShown.kind === "synced") placeLyrics(); });
   document.addEventListener("fullscreenchange", () => { if (lyrShown && lyrShown.kind === "synced") requestAnimationFrame(placeLyrics); });
@@ -2326,16 +2410,16 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     try { history.replaceState(null, "", location.pathname + (rest ? "?" + rest : "") + location.hash); } catch (e) {}
   })();
 
-  function sanitizeTheme(t) {
-    t = t || {};
-    const logo = typeof t.logo_url === "string" && /^\/theme-logo\/[A-Za-z0-9_-]+\?v=\d+$/.test(t.logo_url) ? t.logo_url : null;
+  function sanitizeTheme(th) {
+    th = th || {};
+    const logo = typeof th.logo_url === "string" && /^\/theme-logo\/[A-Za-z0-9_-]+\?v=\d+$/.test(th.logo_url) ? th.logo_url : null;
     return {
-      skin: Object.prototype.hasOwnProperty.call(SKIN_NAMES, t.skin) ? t.skin : "arcade",
-      base: PRESET_IDS.includes(t.base) ? t.base : "night",
-      bg: COLOR_RE.test(t.bg) ? t.bg : "#101820",
-      text: COLOR_RE.test(t.text) ? t.text : "#f2f2f2",
-      accent: COLOR_RE.test(t.accent) ? t.accent : "#ffb703",
-      name: typeof t.name === "string" ? t.name.slice(0, 32) : "",
+      skin: Object.prototype.hasOwnProperty.call(SKIN_NAMES, th.skin) ? th.skin : "arcade",
+      base: PRESET_IDS.includes(th.base) ? th.base : "night",
+      bg: COLOR_RE.test(th.bg) ? th.bg : "#101820",
+      text: COLOR_RE.test(th.text) ? th.text : "#f2f2f2",
+      accent: COLOR_RE.test(th.accent) ? th.accent : "#ffb703",
+      name: typeof th.name === "string" ? th.name.slice(0, 32) : "",
       logo_url: logo,
     };
   }
@@ -2345,57 +2429,57 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2] > 0.35 ? "#101010" : "#ffffff";
   }
   // Put a theme's attributes (and custom colors) on an element.
-  function skinElement(el, t) {
-    el.dataset.skin = t.skin;
-    el.dataset.base = t.base;
+  function skinElement(el, th) {
+    el.dataset.skin = th.skin;
+    el.dataset.base = th.base;
     for (const k of ["bg", "text", "accent"]) {
-      if (t.skin === "custom") el.style.setProperty("--c-" + k, t[k]);
+      if (th.skin === "custom") el.style.setProperty("--c-" + k, th[k]);
       else el.style.removeProperty("--c-" + k);
     }
-    if (t.skin === "custom") el.style.setProperty("--c-on-accent", onAccent(t.accent));
+    if (th.skin === "custom") el.style.setProperty("--c-on-accent", onAccent(th.accent));
     else el.style.removeProperty("--c-on-accent");
   }
   function effectiveTheme() {
     if (draft) return draft;
-    const t = serverTheme || sanitizeTheme(null);
-    return viewerSkin === "server" ? t : Object.assign({}, t, { skin: viewerSkin });
+    const th = serverTheme || sanitizeTheme(null);
+    return viewerSkin === "server" ? th : Object.assign({}, th, { skin: viewerSkin });
   }
   function brandName() {
-    const t = draft || serverTheme;
-    return (t && t.name.trim()) || "DJ Snake";
+    const th = draft || serverTheme;
+    return (th && th.name.trim()) || "DJ Snake";
   }
   function applyTheme() {
-    const t = effectiveTheme();
-    skinElement(html, t);
-    html.dataset.shape = t.skin === "custom" ? t.base : t.skin;
+    const th = effectiveTheme();
+    skinElement(html, th);
+    html.dataset.shape = th.skin === "custom" ? th.base : th.skin;
     const words = brandName().split(/\s+/), last = words.pop();
     const wm = $("wordmark");
     wm.textContent = words.length ? words.join(" ") + " " : "";
     wm.appendChild(mk("span", null, last));
     const img = $("logoimg");
-    img.hidden = !t.logo_url;
-    img.alt = t.logo_url ? i18n("logo_alt", { name: brandName() }) : "";
-    if (t.logo_url) { if (img.getAttribute("src") !== t.logo_url) img.src = t.logo_url; }
+    img.hidden = !th.logo_url;
+    img.alt = th.logo_url ? t("logo_alt", { name: brandName() }) : "";
+    if (th.logo_url) { if (img.getAttribute("src") !== th.logo_url) img.src = th.logo_url; }
     else img.removeAttribute("src");
-    $("e-logoclear").hidden = !t.logo_url;
+    $("e-logoclear").hidden = !th.logo_url;
     buildMenu();
   }
   function setServerTheme(raw) {
-    const t = sanitizeTheme(raw);
-    const sig = JSON.stringify(t);
+    const th = sanitizeTheme(raw);
+    const sig = JSON.stringify(th);
     if (sig === serverSig) return;
     serverSig = sig;
-    serverTheme = t;
-    if (editToken && !draft) { draft = Object.assign({}, t); syncEditor(); openEditor(); }
+    serverTheme = th;
+    if (editToken && !draft) { draft = Object.assign({}, th); syncEditor(); openEditor(); }
     applyTheme();
   }
 
   // viewer menu
   const menu = $("thememenu"), palbtn = $("palbtn");
-  function dots(t) {
+  function dots(th) {
     const s = mk("span", "dots");
     s.setAttribute("aria-hidden", "true");
-    skinElement(s, t);
+    skinElement(s, th);
     for (const v of ["--bg", "--accent", "--accent-2"]) {
       const i = mk("i");
       i.style.background = "var(" + v + ")";
@@ -2408,7 +2492,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     const focused = document.activeElement && menu.contains(document.activeElement) ? document.activeElement.dataset.choice : null;
     menu.textContent = "";
     const st = serverTheme || sanitizeTheme(null);
-    const item = (choice, label, t) => {
+    const item = (choice, label, th) => {
       const b = mk("button");
       b.type = "button";
       b.dataset.choice = choice;
@@ -2416,7 +2500,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
       b.setAttribute("aria-checked", String(viewerSkin === choice));
       b.appendChild(mk("span", "tick", viewerSkin === choice ? "✓" : ""));
       b.appendChild(mk("span", null, label));
-      b.appendChild(dots(t));
+      b.appendChild(dots(th));
       menu.appendChild(b);
     };
     item("server", t("menu_server", { skin: st.skin === "custom" ? t("skin_custom") : SKIN_NAMES[st.skin] }), st);
@@ -2538,8 +2622,8 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     }
     return null;
   }
-  function adoptSaved(t, keepDraft) {
-    serverTheme = sanitizeTheme(t);
+  function adoptSaved(th, keepDraft) {
+    serverTheme = sanitizeTheme(th);
     serverSig = JSON.stringify(serverTheme);
     if (keepDraft) draft.logo_url = serverTheme.logo_url; // other edits stay pending
     else { draft = Object.assign({}, serverTheme); syncEditor(); }
@@ -2552,9 +2636,9 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     const btn = $("e-save");
     btn.disabled = true;
     const body = JSON.stringify({ skin: draft.skin, base: draft.base, bg: draft.bg, text: draft.text, accent: draft.accent, name });
-    const t = await themeRequest("/theme", "POST", body, "application/json");
+    const th = await themeRequest("/theme", "POST", body, "application/json");
     btn.disabled = false;
-    if (t) { adoptSaved(t, false); editMsg(["ed_saved"], true); }
+    if (th) { adoptSaved(th, false); editMsg(["ed_saved"], true); }
   });
   async function uploadLogo(file) {
     editMsg("");
@@ -2562,15 +2646,15 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) { editMsg(["ed_bad_format"]); return; }
     if (file.size > LOGO_MAX) { editMsg(["ed_too_large"]); return; }
     editMsg(["ed_uploading"], true);
-    const t = await themeRequest("/theme/logo", "POST", file, file.type);
+    const th = await themeRequest("/theme/logo", "POST", file, file.type);
     $("e-logo").value = "";
-    if (t) { adoptSaved(t, true); editMsg(["ed_logo_saved"], true); }
+    if (th) { adoptSaved(th, true); editMsg(["ed_logo_saved"], true); }
   }
   $("e-logo").addEventListener("change", (e) => uploadLogo(e.target.files[0]));
   $("e-logoclear").addEventListener("click", async () => {
     if (!editToken || !draft) return;
-    const t = await themeRequest("/theme/logo", "DELETE", null, null);
-    if (t) { adoptSaved(t, true); editMsg(["ed_logo_removed"], true); }
+    const th = await themeRequest("/theme/logo", "DELETE", null, null);
+    if (th) { adoptSaved(th, true); editMsg(["ed_logo_removed"], true); }
   });
   for (const el of [$("drop"), $("header")]) {
     el.addEventListener("dragover", (e) => { if (!draft) return; e.preventDefault(); el.classList.add("dragover"); });
@@ -2618,7 +2702,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
       showVolume();
     }
     if (!pending.has("autoplay")) autoplay = !!d.autoplay;
-    $("queueempty").textContent = !canControl ? EMPTY_QUEUE.view : autoplay ? EMPTY_QUEUE.autoplay : EMPTY_QUEUE.control;
+    showEmptyQueue();
     lyrAvail = d.lyrics === true; // false when the bot runs with LYRICS=0
     $("lyrbtn").hidden = !lyrAvail;
     $("pausebadge").hidden = !(paused && d.now_playing);
@@ -2698,10 +2782,11 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     dis("loop", !active() || pending.has("loop"));
     const lp = $("loop");
     lp.dataset.mode = loopMode;
-    lp.title = "Loop: " + loopMode;
-    lp.setAttribute("aria-label", "Loop: " + loopMode + ". Switch to loop " + LOOP_NEXT[loopMode]);
+    lp.title = t("loop_title", { mode: t("loop_" + loopMode) });
+    lp.setAttribute("aria-label", t("loop_aria_" + loopMode));
     dis("autoplay", !active() || pending.has("autoplay"));
     $("autoplay").setAttribute("aria-checked", String(autoplay));
+    showEmptyQueue();
     const pp = $("pp");
     pp.setAttribute("aria-label", t(paused ? "resume" : "pause"));
     pp.title = t(paused ? "resume" : "pause");
@@ -2755,7 +2840,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
   const LOOP_NEXT = { off: "track", track: "queue", queue: "off" };
   $("shuffle").addEventListener("click", () => {
     if (!active() || pending.has("shuffle")) return;
-    send("shuffle").then((ok) => { if (ok) toast("Queue shuffled.", "ok"); });
+    send("shuffle").then((ok) => { if (ok) toast(t("shuffled"), "ok"); });
   });
   $("loop").addEventListener("click", () => {
     if (!active() || pending.has("loop")) return;
@@ -2787,7 +2872,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
       pick.textContent = "";
       const first = document.createElement("option");
       first.value = "";
-      first.textContent = list.length ? "Saved playlists…" : "No saved playlists";
+      first.textContent = t(list.length ? "pl_pick" : "pl_none");
       pick.appendChild(first);
       list.forEach((p) => {
         const o = document.createElement("option");
@@ -2807,10 +2892,14 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
   });
   $("plsave").addEventListener("click", () => {
     if (!active() || pending.has("save_playlist")) return;
-    const name = (window.prompt("Name for this playlist (current track and queue):") || "").trim();
+    const name = (window.prompt(t("pl_prompt")) || "").trim();
     if (name) send("save_playlist", { name });
   });
   loadPlaylists();
+  langListeners.push(() => {
+    const first = $("plpick").options[0];
+    if (first && first.value === "") first.textContent = t($("plpick").options.length > 1 ? "pl_pick" : "pl_none");
+  });
 
   // ---- live viewers: a random id per tab, kept for the tab's lifetime
   const VIEWER_RE = /^[A-Za-z0-9_-]{8,40}$/;
@@ -2835,18 +2924,18 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     items.forEach((it, i) => {
       const li = mk("li");
       li.appendChild(mk("span", "r", String(i + 1)));
-      const t = mk("span", "t");
-      if (it.name === null) t.appendChild(mk("span", "web", i18n("st_web")));
-      else t.appendChild(document.createTextNode(it.title != null ? it.title : it.name));
-      if (it.artist) { t.appendChild(document.createTextNode(" ")); t.appendChild(mk("small", null, "· " + it.artist)); }
-      t.title = (it.title != null ? it.title : it.name || i18n("st_web")) + (it.artist ? " · " + it.artist : "");
-      li.appendChild(t);
+      const lab = mk("span", "t");
+      if (it.name === null) lab.appendChild(mk("span", "web", t("st_web")));
+      else lab.appendChild(document.createTextNode(it.title != null ? it.title : it.name));
+      if (it.artist) { lab.appendChild(document.createTextNode(" ")); lab.appendChild(mk("small", null, "· " + it.artist)); }
+      lab.title = (it.title != null ? it.title : it.name || t("st_web")) + (it.artist ? " · " + it.artist : "");
+      li.appendChild(lab);
       li.appendChild(mk("span", "c", "×" + nf(it.plays)));
       const bar = mk("span", "meter"), fill = mk("i");
       fill.style.width = Math.round((100 * (it.plays || 0)) / max) + "%";
       bar.appendChild(fill);
       li.appendChild(bar);
-      li.setAttribute("aria-label", i18n("st_rank_aria", { rank: i + 1, title: t.title, n: nf(it.plays) }));
+      li.setAttribute("aria-label", t("st_rank_aria", { rank: i + 1, title: lab.title, n: nf(it.plays) }));
       ol.appendChild(li);
     });
     return ol;
@@ -2861,11 +2950,11 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     return s;
   }
   function tile(k, v, sub) {
-    const t = mk("div", "tile");
-    t.appendChild(mk("div", "k", k));
-    t.appendChild(mk("div", "v", v));
-    if (sub) t.appendChild(mk("div", "s", sub));
-    return t;
+    const el = mk("div", "tile");
+    el.appendChild(mk("div", "k", k));
+    el.appendChild(mk("div", "v", v));
+    if (sub) el.appendChild(mk("div", "s", sub));
+    return el;
   }
   function heatmap(utc) {
     // UTC hour-of-week buckets (Monday 00:00 = 0) shifted to this browser's zone.
