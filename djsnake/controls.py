@@ -23,6 +23,7 @@ from .playback import (
 )
 from .player import discard_tracks
 from .sessions import refresh_panel
+from .volume import percent_to_gain, save_volumes, valid_volume, volume_for
 
 
 class _NullMessage:
@@ -66,6 +67,11 @@ class ControlError(Exception):
         "bad_index": (400, "Invalid position."),
         "bad_loop": (400, "Loop mode must be off, track or queue."),
         "nothing_to_shuffle": (409, "Not enough queued tracks to shuffle."),
+        "bad_volume": (400, "Volume must be a whole number from 0 to 150."),
+        "volume_not_saved": (
+            500,
+            "Volume changed, but it could not be saved on the server.",
+        ),
         "bad_url": (
             400,
             "Only YouTube (video or playlist) and Spotify (track, album or "
@@ -228,6 +234,26 @@ async def control_shuffle(player):
             raise ControlError("nothing_to_shuffle")
         random.shuffle(player.queue)
     player.last_active = state.clock()
+
+
+def control_volume(player, guild_id, percent):
+    """Set the server's volume (0-150 %, 100 = the normalised level). It
+    applies to the playing track at once, glides over a few frames and is
+    saved for later. Raises `volume_not_saved` (the change still applies
+    until restart) if DATA_DIR is not writable."""
+    if not valid_volume(percent):
+        raise ControlError("bad_volume")
+    state.guild_volumes[guild_id] = percent
+    player.last_active = state.clock()
+    if player.mixer is not None:
+        player.mixer.set_volume(percent_to_gain(percent))
+    refresh_panel(player)
+    try:
+        save_volumes()
+    except OSError as e:
+        print(f"Could not save volumes: {e}")
+        raise ControlError("volume_not_saved")
+    return volume_for(guild_id)
 
 
 def seek_label(player, applied):

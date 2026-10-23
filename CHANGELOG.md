@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Optional `GET /metrics` in the Prometheus text format (players, queued tracks, downloads, viewers, Discord latency, tracks played), off unless `METRICS=1`.
 - Search by text: `!play daft punk one more time` (any argument that is not a link) and the clip page's add box search YouTube and queue the best match, scored like Spotify tracks. When nothing scores high enough the bot says so.
 - Loop and shuffle. `!loop [off|track|queue]` (no argument cycles) replays the current track or sends finished tracks back to the end of the queue; `!shuffle` shuffles the upcoming queue once. The clip page has matching shuffle and loop buttons, the control API gets `loop` and `shuffle` actions, `/api/{sid}/state` exposes `loop`, and the status panel shows the loop mode.
+- Per-server volume: `!volume` shows it, `!volume <0-150>` sets it (percent, 100 = the normalised level). It applies to the playing track without a restart, glides over a few frames to avoid clicks, is soft-limited above 100%, works with crossfade and is saved in `DATA_DIR/volume.json`.
+- Clip page: a volume button with a slider popover next to Sync, a `volume` control action and a `volume` field in `/api/{sid}/state`. The status panel shows the volume only when it is not 100%.
 
 ## [1.3.0] - 2026-10-22
 

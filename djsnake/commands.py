@@ -26,6 +26,7 @@ from .controls import (
     control_resume,
     control_seek,
     control_shuffle,
+    control_volume,
     read_spotify,
     seek_label,
 )
@@ -47,6 +48,7 @@ from .sessions import (
     touch,
 )
 from .themes import issue_edit_token, reset_theme, save_themes, theme_for
+from .volume import parse_volume, volume_for
 
 bot = state.bot
 
@@ -385,6 +387,29 @@ async def loop_command(ctx, mode: str = None):
 async def shuffle(ctx):
     if await _run_command_control(ctx, control_shuffle) is not _FAILED:
         set_action(state.music_players[ctx.guild.id], "🔀 Queue shuffled")
+
+
+@bot.command(name="volume")
+async def volume(ctx, level: str = None):
+    """Show the server's volume, or set it (0-150 %, 100 = normal)."""
+    if level is None:
+        await ctx.send(
+            f"🔊 Volume: **{volume_for(ctx.guild.id)}%**\n"
+            f"`{COMMAND_PREFIX}volume <0-150>` changes it (100 is the normal level)."
+        )
+        return
+    percent = parse_volume(level)
+    if percent is None:
+        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}volume [0-150]`")
+        return
+    player = state.music_players.setdefault(ctx.guild.id, MusicPlayer())
+    touch(player)
+    try:
+        control_volume(player, ctx.guild.id, percent)
+    except ControlError as e:
+        await ctx.send(f"⚠️ {e.message}")
+        return
+    await ack(ctx)
 
 
 @bot.command(name="theme")

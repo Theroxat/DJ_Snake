@@ -41,6 +41,7 @@ from .controls import (
     control_resume,
     control_seek,
     control_shuffle,
+    control_volume,
     seek_label,
 )
 from .sessions import refresh_panel, session_player, set_action, short, touch
@@ -55,6 +56,7 @@ from .themes import (
     theme_state,
     valid_color,
 )
+from .volume import valid_volume, volume_for
 
 # --- Web server: synced clip page -------------------------------------------
 #
@@ -73,6 +75,7 @@ from .themes import (
 #                              seek, jump, crossfade ({"enabled": bool}),
 #                              loop ({"mode": off|track|queue}, none cycles),
 #                              shuffle
+#                              volume ({"value": int 0-150, percent})
 #   GET /media/{sid}/{id}      the mp4 of a playing, queued or history track
 #   POST /api/{sid}/theme      {skin, base, bg, text, accent, name}, with the
 #                              X-Edit-Token header of a `!theme edit` link
@@ -275,6 +278,7 @@ async def web_state(request):
             "can_previous": now_playing is not None and player.pending_action is None,
             "crossfade": player.crossfade,
             "loop": player.loop,
+            "volume": volume_for(state.sessions[sid]),
             # True while the previous track still drains under this one.
             "crossfading": now_playing is not None
             and player.mixer is not None
@@ -400,6 +404,7 @@ async def web_control(request):
         "crossfade",
         "loop",
         "shuffle",
+        "volume",
     ):
         return _control_error(400, "Unknown action.")
 
@@ -427,6 +432,8 @@ async def web_control(request):
     mode = data.get("mode")
     if action == "loop" and mode is not None and mode not in LOOP_MODES:
         return _control_error(400, ControlError.MESSAGES["bad_loop"][1])
+    if action == "volume" and not valid_volume(data.get("value")):
+        return _control_error(400, ControlError("bad_volume").message)
 
     touch(player)
     if player.sid != sid:  # Expired just now
@@ -464,6 +471,8 @@ async def web_control(request):
         elif action == "shuffle":
             await control_shuffle(player)
             set_action(player, "🔀 Queue shuffled via the web page")
+        elif action == "volume":
+            _announce_volume(player, guild_id, data["value"])
         elif action == "jump":
             track = await control_jump(player, guild_id, track_id)
             set_action(player, f"▶️ Jumped to: {short(track['title'])}")
@@ -473,6 +482,15 @@ async def web_control(request):
     except ControlError as e:
         return _control_error(e.status, e.message)
     return web.json_response({"ok": True})
+
+
+def _announce_volume(player, guild_id, percent):
+    """Apply a web volume change. The panel line is the usual coalesced edit
+    (one per PANEL_MIN_INTERVAL), so dragging the slider does not spam."""
+    try:
+        control_volume(player, guild_id, percent)
+    finally:
+        set_action(player, f"🔊 Volume set to {percent}% via the web page")
 
 
 def _theme_auth(request):

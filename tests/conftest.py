@@ -21,7 +21,7 @@ import discord  # noqa: E402
 import pytest  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 
-from djsnake import media, state, stats, themes, web  # noqa: E402
+from djsnake import media, state, stats, themes, volume, web  # noqa: E402
 from djsnake.player import MusicPlayer  # noqa: E402
 from djsnake.sessions import open_session  # noqa: E402
 from djsnake.web import build_web_app  # noqa: E402
@@ -41,6 +41,7 @@ def fresh_state(tmp_path, monkeypatch):
         state.music_players,
         state.sessions,
         state.guild_themes,
+        state.guild_volumes,
         state.edit_tokens,
         state.viewers,
         stats._peaks,
@@ -51,6 +52,7 @@ def fresh_state(tmp_path, monkeypatch):
     monkeypatch.setattr(stats, "DB_PATH", str(data_dir / "stats.db"))
     monkeypatch.setattr(themes, "THEMES_FILE", str(data_dir / "themes.json"))
     monkeypatch.setattr(themes, "LOGO_DIR", str(data_dir / "logos"))
+    monkeypatch.setattr(volume, "VOLUME_FILE", str(data_dir / "volume.json"))
     media_dir = tmp_path / "media"
     media_dir.mkdir()
     monkeypatch.setattr(media, "TEMP_DIR", str(media_dir))

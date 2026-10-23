@@ -12,8 +12,10 @@ from .config import (
     PUBLIC_BASE_URL,
     SESSION_CLEANUP_SECONDS,
     SESSION_IDLE_HOURS,
+    VOLUME_DEFAULT,
 )
 from .player import discard_tracks
+from .volume import volume_for
 
 # --- Sessions ---------------------------------------------------------------
 
@@ -145,6 +147,9 @@ def render_panel(player):
         lines.append("🔀 Crossfade on")
     if player.loop != "off":
         lines.append(f"🔁 Loop: {player.loop}")
+    volume = volume_for(state.sessions.get(player.sid))
+    if volume != VOLUME_DEFAULT:
+        lines.append(f"🔊 Volume {volume}%")
     if player.load_line:
         lines.append(player.load_line)
     elif len(player.pending_downloads) > 1:

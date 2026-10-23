@@ -110,7 +110,7 @@ Module map, lowest layer first (each imports only the ones above it):
 - `config.py`: environment variables and constants, read once at import
   (`WEB_INDEX` resolves `web/index.html` from the repository root).
 - `state.py`: shared mutable state: the `bot` instance, `music_players`,
-  `sessions`, `guild_themes`, `edit_tokens`, `viewers`, `background_tasks` and
+  `sessions`, `guild_themes`, `guild_volumes`, `edit_tokens`, `viewers`, `background_tasks` and
   `clock()`.
   Always use it as `state.music_players` (never `from .state import ...`), so
   every module and test sees the same objects.
@@ -123,6 +123,7 @@ Module map, lowest layer first (each imports only the ones above it):
   `session_cleanup_loop()`, `open_session()`) and the status panel
   (`refresh_panel()`, `set_action()`, `ack()`, `short()`).
 - `themes.py`: theme storage, logos and `!theme edit` tokens.
+- `volume.py`: per-server volume storage (`{DATA_DIR}/volume.json`) and `percent_to_gain()`.
 - `media.py`: YouTube URL parsing, yt-dlp (`download_media()`,
   `get_playlist_info()`), the SponsorBlock cut, `analyse_media()`,
   `playback_options()`, `crossfade_eligible()`, and `search_youtube()` (flat
@@ -203,7 +204,22 @@ Module map, lowest layer first (each imports only the ones above it):
   options are exactly the usual ones (1 s in, 4 s out). The state's
   `crossfading` is true while the old track drains; only then does the page
   cross-dissolve its two stacked `<video>`s (skips stay an instant swap).
-- **Controls** (`control_next/previous/pause/resume/remove/move/add/seek/jump/crossfade/loop/shuffle`) are shared
+- **Volume** (`state.guild_volumes`, guild id to percent 0-150, default 100,
+  persisted by `volume.py` in `{DATA_DIR}/volume.json`, cleaned entry by entry on
+  load, written atomically): `!volume [0-150]` and the web `volume` action both
+  call `control_volume()`, which validates (`bad_volume`, 400), stores, saves
+  (`volume_not_saved`, 500, if DATA_DIR is not writable; the change still applies)
+  and calls `mixer.set_volume()`. The gain stage is the last step of
+  `CrossfadeMixer.read()`, after the crossfade sum, so overlaps and the FFmpeg
+  fades are unaffected. Gain is linear (`percent / 100`); a change glides from the
+  current gain at most `VOLUME_MAX/100/VOLUME_RAMP_FRAMES` per 20 ms frame,
+  interpolated in 8 slices inside each frame. `scale()` uses `audioop.mul`, and
+  only when a frame's peak times the gain passes 0.9 of full scale does it run a
+  tanh soft limiter, so 100% is bit-exact. New mixers start at the saved volume
+  (`play_next()`). The web action panel line ("Volume set to N% via the web
+  page") goes through `set_action()`, so dragging coalesces to one edit per
+  `PANEL_MIN_INTERVAL`; the panel also shows "Volume N%" when not 100.
+- **Controls** (`control_next/previous/pause/resume/remove/move/add/seek/jump/crossfade/loop/shuffle/volume`) are shared
   by Discord commands and the web page and raise `ControlError` (HTTP status and
   one English message, shown on Discord and on the web page). Previous restarts the track
   after 5 s of play or with empty history. Add accepts only YouTube hosts and
@@ -303,7 +319,7 @@ Module map, lowest layer first (each imports only the ones above it):
   `0.0.0.0:WEB_PORT`. Routes, the contract `web/index.html` relies on:
   `GET /` landing text; `GET /{sid}` serves `web/index.html`;
   `GET /api/{sid}/state` returns `{active, in_voice, guild, channel, loading,
-  paused, can_previous, crossfade, loop, crossfading, server_time, viewers, now_playing: {id,
+  paused, can_previous, crossfade, loop, volume, crossfading, server_time, viewers, now_playing: {id,
   title, duration, thumbnail, url, video_url, elapsed, start, end} | null, queue: [{id, title, duration,
   thumbnail, url}], downloading: [{key, title, source}], downloading_total,
   theme: {skin, base, bg, text, accent, name, logo_url}}`
@@ -319,9 +335,9 @@ Module map, lowest layer first (each imports only the ones above it):
   `GET /api/{sid}/stats?range=week|month|all` (default week, 400 otherwise,
   404 for an unknown sid) returns `stats.summary()` for the session's guild,
   cached `STATS_CACHE_SECONDS` (15) per guild and range (see Stats). `POST /api/{sid}/control` takes `{action:
-  next|previous|pause|resume|remove|move|add|seek|jump|crossfade|loop|shuffle, id?, index?,
-  url?, position?, enabled?, mode?}` (body <= 4 KB; crossfade takes a boolean
-  `enabled`; seek restarts the track at `position` seconds (file time),
+  next|previous|pause|resume|remove|move|add|seek|jump|crossfade|loop|shuffle|volume, id?, index?,
+  url?, position?, enabled?, mode?, value?}` (body <= 4 KB; crossfade takes a boolean
+  `enabled`; volume an integer `value` 0-150, valid out of voice too; seek restarts the track at `position` seconds (file time),
   clamped, staying paused if it was, unannounced; jump plays a queued `id` now;
   loop takes `mode` off|track|queue, none cycles; shuffle needs 2+ queued tracks)
   and returns 200 `{"ok": true}` (202 for add, which downloads in the
@@ -414,7 +430,7 @@ Module map, lowest layer first (each imports only the ones above it):
   session). `join_voice_channel()` wraps it. `!reset` forces a reconnect.
 - **Commands**: `!play` (YouTube or Spotify link, or search text), `!list`, `!next`, `!pause`, `!resume`, `!seek`
   (position relative to the track's automix `start`, as the page shows it),
-  `!crossfade on|off`, `!loop [off|track|queue]`, `!shuffle`, `!stop`, `!reset`, `!theme [preset|reset|edit]`
+  `!crossfade on|off`, `!loop [off|track|queue]`, `!shuffle`, `!volume [0-150]`, `!stop`, `!reset`, `!theme [preset|reset|edit]`
   (Manage Server permission via `commands.has_guild_permissions`).
 - Voice needs `PyNaCl`, `davey` (DAVE encryption, required by discord.py 2.7+)
   and, on Python 3.13+, `audioop-lts`. The Docker image uses Python 3.12. CI
