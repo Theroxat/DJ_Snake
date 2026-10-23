@@ -91,6 +91,10 @@ Every command also works as a slash command (`/play`, `/next`, ...); the table s
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
 | `!theme [preset\|reset\|edit]` | Show or set the clip page's default theme for the server. `edit` DMs you a private editor link. Needs the Manage Server permission. |
+| `!weblink` | DM you the clip page's control link (and the view-only link). DJs only when control is limited. |
+| `!djrole [role\|off]` | Show, set or remove the DJ role. Needs the Manage Server permission. |
+
+When a server has a DJ role, `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!stop` and `!reset` need that role or the Manage Server permission; whoever queued the playing track may still skip it with `!next`. `!play` and `!list` stay open to everyone. See [Who controls the music](#who-controls-the-music).
 
 ## Spotify links
 
@@ -157,6 +161,19 @@ location / {
 The page gets live updates as a Server-Sent Events stream (`/api/<session>/events`), and falls back to polling if the stream cannot get through. Caddy and Cloudflare Tunnel work as is. With nginx, turn off `proxy_buffering` for the bot (the bot also sends `X-Accel-Buffering: no`) and raise `proxy_read_timeout` above the 15 s heartbeat. Behind any proxy, pass the client address in `X-Forwarded-For`: the bot caps open streams per client.
 
 Anyone who has the link can control the queue. Treat it as a secret and share it only with people you trust.
+### Who controls the music
+
+Each session has two links, both long random ids:
+
+- the **control link** (`/<session>`): the full page, with every control;
+- the **view-only link**: the same page with the controls hidden and a "View only" badge. The server refuses any control sent with it (403), so it is safe to share widely.
+
+By default (`WEB_CONTROL=everyone`, no DJ role) the status message shows both links, as before: anyone in the channel can control the music. To limit control:
+
+- `!djrole <role>` (Manage Server) makes a role the DJ role. The status message then shows only the view-only link, and the control link that was posted before stops working (a new one is made). DJs, and members with Manage Server, get the control link by DM with `!weblink`. The DJ role also gates the Discord commands above. `!djrole off` opens everything again.
+- `WEB_CONTROL=dj` does the same for the links on every server, even without a DJ role: then only members with Manage Server can get the control link.
+
+Anyone who has the control link can control the queue: treat it as a secret.
 
 ### Themes
 
@@ -192,6 +209,9 @@ Set these in `.env` (see `.env.example`).
 | `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), volumes (`volume.json`), logos, listening stats (`stats.db`) and cached lyrics (`lyrics/`). Compose mounts `./data` there. |
 | `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`. |
 | `LYRICS` | `1` | Synced lyrics on the clip page, from lrclib.net (`0` turns them off: no lookups, no button). |
+| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), logos, DJ roles (`permissions.json`) and listening stats (`stats.db`). Compose mounts `./data` there. |
+| `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`. |
+| `WEB_CONTROL` | `everyone` | `everyone`: the status message shows the control link and the view-only link. `dj`: only the view-only link; DJs get the control link with `!weblink`. A server with a DJ role always behaves as `dj`. |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | empty | Optional Spotify Web API credentials, for playlists over 100 tracks. Without them, Spotify links are read from the public embed page. |
 | `YTDLP_AUTO_UPDATE` | `1` | Upgrade yt-dlp on container start (`0` to skip). |
 | `METRICS` | `0` | `1` serves Prometheus metrics on `GET /metrics`. `GET /healthz` (used by the Docker health check) is always on. |

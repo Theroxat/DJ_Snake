@@ -14,6 +14,7 @@ from .config import (
     SESSION_IDLE_HOURS,
     VOLUME_DEFAULT,
 )
+from .permissions import web_control_restricted
 from .player import discard_tracks, notify_state
 from .volume import volume_for
 
@@ -26,13 +27,63 @@ def _session_expired(player):
     return state.clock() - player.last_active > SESSION_IDLE_HOURS * 3600
 
 
+def _new_id():
+    return secrets.token_urlsafe(16)
+
+
+def _drop_session(sid):
+    """Forget `sid` and every view-only id pointing at it."""
+    state.sessions.pop(sid, None)
+    state.viewers.pop(sid, None)
+    for wid in [w for w, s in state.watch_ids.items() if s == sid]:
+        del state.watch_ids[wid]
+
+
+def resolve_link(given):
+    """(sid, can_control) for the id in a page or API URL: a session id gives
+    control, a view-only id gives (its session id, False); anything else
+    (None, False). Ids are bearer secrets: every live id is compared with
+    secrets.compare_digest, so the time taken does not depend on how much of
+    a guess matches. Ids are never logged."""
+    if not isinstance(given, str) or not 0 < len(given) <= 64:
+        return None, False
+    given = given.encode("utf-8", "replace")
+    found, control = None, False
+    for sid in list(state.sessions):
+        if secrets.compare_digest(sid.encode(), given):
+            found, control = sid, True
+    for wid, sid in list(state.watch_ids.items()):
+        if secrets.compare_digest(wid.encode(), given):
+            found, control = sid, False
+    return found, control
+
+
+def rotate_control_link(player):
+    """Give a live session a new control id (the view-only id stays): the
+    old control link, maybe posted publicly, stops working."""
+    if not player.sid or player.sid not in state.sessions:
+        return
+    old = player.sid
+    guild_id = state.sessions[old]
+    new = _new_id()
+    state.sessions.pop(old)
+    state.sessions[new] = guild_id
+    if old in state.viewers:
+        state.viewers[new] = state.viewers.pop(old)
+    for wid, sid in list(state.watch_ids.items()):
+        if sid == old:
+            state.watch_ids[wid] = new
+    player.sid = new
+    refresh_panel(player)
+
+
 def expire_session(player):
     """End the session for good: its links stop working and its files go."""
     if player.sid:
-        state.sessions.pop(player.sid, None)
-        state.viewers.pop(player.sid, None)
-        print(f"Web session expired: {player.sid}")
+        _drop_session(player.sid)
+        print("Web session expired")
         player.sid = None
+        player.watch_id = None
         player.expired = True
         refresh_panel(player)
     player.cancel_idle()
@@ -62,8 +113,7 @@ def session_player(sid):
         return None
     player = state.music_players.get(guild_id)
     if not player or player.sid != sid:
-        state.sessions.pop(sid, None)
-        state.viewers.pop(sid, None)
+        _drop_session(sid)
         return None
     if player.in_voice():
         player.last_active = state.clock()
@@ -88,11 +138,13 @@ async def open_session(ctx, player, announce=True):
     touch(player)
     created = False
     if not player.sid:
-        player.sid = secrets.token_urlsafe(16)
+        player.sid = _new_id()
+        player.watch_id = _new_id()
         state.sessions[player.sid] = ctx.guild.id
+        state.watch_ids[player.watch_id] = player.sid
         player.expired = False
         created = True
-        print(f"Web session opened for {ctx.guild.name}: {player.sid}")
+        print(f"Web session opened for {ctx.guild.name}")  # Never log the ids
     if not (created or announce):
         return
     player.text_channel = ctx.channel
@@ -119,12 +171,30 @@ def _duration(seconds):
     return f"{seconds} s"
 
 
+def _link_lines(player):
+    """The panel's links. The view-only link is always public; the control
+    link only when the guild leaves control to everyone (WEB_CONTROL, no DJ
+    role), else DJs get it by DM with `!weblink`."""
+    guild_id = state.sessions.get(player.sid) if player.sid else None
+    if guild_id is None:
+        return []
+    watch = f"{PUBLIC_BASE_URL}/{player.watch_id}" if player.watch_id else None
+    if web_control_restricted(guild_id):
+        lines = [f"📺 Watch the clip live: {watch}"] if watch else []
+        lines.append(f"🎛️ DJs: `{COMMAND_PREFIX}weblink` DMs you the control link")
+        return lines
+    lines = [f"📺 Watch and control the clip live: {PUBLIC_BASE_URL}/{player.sid}"]
+    if watch:
+        # In <>: Discord shows no second preview for it.
+        lines.append(f"👀 View-only link: <{watch}>")
+    return lines
+
+
 def render_panel(player):
     if player.expired:
         return "⌛ Session expired"
     lines = []
-    if player.sid:
-        lines.append(f"📺 Watch the clip live: {PUBLIC_BASE_URL}/{player.sid}")
+    lines.extend(_link_lines(player))
     if not player.in_voice():
         lines.append(f"💤 Idle — {COMMAND_PREFIX}play to resume")
     elif player.lingering() and not player.now_playing and not player.queue:

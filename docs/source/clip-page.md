@@ -1,6 +1,6 @@
 # The clip page
 
-When the bot joins voice it posts a link such as `https://dj.example.com/<session>` and keeps a status message in that text channel. The clip page is a web page that shows the video of the current track, muted and in sync with the audio the bot plays in Discord.
+When the bot joins voice it posts a link such as `https://dj.example.com/<session>` and keeps a status message in that text channel (see [Who controls the music](#who-controls-the-music) for the view-only link). The clip page is a web page that shows the video of the current track, muted and in sync with the audio the bot plays in Discord.
 
 ![The clip page on desktop](../screenshots/clip-page.png)
 
@@ -94,9 +94,25 @@ location / {
 - Pass the client address in `X-Forwarded-For` (as above). The bot caps open streams per client (10) and per session (100); behind a local proxy without that header, every visitor would share one address.
 
 If the stream still cannot get through, the page falls back to polling on its own, so it keeps working, only with up to 2 seconds of delay.
+## Who controls the music
+
+Each session has two links, both long random ids that cannot be guessed:
+
+- the **control link** (`/<session>`): the full page, with every control;
+- the **view-only link**: the same page with the controls hidden and a "View only" badge in the header. The server refuses every control sent with it (HTTP 403), so it is safe to share widely.
+
+How the bot hands them out:
+
+| Setup | Status message | Control link |
+| --- | --- | --- |
+| `WEB_CONTROL=everyone` (default), no DJ role | Both links | Public: anyone in the channel can control the music, as in earlier versions. |
+| A DJ role set with `!djrole <role>` | View-only link only | DJs and members with Manage Server get it by DM with `!weblink`. |
+| `WEB_CONTROL=dj` | View-only link only | Members with Manage Server, or the DJ role if one is set, get it with `!weblink`. |
+
+Setting a DJ role while a session is live replaces its control link: the one that was posted publicly stops working, and the view-only link keeps working. The DJ role also gates the Discord commands that change playback; see `!djrole` in [Commands](commands.md#server-settings).
 
 ```{warning}
-Anyone who has the link can control the queue. Treat it as a secret and share it only with people you trust.
+Anyone who has the control link can control the queue. Treat it as a secret and share the view-only link instead.
 ```
 
 ## Themes

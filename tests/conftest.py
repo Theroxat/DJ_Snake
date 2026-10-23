@@ -21,16 +21,17 @@ import discord  # noqa: E402
 import pytest  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 
-from djsnake import (
+from djsnake import (  # noqa: E402
     lyrics,
     media,
+    permissions,
     playlists,
     state,
     stats,
     themes,
     volume,
     web,
-)  # noqa: E402
+)
 from djsnake.player import MusicPlayer  # noqa: E402
 from djsnake.sessions import open_session  # noqa: E402
 from djsnake.web import build_web_app  # noqa: E402
@@ -49,6 +50,8 @@ def fresh_state(tmp_path, monkeypatch):
     for registry in (
         state.music_players,
         state.sessions,
+        state.watch_ids,
+        state.guild_perms,
         state.guild_themes,
         state.guild_volumes,
         state.edit_tokens,
@@ -73,6 +76,9 @@ def fresh_state(tmp_path, monkeypatch):
         raise lyrics.LyricsUnavailable("no network in tests")
 
     monkeypatch.setattr(lyrics, "_http", no_network)
+    monkeypatch.setattr(
+        permissions, "PERMISSIONS_FILE", str(data_dir / "permissions.json")
+    )
     media_dir = tmp_path / "media"
     media_dir.mkdir()
     monkeypatch.setattr(media, "TEMP_DIR", str(media_dir))
@@ -91,6 +97,7 @@ def fresh_state(tmp_path, monkeypatch):
     state.counters["tracks_played"] = 0
     state.music_players.clear()
     state.sessions.clear()
+    state.watch_ids.clear()
 
 
 @pytest.fixture

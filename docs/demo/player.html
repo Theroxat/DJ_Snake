@@ -423,6 +423,20 @@ header.dragover { outline: 2px dashed var(--accent); outline-offset: -6px; }
 .credits { display: none; color: var(--muted); }
 [data-shape="arcade"] .credits { display: inline; }
 .badge svg { width: 16px; height: 16px; fill: currentColor; display: block; }
+/* View-only link (state `can_control: false`): the page watches, nothing in
+   it looks or acts clickable, and the remaining tools close up the gaps. */
+.viewonly { color: var(--muted); border-color: var(--hair); }
+.viewonly svg { width: 14px; height: 14px; }
+[data-viewonly] .tcenter, [data-viewonly] .tside:not(.end), [data-viewonly] #addform,
+[data-viewonly] li button.grip, [data-viewonly] li button.rm,
+[data-viewonly] #voltoggle, [data-viewonly] #volpanel, [data-viewonly] #autoplay,
+[data-viewonly] #plform { display: none; }
+[data-viewonly] .transport { display: flex; justify-content: flex-end; }
+[data-viewonly] .seek.disabled { opacity: 1; }
+[data-viewonly] #queue li { cursor: default; }
+[data-viewonly] #queue li:hover, [data-viewonly] #queue li:active { background: transparent; color: inherit; }
+[data-viewonly] #queue li:hover .idx .num { display: inline; }
+[data-viewonly] #queue li:hover .idx .pl { display: none; }
 
 /* Layout */
 main {
@@ -922,6 +936,8 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
   .spacer { display: none; }
   .hdrtools { flex: 1 1 100%; }
   .hdrtools .live { margin-right: auto; }
+  [data-viewonly] .hdrtools .live { margin-right: 0; }
+  [data-viewonly] .hdrtools .viewonly { margin-right: auto; }
   .deck { padding: 14px 14px 12px; }
   /* Play controls on their own row; the toggles share the next one and wrap
      onto a third only when they cannot fit (narrow phones, wide fonts). */
@@ -970,6 +986,7 @@ html.demo-embedded .demo-ribbon { display: none; }
 .demo-ribbon a { color: #ffd166; text-decoration: underline; white-space: nowrap; }
 .demo-ribbon a:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 @media (max-width: 520px) { .demo-ribbon { font-size: 11px; gap: 8px; padding: 6px 10px; } }
+@media (max-width: 700px) { .demo-ribbon .wide { display: none; } }
 </style>
 </head>
 <body>
@@ -983,6 +1000,7 @@ html.demo-embedded .demo-ribbon { display: none; }
   <div class="hdrtools">
     <span id="net" class="badge net hud" hidden>Reconnecting…</span>
     <span id="live" class="badge live off hud"><i>●</i> <span id="livetxt">NOT SYNCED</span></span>
+    <span id="viewonly" class="badge hud viewonly" title="This link can watch but not control the music. Ask a DJ for the control link." hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 10V7A5 5 0 0 0 7 7v3H5v11h14V10zM9 7a3 3 0 0 1 6 0v3H9z"/></svg>View only</span>
     <span class="hud credits">CREDITS: ∞</span>
     <span id="viewers" class="badge hud viewers" title="people on the page" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C6.5 5 2.7 9.3 1.5 12c1.2 2.7 5 7 10.5 7s9.3-4.3 10.5-7C21.3 9.3 17.5 5 12 5zm0 11.5a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9zm0-2.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg> <b id="viewcount">1</b></span>
     <button id="statsbtn" class="ghost palette" type="button" aria-haspopup="dialog" aria-controls="stats" aria-label="Stats" title="Stats">
@@ -1206,6 +1224,15 @@ html.demo-embedded .demo-ribbon { display: none; }
   let lastQueueSig = "";
   let inVoice = true, paused = false, canPrev = false, xfade = false, loopMode = "off", queueLen = 0, autoplay = false;
   let vol = 100, volHold = 0, volTimer = null, volAgain = false;
+  // False on a view-only link (state `can_control`): controls are hidden and
+  // never sent (the server would refuse them with 403 anyway).
+  let canControl = true;
+  const active = () => inVoice && canControl;
+  const EMPTY_QUEUE = {
+    control: "The queue is empty. Paste a link above to add a track.",
+    autoplay: "The queue is empty. Autoplay picks a related track when it ends, or paste a link above.",
+    view: "The queue is empty.",
+  };
   let dissolveTimer = null;
   let queue = [];          // current (possibly optimistic) queue
   let dragging = false, deferredQueue = null;
@@ -1272,6 +1299,7 @@ html.demo-embedded .demo-ribbon { display: none; }
     if (volAgain) { volAgain = false; flushVolume(); }
   }
   function setVolume(v) {
+    if (!canControl) return;
     vol = Math.max(0, Math.min(VOL_MAX, Math.round(v)));
     volHold = Date.now() + VOL_HOLD_MS; // polls must not fight the slider
     showVolume();
@@ -1358,7 +1386,7 @@ html.demo-embedded .demo-ribbon { display: none; }
   function renderQueue(q) {
     queue = q;
     if (dragging) { deferredQueue = q; return; }
-    const sig = JSON.stringify(q.map((t) => [t.id, t.title, t.duration, t.url, t.thumbnail]));
+    const sig = JSON.stringify([canControl, q.map((t) => [t.id, t.title, t.duration, t.url, t.thumbnail])]);
     if (sig === lastQueueSig) return;
     lastQueueSig = sig;
     const ol = $("queue");
@@ -1376,13 +1404,15 @@ html.demo-embedded .demo-ribbon { display: none; }
       idx.appendChild(mk("span", "num", String(i + 1).padStart(2, "0")));
       idx.appendChild(mk("span", "pl", "▶"));
       li.appendChild(idx);
-      li.title = "Play now";
+      if (canControl) li.title = "Play now";
       if (t.thumbnail) li.appendChild(safeImg(t.thumbnail));
       const n = mk("span", "n");
       n.textContent = t.title;
-      n.tabIndex = 0;
-      n.setAttribute("role", "button");
-      n.setAttribute("aria-label", "Play \u201c" + t.title + "\u201d now");
+      if (canControl) {
+        n.tabIndex = 0;
+        n.setAttribute("role", "button");
+        n.setAttribute("aria-label", "Play \u201c" + t.title + "\u201d now");
+      }
       li.appendChild(n);
       const yt = ytLink(t.url);
       if (yt) li.appendChild(yt);
@@ -1498,7 +1528,7 @@ html.demo-embedded .demo-ribbon { display: none; }
     if (e.target.closest("a.yt, button.grip")) return;
     const rm = e.target.closest("button.rm");
     if (rm) {
-      if (!inVoice) return;
+      if (!active()) return;
       const id = rm.closest("li").dataset.id;
       rm.disabled = true;
       renderQueue(queue.filter((t) => t.id !== id));
@@ -1509,7 +1539,7 @@ html.demo-embedded .demo-ribbon { display: none; }
     if (li) jumpTo(li);
   });
   function jumpTo(li) {
-    if (!inVoice || dragging || pending.has("jump")) return;
+    if (!active() || dragging || pending.has("jump")) return;
     li.classList.add("busy");
     send("jump", { id: li.dataset.id });
   }
@@ -1521,7 +1551,7 @@ html.demo-embedded .demo-ribbon { display: none; }
   });
   $("queue").addEventListener("keydown", (e) => {
     const g = e.target.closest && e.target.closest("button.grip");
-    if (!g || !inVoice || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+    if (!g || !active() || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
     e.preventDefault();
     const from = queue.findIndex((t) => t.id === g.dataset.id);
     doMove(from, from + (e.key === "ArrowUp" ? -1 : 1), true);
@@ -1530,7 +1560,7 @@ html.demo-embedded .demo-ribbon { display: none; }
   // pointer drag-and-drop (mouse + touch), started from the grip only
   $("queue").addEventListener("pointerdown", (e) => {
     const g = e.target.closest("button.grip");
-    if (!g || !inVoice || dragging || (e.pointerType === "mouse" && e.button !== 0)) return;
+    if (!g || !active() || dragging || (e.pointerType === "mouse" && e.button !== 0)) return;
     const ol = $("queue");
     const li = g.closest("li");
     const items = [...ol.children];
@@ -1736,7 +1766,7 @@ html.demo-embedded .demo-ribbon { display: none; }
       const e = curElapsed() - state.start; // bar spans start..end (file time)
       const dur = state.end - state.start;
       const pct = dur > 0 ? Math.max(0, Math.min(100, (e / dur) * 100)) : 0;
-      const sk = $("seek"), on = !!dur && inVoice;
+      const sk = $("seek"), on = !!dur && active();
       sk.classList.toggle("disabled", !on);
       sk.tabIndex = on ? 0 : -1;
       sk.setAttribute("aria-disabled", String(!on));
@@ -1756,7 +1786,7 @@ html.demo-embedded .demo-ribbon { display: none; }
   // ---- seek bar (click, drag, touch, keyboard)
   const seekEl = $("seek");
   let seeking = false, seekFrac = 0;
-  const seekOn = () => !!(state && state.end > state.start && inVoice);
+  const seekOn = () => !!(state && state.end > state.start && active());
   function fracAt(x) {
     const r = seekEl.getBoundingClientRect();
     return r.width ? Math.max(0, Math.min(1, (x - r.left) / r.width)) : 0;
@@ -2199,6 +2229,12 @@ html.demo-embedded .demo-ribbon { display: none; }
     $("ended").hidden = true;
     if (d.theme) setServerTheme(d.theme);
     inVoice = d.in_voice !== false;
+    const cc = d.can_control !== false; // older servers do not send it
+    if (cc !== canControl) {
+      canControl = cc;
+      document.documentElement.toggleAttribute("data-viewonly", !cc);
+      $("viewonly").hidden = cc;
+    }
     paused = !!d.paused && inVoice;
     canPrev = !!d.can_previous;
     if (!pending.has("crossfade")) xfade = !!d.crossfade;
@@ -2209,9 +2245,7 @@ html.demo-embedded .demo-ribbon { display: none; }
       showVolume();
     }
     if (!pending.has("autoplay")) autoplay = !!d.autoplay;
-    $("queueempty").textContent = autoplay
-      ? "The queue is empty. Autoplay picks a related track when it ends, or paste a link above."
-      : "The queue is empty. Paste a link above to add a track.";
+    $("queueempty").textContent = !canControl ? EMPTY_QUEUE.view : autoplay ? EMPTY_QUEUE.autoplay : EMPTY_QUEUE.control;
     lyrAvail = d.lyrics === true; // false when the bot runs with LYRICS=0
     $("lyrbtn").hidden = !lyrAvail;
     $("pausebadge").hidden = !(paused && d.now_playing);
@@ -2276,23 +2310,23 @@ html.demo-embedded .demo-ribbon { display: none; }
   // ---- controls
   function updateControls() {
     const dis = (id, v) => { $(id).disabled = !!v; };
-    dis("prev", !inVoice || !canPrev || pending.has("previous"));
-    dis("next", !inVoice || pending.has("next"));
-    dis("pp", !inVoice || !state || pending.has("pause") || pending.has("resume"));
-    dis("addurl", !inVoice);
-    dis("addbtn", !inVoice || pending.has("add"));
-    dis("xfade", !inVoice || pending.has("crossfade"));
-    dis("plpick", $("plpick").options.length < 2);
-    dis("plload", !inVoice || !$("plpick").value || pending.has("load_playlist"));
-    dis("plsave", !inVoice || !state || pending.has("save_playlist"));
+    dis("prev", !active() || !canPrev || pending.has("previous"));
+    dis("next", !active() || pending.has("next"));
+    dis("pp", !active() || !state || pending.has("pause") || pending.has("resume"));
+    dis("addurl", !active());
+    dis("addbtn", !active() || pending.has("add"));
+    dis("xfade", !active() || pending.has("crossfade"));
+    dis("plpick", !canControl || $("plpick").options.length < 2);
+    dis("plload", !active() || !$("plpick").value || pending.has("load_playlist"));
+    dis("plsave", !active() || !state || pending.has("save_playlist"));
     $("xfade").setAttribute("aria-checked", String(xfade));
-    dis("shuffle", !inVoice || queueLen < 2 || pending.has("shuffle"));
-    dis("loop", !inVoice || pending.has("loop"));
+    dis("shuffle", !active() || queueLen < 2 || pending.has("shuffle"));
+    dis("loop", !active() || pending.has("loop"));
     const lp = $("loop");
     lp.dataset.mode = loopMode;
     lp.title = "Loop: " + loopMode;
     lp.setAttribute("aria-label", "Loop: " + loopMode + ". Switch to loop " + LOOP_NEXT[loopMode]);
-    dis("autoplay", !inVoice || pending.has("autoplay"));
+    dis("autoplay", !active() || pending.has("autoplay"));
     $("autoplay").setAttribute("aria-checked", String(autoplay));
     const pp = $("pp");
     pp.setAttribute("aria-label", paused ? "Resume" : "Pause");
@@ -2339,24 +2373,24 @@ html.demo-embedded .demo-ribbon { display: none; }
   $("next").addEventListener("click", () => send("next"));
   $("pp").addEventListener("click", () => send(paused ? "resume" : "pause"));
   $("xfade").addEventListener("click", () => {
-    if (!inVoice || pending.has("crossfade")) return;
+    if (!active() || pending.has("crossfade")) return;
     const want = !xfade;
     xfade = want; // optimistic; the next poll confirms
     send("crossfade", { enabled: want }).then((ok) => { if (!ok) xfade = !want; updateControls(); });
   });
   const LOOP_NEXT = { off: "track", track: "queue", queue: "off" };
   $("shuffle").addEventListener("click", () => {
-    if (!inVoice || pending.has("shuffle")) return;
+    if (!active() || pending.has("shuffle")) return;
     send("shuffle").then((ok) => { if (ok) toast("Queue shuffled.", "ok"); });
   });
   $("loop").addEventListener("click", () => {
-    if (!inVoice || pending.has("loop")) return;
+    if (!active() || pending.has("loop")) return;
     const prev = loopMode;
     loopMode = LOOP_NEXT[prev]; // optimistic; the next poll confirms
     send("loop", { mode: loopMode }).then((ok) => { if (!ok) loopMode = prev; updateControls(); });
   });
   $("autoplay").addEventListener("click", () => {
-    if (!inVoice || pending.has("autoplay")) return;
+    if (!active() || pending.has("autoplay")) return;
     const want = !autoplay;
     autoplay = want; // optimistic; the next poll confirms
     send("autoplay", { enabled: want }).then((ok) => { if (!ok) autoplay = !want; updateControls(); });
@@ -2365,7 +2399,7 @@ html.demo-embedded .demo-ribbon { display: none; }
     e.preventDefault();
     const inp = $("addurl");
     const url = inp.value.trim();
-    if (!url || !inVoice || pending.has("add")) return;
+    if (!url || !active() || pending.has("add")) return;
     if (await send("add", { url })) inp.value = "";
   });
 
@@ -2395,10 +2429,10 @@ html.demo-embedded .demo-ribbon { display: none; }
   $("plform").addEventListener("submit", (e) => {
     e.preventDefault();
     const name = $("plpick").value;
-    if (name && inVoice && !pending.has("load_playlist")) send("load_playlist", { name });
+    if (name && active() && !pending.has("load_playlist")) send("load_playlist", { name });
   });
   $("plsave").addEventListener("click", () => {
-    if (!inVoice || pending.has("save_playlist")) return;
+    if (!active() || pending.has("save_playlist")) return;
     const name = (window.prompt("Name for this playlist (current track and queue):") || "").trim();
     if (name) send("save_playlist", { name });
   });
@@ -2703,6 +2737,7 @@ html.demo-embedded .demo-ribbon { display: none; }
   <span title="Excerpts of Caminandes 3, Cosmos Laundromat, Big Buck Bunny, Tears of Steel and Sintel (Blender Foundation / Blender Studio, CC BY licence).">Demo: CC BY film excerpts (Blender)</span>
   <a href="./">Discord demo</a>
   <a href="?edit=demo">Theme editor</a>
+  <a class="wide" href="?view">View-only link</a>
   <a href="../#credits">Credits</a>
 </div>
 </body>

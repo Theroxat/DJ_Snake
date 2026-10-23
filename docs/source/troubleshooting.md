@@ -26,8 +26,14 @@
 **The link says the session is unknown.**
 : It expired after `SESSION_IDLE_HOURS` without activity. Run `!play` again for a fresh one.
 
-**`!theme edit` says it cannot send a direct message.**
+**`!theme edit` or `!weblink` says it cannot send a direct message.**
 : Allow DMs from server members in your Discord privacy settings, then run it again.
+
+**The page shows "View only" and its controls are gone.**
+: You opened the view-only link. Ask a DJ, or run `!weblink` if you are one, for the control link.
+
+**The clip link stopped working after `!djrole`.**
+: Setting a DJ role replaces the public control link. The view-only link in the status message still works; DJs get the new control link with `!weblink`.
 
 **Themes, logos or stats are not saved.**
 : `DATA_DIR` (`./data` with Compose) must be writable by UID 1000, the user the container runs as.

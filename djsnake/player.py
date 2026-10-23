@@ -23,6 +23,7 @@ class MusicPlayer:
         self.now_playing = None
         self.loading_jobs = 0  # Playlist / web downloads still running
         self.sid = None  # Web session id (outlives the stay in voice)
+        self.watch_id = None  # The session's view-only link id
         self.last_active = state.clock()
         self.text_channel = None  # Where the session was last announced
         self.started_at = None  # time.monotonic() when now_playing started

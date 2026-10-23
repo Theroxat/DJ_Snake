@@ -263,7 +263,10 @@ async def _download_and_queue(
             return None
 
         # For the stats: who asked (None from the web page, which has no author).
-        track["requester"] = getattr(getattr(ctx, "author", None), "display_name", None)
+        author = getattr(ctx, "author", None)
+        track["requester"] = getattr(author, "display_name", None)
+        # Who may always skip it, even without the DJ role (permissions.py).
+        track["requester_id"] = getattr(author, "id", None)
         if extra:
             track.update(extra)
         player.add_to_queue(track)

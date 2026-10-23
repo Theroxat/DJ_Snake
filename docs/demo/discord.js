@@ -66,13 +66,15 @@
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   /** A small subset of Discord markdown: code blocks, inline code, bold, links. */
   function md(text) {
-    const parts = String(text).split(/```\n?([\s\S]*?)```/);
+    // <url> only hides Discord's link preview: show the bare link.
+    const parts = String(text).replace(/<(https?:\/\/[^\s>]+)>/g, "$1").split(/```\n?([\s\S]*?)```/);
     return parts.map((part, i) => {
       if (i % 2) return "<pre>" + esc(part.replace(/\n$/, "")) + "</pre>";
       return part.split(/`([^`]+)`/).map((p, j) => {
         if (j % 2) return "<code>" + esc(p) + "</code>";
         let h = esc(p).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
         h = h.replace(/https?:\/\/[^\s<]+/g, (u) => {
+          if (B.wid && u === B.baseUrl + "/" + B.wid) return '<a class="clip" href="#" data-clip="view">' + u + "</a>";
           if (u.startsWith(B.baseUrl + "/")) return '<a class="clip" href="#" data-clip="1">' + u + "</a>";
           return '<span class="lnk">' + u + "</span>";
         });
@@ -189,10 +191,13 @@
     document.body.classList.toggle("view-web", !!web);
     tourPlace();
   }
+  let frameView = false; // The frame shows the view-only link (player.html?view)
   function openClip(query) {
     if (!B.sid) return;
-    $("urltext").innerHTML = '<span class="host">dj.example.com</span>/' + esc(B.sid) + (query ? esc(query) : "");
+    const view = query === "?view";
+    $("urltext").innerHTML = '<span class="host">dj.example.com</span>/' + esc(view ? B.wid : B.sid) + (query && !view ? esc(query) : "");
     if (!frame || query !== undefined) {
+      frameView = view;
       if (frame) frame.remove();
       frame = document.createElement("iframe");
       frame.title = "DJ Snake clip page";
@@ -209,7 +214,8 @@
     const a = e.target.closest("a[data-clip]");
     if (!a) return;
     e.preventDefault();
-    openClip();
+    if (a.dataset.clip === "view") openClip("?view");
+    else openClip(frameView ? "" : undefined);
   });
   $("back").addEventListener("click", () => showView(false));
   $("toweb").addEventListener("click", () => showView(true));

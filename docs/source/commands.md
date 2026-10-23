@@ -18,6 +18,8 @@ Every command works two ways: as a text message with the prefix, `!` by default 
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
 | `!theme [preset\|reset\|edit]` | Show or set the clip page's default theme for the server. `edit` DMs you a private editor link. Needs the Manage Server permission. |
+| `!weblink` | DM you the clip page's control link and its view-only link. DJs only when control is limited. |
+| `!djrole [role\|off]` | Show, set or remove the DJ role. Needs the Manage Server permission. |
 
 ## Playing music
 
@@ -106,6 +108,28 @@ Needs the **Manage Server** permission.
 
 See [Themes](clip-page.md#themes) for details. `!theme edit` needs your DMs open to server members; otherwise the bot tells you so.
 
+### `!djrole [role|off]`
+
+Needs the **Manage Server** permission. The setting is saved per server in `DATA_DIR/permissions.json`.
+
+| Form | Effect |
+| --- | --- |
+| `!djrole` | Shows the current DJ role, or that everyone controls the music. |
+| `!djrole <role>` | Makes a role (name, ID or mention) the DJ role. |
+| `!djrole off` | Removes it: everyone controls the music again. |
+
+With a DJ role set:
+
+- `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!stop` and `!reset` need the DJ role or the Manage Server permission. The member who queued the playing track may still skip it with `!next`.
+- `!play` and `!list` stay open to everyone: adding a track never interrupts what plays, and DJs can still skip or remove it.
+- The status message shows only the clip page's view-only link, and the control link posted before stops working. See [Who controls the music](clip-page.md#who-controls-the-music).
+
+Without a DJ role every command works for everyone, as in earlier versions.
+
+### `!weblink`
+
+Sends you, by direct message, the clip page's control link and its view-only link, opening a session (without joining voice) if the server has none. When control is limited (a DJ role is set, or `WEB_CONTROL=dj`), only DJs and members with Manage Server get it; with `WEB_CONTROL=dj` and no DJ role, only Manage Server. Your DMs must be open to server members.
+
 ## Errors
 
-If you leave out a required argument the bot says so. Commands that need music playing answer "No music is currently playing." when there is none, and `!theme` without the permission is refused.
+If you leave out a required argument the bot says so. Commands that need music playing answer "No music is currently playing." when there is none, and `!theme` without the permission is refused. A command reserved for DJs answers, for example, "Only DJs can use `!stop`: you need the **DJ** role or the **Manage Server** permission."
