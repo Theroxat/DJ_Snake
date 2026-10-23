@@ -42,6 +42,11 @@
       "Only YouTube (video or playlist) and Spotify (track, album or playlist) links are accepted."],
     spotify_short_link: [400,
       "Short spotify.link links are not supported: open it and copy the open.spotify.com link."],
+    bad_playlist_name: [400, "Invalid playlist name: use up to 32 letters, digits, spaces or . ' & ! + ( ) -"],
+    playlist_not_found: [404, "No saved playlist has that name."],
+    playlist_exists: [409,
+      "A playlist with that name already exists. Only its creator or a member with Manage Server can replace it."],
+    playlist_empty: [400, "There is nothing to save: no track is queued."],
   };
   class ControlError extends Error {
     constructor(code) {
@@ -111,6 +116,7 @@
       sid: null, inVoice: false, current: null, queue: [], history: [],
       startedAt: 0, pausedAt: null, pausedTotal: 0,
       crossfade: false, loop: "off", volume: 100, autoplay: false, epoch: 0, jobs: 0, single: 0,
+      playlists: [], // saved playlists: {name, ids: YouTube video ids}
       pending: [], // pending_downloads: {key, title (null: link not read), source}
       loadLine: null, loadFinal: false, lastAction: null,
       theme: { skin: "arcade", base: "night", bg: "#101820", text: "#f2f2f2", accent: "#ffb703", name: "", logo_url: null },
@@ -376,6 +382,22 @@
         if (!S.inVoice) throw new ControlError("not_in_voice");
         queueLink(parseLink(url));
       },
+      savePlaylist(name) {
+        name = String(name || "").trim().replace(/\s+/g, " ");
+        if (!name || name.length > 32 || !/^\w[\w .'&!+()-]*$/.test(name)) throw new ControlError("bad_playlist_name");
+        if (S.playlists.some((p) => p.name.toLowerCase() === name.toLowerCase())) throw new ControlError("playlist_exists");
+        const ids = (S.current ? [S.current] : []).concat(S.queue).map((t) => t.url.split("v=")[1]);
+        if (!ids.length) throw new ControlError("playlist_empty");
+        S.playlists.push({ name, ids });
+        return name;
+      },
+      loadPlaylist(name) {
+        if (!S.inVoice) throw new ControlError("not_in_voice");
+        const p = S.playlists.find((x) => x.name.toLowerCase() === String(name).trim().toLowerCase());
+        if (!p) throw new ControlError("playlist_not_found");
+        loadList(p.ids.map(trackFor), null, "youtube");
+        return p.name;
+      },
       stop() {
         S.epoch++;
         S.queue = []; S.history = []; S.pending = [];
@@ -508,6 +530,13 @@
         } else if (a === "autoplay") {
           if (typeof d.enabled !== "boolean") return fail(400, "Invalid request.");
           C.autoplay(d.enabled);
+        } else if (a === "save_playlist" || a === "load_playlist") {
+          if (typeof d.name !== "string" || !d.name || d.name.length > 200) return fail(400, "Invalid playlist name.");
+          if (a === "save_playlist") setAction(`💾 Saved playlist ${C.savePlaylist(d.name)} via the web page`);
+          else {
+            setAction(`📥 Loading playlist ${C.loadPlaylist(d.name)} via the web page`);
+            return { status: 202, body: { ok: true } };
+          }
         } else if (a === "add") {
           if (typeof d.url !== "string") return fail(400, "Missing link.");
           C.add(d.url);
@@ -543,6 +572,11 @@
         return { status: 200, body: fakeStats(range) };
       }
       if (route === "control") return control(body);
+      if (route === "playlists") {
+        if (!S.sid) return { status: 404, body: { active: false } };
+        const playlists = S.playlists.map((p) => ({ name: p.name, tracks: p.ids.length, duration: p.ids.length * DURATION }));
+        return { status: 200, body: { playlists } };
+      }
       if (!S.sid) return fail(404, "Unknown or expired session.");
       if (route === "theme") return setTheme(body);
       return fail(400, "Logos are not available in the demo.");

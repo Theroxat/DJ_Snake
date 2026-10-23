@@ -37,6 +37,9 @@ from .controls import (
     control_move,
     control_next,
     control_pause,
+    control_playlist_list,
+    control_playlist_load,
+    control_playlist_save,
     control_previous,
     control_remove,
     control_resume,
@@ -77,6 +80,10 @@ from .volume import valid_volume, volume_for
 #                              loop ({"mode": off|track|queue}, none cycles),
 #                              shuffle,
 #                              volume ({"value": int 0-150, percent})
+#                              plus save_playlist ({"name"}: the current track
+#                              and the queue) and load_playlist ({"name"}, 202)
+#   GET /api/{sid}/playlists   the guild's saved playlists, {"playlists":
+#                              [{name, tracks, duration}]}
 #   GET /media/{sid}/{id}      the mp4 of a playing, queued or history track
 #   POST /api/{sid}/theme      {skin, base, bg, text, accent, name}, with the
 #                              X-Edit-Token header of a `!theme edit` link
@@ -351,6 +358,18 @@ async def web_stats(request):
     return web.json_response(result, headers=headers)
 
 
+async def web_playlists(request):
+    sid = request.match_info["sid"]
+    headers = {"Cache-Control": "no-store"}
+    if session_player(sid) is None:
+        return web.json_response({"active": False}, status=404, headers=headers)
+    try:
+        found = await control_playlist_list(state.sessions[sid])
+    except ControlError as e:
+        return _control_error(e.status, e.message)
+    return web.json_response({"playlists": found}, headers=headers)
+
+
 def _control_error(status, message):
     return web.json_response({"ok": False, "error": message}, status=status)
 
@@ -409,6 +428,8 @@ async def web_control(request):
         "shuffle",
         "volume",
         "autoplay",
+        "save_playlist",
+        "load_playlist",
     ):
         return _control_error(400, "Unknown action.")
 
@@ -434,6 +455,11 @@ async def web_control(request):
         data.get("enabled"), bool
     ):
         return _control_error(400, "Invalid request.")
+    name = data.get("name")
+    if action in ("save_playlist", "load_playlist") and not (
+        isinstance(name, str) and 0 < len(name) <= 200
+    ):
+        return _control_error(400, "Invalid playlist name.")
 
     mode = data.get("mode")
     if action == "loop" and mode is not None and mode not in LOOP_MODES:
@@ -484,6 +510,13 @@ async def web_control(request):
         elif action == "jump":
             track = await control_jump(player, guild_id, track_id)
             set_action(player, f"▶️ Jumped to: {short(track['title'])}")
+        elif action == "save_playlist":
+            saved = await control_playlist_save(player, guild_id, name)
+            set_action(player, f"💾 Saved playlist {saved['name']} via the web page")
+        elif action == "load_playlist":
+            loaded = await control_playlist_load(player, guild_id, name)
+            set_action(player, f"📥 Loading playlist {loaded['name']} via the web page")
+            return web.json_response({"ok": True}, status=202)
         elif action == "add":
             await control_add(player, guild_id, data["url"])
             return web.json_response({"ok": True}, status=202)
@@ -628,6 +661,7 @@ def build_web_app():
     app.router.add_get("/api/{sid}/state", web_state)
     app.router.add_post("/api/{sid}/control", web_control)
     app.router.add_get("/api/{sid}/stats", web_stats)
+    app.router.add_get("/api/{sid}/playlists", web_playlists)
     app.router.add_post("/api/{sid}/theme", web_theme)
     app.router.add_post("/api/{sid}/theme/logo", web_theme_logo)
     app.router.add_delete("/api/{sid}/theme/logo", web_theme_logo)

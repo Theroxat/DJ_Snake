@@ -24,10 +24,16 @@ from .controls import (
     control_loop,
     control_next,
     control_pause,
+    control_playlist_add,
+    control_playlist_delete,
+    control_playlist_get,
+    control_playlist_list,
+    control_playlist_save,
     control_resume,
     control_seek,
     control_shuffle,
     control_volume,
+    playlist_entries,
     read_spotify,
     seek_label,
 )
@@ -507,6 +513,168 @@ async def pause(ctx):
 @bot.command(name="resume")
 async def resume(ctx):
     await _run_command_control(ctx, control_resume)
+
+
+# --- Saved playlists ------------------------------------------------------------
+
+_NO_MENTIONS = discord.AllowedMentions.none()
+
+
+def _can_manage(ctx):
+    perms = getattr(ctx.author, "guild_permissions", None)
+    return bool(getattr(perms, "manage_guild", False))
+
+
+def _playlist_usage():
+    p = COMMAND_PREFIX
+    return (
+        "❌ Usage: "
+        f"`{p}playlist save|load|show|delete|add <name>` or `{p}playlist list`"
+    )
+
+
+def _fit(header, lines, limit=1900):
+    """A message of `header` and as many `lines` as fit Discord's limit."""
+    text = header
+    for i, line in enumerate(lines):
+        if len(text) + len(line) + 30 > limit:
+            return text + f"\n... and {len(lines) - i} more"
+        text += "\n" + line
+    return text
+
+
+def _mmss(seconds):
+    seconds = int(seconds or 0)
+    return f"{seconds // 60}:{seconds % 60:02d}"
+
+
+async def _playlist_reply(ctx, call):
+    """Await `call`; returns its result, or _FAILED after replying with the
+    error."""
+    try:
+        return await call
+    except ControlError as e:
+        await ctx.send(f"❌ {e.message}")
+        return _FAILED
+
+
+@bot.group(name="playlist", invoke_without_command=True)
+async def playlist(ctx):
+    await ctx.send(_playlist_usage())
+
+
+@playlist.command(name="save")
+async def playlist_save(ctx, *, name: str = None):
+    """Save the current track and the queue under a name."""
+    if name is None:
+        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}playlist save <name>`")
+        return
+    player = state.music_players.get(ctx.guild.id)
+    if player is None:
+        await ctx.send("❌ No music is currently playing.")
+        return
+    result = await _playlist_reply(
+        ctx,
+        control_playlist_save(
+            player, ctx.guild.id, name, ctx.author.id, _can_manage(ctx)
+        ),
+    )
+    if result is _FAILED:
+        return
+    await ack(ctx)
+    set_action(player, f"💾 Saved playlist {result['name']} ({result['count']} tracks)")
+
+
+@playlist.command(name="add")
+async def playlist_add(ctx, *, name: str = None):
+    """Add the current track to a saved playlist."""
+    if name is None:
+        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}playlist add <name>`")
+        return
+    player = state.music_players.get(ctx.guild.id)
+    if player is None:
+        await ctx.send("❌ No music is currently playing.")
+        return
+    result = await _playlist_reply(
+        ctx, control_playlist_add(player, ctx.guild.id, name)
+    )
+    if result is not _FAILED:
+        await ack(ctx)
+        set_action(
+            player, f"💾 Added to playlist {result['name']} ({result['count']} tracks)"
+        )
+
+
+@playlist.command(name="load")
+async def playlist_load(ctx, *, name: str = None):
+    """Queue every track of a saved playlist."""
+    if name is None:
+        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}playlist load <name>`")
+        return
+    saved = await _playlist_reply(ctx, control_playlist_get(ctx.guild.id, name))
+    if saved is _FAILED:
+        return
+    entries = playlist_entries(saved)
+    if not entries:
+        await ctx.send(f"❌ {ControlError('playlist_empty').message}")
+        return
+    if not await join_voice_channel(ctx):
+        return
+    player = state.music_players.setdefault(ctx.guild.id, MusicPlayer())
+    player.should_stop = False
+    await ack(ctx)
+    await queue_playlist(ctx, player, entries)
+
+
+@playlist.command(name="list")
+async def playlist_list(ctx):
+    """List the server's saved playlists."""
+    found = await _playlist_reply(ctx, control_playlist_list(ctx.guild.id))
+    if found is _FAILED:
+        return
+    if not found:
+        await ctx.send(
+            f"❌ No saved playlists. Use `{COMMAND_PREFIX}playlist save <name>`."
+        )
+        return
+    lines = [
+        f"• **{p['name']}** ({p['tracks']} tracks, {_mmss(p['duration'])})"
+        for p in found
+    ]
+    await ctx.send(
+        _fit("📚 **Saved playlists:**", lines), allowed_mentions=_NO_MENTIONS
+    )
+
+
+@playlist.command(name="show")
+async def playlist_show(ctx, *, name: str = None):
+    """Show the tracks of a saved playlist."""
+    if name is None:
+        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}playlist show <name>`")
+        return
+    saved = await _playlist_reply(ctx, control_playlist_get(ctx.guild.id, name))
+    if saved is _FAILED:
+        return
+    lines = [
+        f"{i + 1}. {t['title']} ({_mmss(t['duration'])})"
+        for i, t in enumerate(saved["tracks"])
+    ]
+    header = f"📚 **{saved['name']}** ({len(lines)} tracks)"
+    await ctx.send(_fit(header, lines), allowed_mentions=_NO_MENTIONS)
+
+
+@playlist.command(name="delete")
+async def playlist_delete(ctx, *, name: str = None):
+    """Delete a saved playlist (its creator, or Manage Server)."""
+    if name is None:
+        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}playlist delete <name>`")
+        return
+    result = await _playlist_reply(
+        ctx,
+        control_playlist_delete(ctx.guild.id, name, ctx.author.id, _can_manage(ctx)),
+    )
+    if result is not _FAILED:
+        await ack(ctx)
 
 
 @bot.event

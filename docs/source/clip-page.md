@@ -24,7 +24,8 @@ The page shows the current video, the queue ("Up next"), a "Now playing" row, tr
 - shuffle the queue once and cycle the loop mode (off, track, queue) with the two buttons around the transport controls;
 - toggle crossfade;
 - change the server's volume with the speaker button next to Sync (a slider from 0 to 150%, keyboard accessible; the change is sent after you stop dragging);
-- toggle autoplay (a switch in the "Up next" header; tracks it picks carry a small "Autoplay" badge in "Now playing").
+- toggle autoplay (a switch in the "Up next" header; tracks it picks carry a small "Autoplay" badge in "Now playing");
+- save the current track and queue as a playlist, or load a saved one (see `!playlist` in [Commands](commands.md)).
 
 Web actions are applied exactly like Discord commands and are reflected in the status message. The header shows how many people have the page open and a chart button that opens the server's listening stats.
 
