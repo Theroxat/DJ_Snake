@@ -307,12 +307,18 @@ def get_tracks(provider, kind, ref, limit):
     (blocking). Raises SpotifyError, including "link_empty"."""
     if provider == "spotify":
         return spotify.get_tracks(kind, ref, limit)
-    if provider == "deezer":
-        tracks = fetch_deezer(kind, ref, limit)
-    elif provider == "apple":
-        tracks = fetch_apple(kind, ref, limit)
-    else:
-        raise ValueError(f"Unknown provider {provider!r}")
+    try:
+        if provider == "deezer":
+            tracks = fetch_deezer(kind, ref, limit)
+        elif provider == "apple":
+            tracks = fetch_apple(kind, ref, limit)
+        else:
+            raise ValueError(f"Unknown provider {provider!r}")
+    except SpotifyError as e:
+        if e.code != "spotify_unreadable":
+            raise
+        # spotify._http's network error: not a Spotify link, say so plainly.
+        raise SpotifyError("link_unreadable", str(e)) from e
     tracks = tracks[:limit]
     if not tracks:
         raise SpotifyError("link_empty")

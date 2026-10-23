@@ -493,3 +493,18 @@ async def test_web_add_soundcloud_set_is_listed_with_its_url(
 async def test_web_add_rejects_unknown_hosts(web_add):
     status, body = await web_add("https://example.com/forss/flickermood")
     assert status == 400 and "SoundCloud" in body["error"]
+
+
+@pytest.mark.parametrize(
+    "provider, kind, ref",
+    [("deezer", "album", "302127"), ("apple", "album", ("us", "x", "1", None))],
+)
+def test_network_failure_is_not_worded_for_spotify(monkeypatch, provider, kind, ref):
+    def down(url, headers=None, data=None):
+        raise SpotifyError("spotify_unreadable", "network: down")
+
+    monkeypatch.setattr(spotify, "_http", down)
+    with pytest.raises(SpotifyError) as e:
+        catalog.get_tracks(provider, kind, ref, 10)
+    assert e.value.code == "link_unreadable"
+    assert "Spotify" not in controls.ControlError(e.value.code).message
