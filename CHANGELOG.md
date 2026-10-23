@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- View-only clip page link: every session also has a second unguessable link that shows the same page with the controls hidden and a "View only" badge; the server refuses controls sent with it (403).
+- DJ role: `!djrole <role>|off` (Manage Server, saved in `DATA_DIR/permissions.json`). When set, `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!stop` and `!reset` need the role or Manage Server (whoever queued the playing track may still skip it), and the status message shows only the view-only link.
+- `!weblink` DMs the control link and the view-only link (DJs only when control is limited).
+- `WEB_CONTROL=everyone|dj` (default `everyone`): with `dj`, the control link is never posted publicly.
+
+### Changed
+
+- The status message now shows the view-only link next to the control link. With the defaults, everyone can still control the music as before.
+- Session ids are no longer written to the logs.
+
 ## [1.3.0] - 2026-10-22
 
 ### Added

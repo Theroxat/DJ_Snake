@@ -25,6 +25,7 @@ html.demo-embedded .demo-ribbon { display: none; }
 .demo-ribbon a { color: #ffd166; text-decoration: underline; white-space: nowrap; }
 .demo-ribbon a:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 @media (max-width: 520px) { .demo-ribbon { font-size: 11px; gap: 8px; padding: 6px 10px; } }
+@media (max-width: 700px) { .demo-ribbon .wide { display: none; } }
 </style>
 """
 
@@ -33,6 +34,7 @@ RIBBON_HTML = """
   <span title="Excerpts of Caminandes 3, Cosmos Laundromat, Big Buck Bunny, Tears of Steel and Sintel (Blender Foundation / Blender Studio, CC BY licence).">Demo: CC BY film excerpts (Blender)</span>
   <a href="./">Discord demo</a>
   <a href="?edit=demo">Theme editor</a>
+  <a class="wide" href="?view">View-only link</a>
   <a href="../#credits">Credits</a>
 </div>
 """

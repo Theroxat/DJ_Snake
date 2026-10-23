@@ -46,6 +46,16 @@ EMPTY_CHANNEL_GRACE_SECONDS = 30.0
 DATA_DIR = os.getenv("DATA_DIR") or "/app/data"
 THEMES_FILE = os.path.join(DATA_DIR, "themes.json")
 LOGO_DIR = os.path.join(DATA_DIR, "logos")
+# Per-guild DJ role (`!djrole`), see permissions.py.
+PERMISSIONS_FILE = os.path.join(DATA_DIR, "permissions.json")
+# Who gets the clip page's control link: "everyone" (posted in the status
+# panel next to the view-only link) or "dj" (the panel shows only the
+# view-only link; DJs get the control link by DM with `!weblink`). A guild
+# with a DJ role set is always handled as "dj".
+WEB_CONTROL = (os.getenv("WEB_CONTROL") or "everyone").strip().lower()
+if WEB_CONTROL not in ("everyone", "dj"):
+    print(f"⚠️  WEB_CONTROL={WEB_CONTROL!r} is not everyone|dj; using 'everyone'.")
+    WEB_CONTROL = "everyone"
 # Listening statistics (stats.py): SQLite, written by one background thread.
 STATS_DB = os.path.join(DATA_DIR, "stats.db")
 # A track left (next, jump, previous, !stop) before this much actual play

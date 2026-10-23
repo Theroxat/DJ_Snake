@@ -11,6 +11,7 @@ from aiohttp import web
 
 from . import state, stats
 from .config import (
+    COMMAND_PREFIX,
     LOGO_TYPES,
     MAX_CONTROL_BODY,
     MAX_LOGO_BYTES,
@@ -38,7 +39,14 @@ from .controls import (
     control_seek,
     seek_label,
 )
-from .sessions import refresh_panel, session_player, set_action, short, touch
+from .sessions import (
+    refresh_panel,
+    resolve_link,
+    session_player,
+    set_action,
+    short,
+    touch,
+)
 from .themes import (
     check_edit_token,
     clean_theme_name,
@@ -55,6 +63,10 @@ from .themes import (
 #
 # Contract relied on by web/index.html:
 #   GET /                      landing text
+#   {sid} below is a session id (the control link) or the session's view-only
+#   id; both serve the same routes, but a view-only id gets 403 on control and
+#   theme routes, and `can_control: false` in the state. URLs in the state are
+#   built from the id the request used.
 #   GET /{sid}                 the page (it handles unknown/ended sessions)
 #   GET /api/{sid}/state       session state JSON, 404 {"active": false} if none;
 #                              an X-Viewer header (the tab's random id) counts
@@ -123,10 +135,18 @@ def count_viewer(sid, viewer):
     return len(seen)
 
 
+def _session(request):
+    """(link id, sid, player, can_control) for the id in the URL: a session
+    id (control link) or a view-only id; player None if neither is live."""
+    link = request.match_info["sid"]
+    sid, can_control = resolve_link(link)
+    player = session_player(sid) if sid is not None else None
+    return link, sid, player, can_control
+
+
 async def web_state(request):
-    sid = request.match_info["sid"]
+    link, sid, player, can_control = _session(request)
     headers = {"Cache-Control": "no-store"}
-    player = session_player(sid)
     if player is None:
         return web.json_response({"active": False}, status=404, headers=headers)
     viewers = count_viewer(sid, request.headers.get("X-Viewer"))
@@ -143,7 +163,9 @@ async def web_state(request):
         if player.now_playing and player.started_at is not None:
             track = player.now_playing
             now_playing = _track_summary(track)
-            now_playing["video_url"] = f"/media/{sid}/{track['id']}"
+            # Built from the id the page used: a view-only page never sees
+            # the control id.
+            now_playing["video_url"] = f"/media/{link}/{track['id']}"
             now_playing["elapsed"] = player.elapsed()  # File time
             # Automix window (file time): the page's progress bar spans it.
             now_playing["start"] = track.get("start") or 0.0
@@ -172,16 +194,17 @@ async def web_state(request):
             # Asked for, not queued yet (title None: link not read yet).
             "downloading": [dict(item) for item in downloading[:MAX_DOWNLOADING]],
             "downloading_total": len(downloading),
-            "theme": theme_state(sid, state.sessions[sid]),
+            "theme": theme_state(link, state.sessions[sid]),
+            # False on a view-only link: the page hides its controls.
+            "can_control": can_control,
         },
         headers=headers,
     )
 
 
 async def web_media(request):
-    sid = request.match_info["sid"]
     track_id = request.match_info["track_id"]
-    player = session_player(sid)
+    _, _, player, _ = _session(request)
     if player is None:
         raise web.HTTPNotFound()
     tracks = ([player.now_playing] if player.now_playing else []) + list(player.queue)
@@ -205,9 +228,9 @@ _stats_cache = {}
 
 
 async def web_stats(request):
-    sid = request.match_info["sid"]
+    _, sid, player, _ = _session(request)
     headers = {"Cache-Control": "no-store"}
-    if session_player(sid) is None:
+    if player is None:
         return web.json_response({"active": False}, status=404, headers=headers)
     range_name = request.query.get("range", "week")
     if range_name not in stats.RANGES:
@@ -262,18 +285,13 @@ async def _read_json(request):
     return data, None
 
 
-async def web_control(request):
-    sid = request.match_info["sid"]
-    player = session_player(sid)
-    if player is None:
-        return _control_error(404, "Unknown or expired session.")
-    guild_id = state.sessions[sid]
-
-    data, error = await _read_json(request)
-    if error is not None:
-        return error
-    action = data.get("action")
-    if action not in (
+# Every action of POST /api/{id}/control. They all change the session for
+# everyone, so they all need the control link: a new action is added here
+# (and dispatched below) and the permission gate in web_control() covers it
+# with no other change. Something a view-only page may do belongs in a GET
+# route, never in this list.
+CONTROL_ACTIONS = frozenset(
+    {
         "next",
         "previous",
         "pause",
@@ -284,7 +302,30 @@ async def web_control(request):
         "seek",
         "jump",
         "crossfade",
-    ):
+    }
+)
+
+VIEW_ONLY_ERROR = (
+    "This is a view-only link. Ask a DJ for the control link "
+    f"({COMMAND_PREFIX}weblink in Discord)."
+)
+
+
+async def web_control(request):
+    _, sid, player, can_control = _session(request)
+    if player is None:
+        return _control_error(404, "Unknown or expired session.")
+    # The one permission gate of the web API, before the body is even read:
+    # a view-only id can run none of CONTROL_ACTIONS (fail closed).
+    if not can_control:
+        return _control_error(403, VIEW_ONLY_ERROR)
+    guild_id = state.sessions[sid]
+
+    data, error = await _read_json(request)
+    if error is not None:
+        return error
+    action = data.get("action")
+    if action not in CONTROL_ACTIONS:
         return _control_error(400, "Unknown action.")
 
     track_id = data.get("id")
@@ -352,10 +393,11 @@ async def web_control(request):
 def _theme_auth(request):
     """(player, guild id, None) for a valid edit token on a live session,
     else (None, None, error response)."""
-    sid = request.match_info["sid"]
-    player = session_player(sid)
+    _, sid, player, can_control = _session(request)
     if player is None:
         return None, None, _control_error(404, "Unknown or expired session.")
+    if not can_control:  # The editor link is always a control link
+        return None, None, _control_error(403, VIEW_ONLY_ERROR)
     guild_id = state.sessions[sid]
     if not check_edit_token(request.headers.get("X-Edit-Token"), guild_id):
         return (
@@ -445,8 +487,8 @@ async def web_theme_logo(request):
 
 
 async def web_theme_logo_file(request):
-    sid = request.match_info["sid"]
-    if session_player(sid) is None:
+    _, sid, player, _ = _session(request)
+    if player is None:
         raise web.HTTPNotFound()
     guild_id = state.sessions[sid]
     logo = state.guild_themes.get(guild_id, {}).get("logo")

@@ -62,7 +62,8 @@ between tests. The web API runs through aiohttp's `TestClient`. Tests that need
 the real `ffmpeg` binary are marked `ffmpeg` and skipped without it. Patch
 `media.download_media`, `media.get_playlist_info`, `state.clock` or
 `sessions.PANEL_MIN_INTERVAL` on their module: callers look them up there.
-`conftest.py` also points `stats.DB_PATH` at the test's own directory and
+`conftest.py` also points `stats.DB_PATH`, the theme files and
+`permissions.PERMISSIONS_FILE` at the test's own directory and
 calls `stats.flush()` at teardown; call `stats.flush()` before reading the
 database in a test.
 Playback in Discord is still tested by hand, e.g. `!play <youtube url>`.
@@ -98,7 +99,9 @@ which is no longer read), `TEMP_DIR`, `POT_BASE_URL`, `WEB_PORT` (47823),
 before leaving voice once the queue runs out), `DATA_DIR`
 (`/app/data`, mounted from `./data` by Compose; the container's UID 1000 must
 be able to write it), `WEB_THEME` (`arcade`, the theme of guilds that never
-chose one), `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` (optional, both
+chose one), `WEB_CONTROL` (`everyone`, or `dj`: the control link is never
+posted publicly, see Permissions; anything else falls back to `everyone`),
+`SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` (optional, both
 needed to use the Spotify Web API), and `YTDLP_AUTO_UPDATE` (entrypoint only).
 
 ## Architecture (`djsnake/`)
@@ -108,8 +111,8 @@ Module map, lowest layer first (each imports only the ones above it):
 - `config.py`: environment variables and constants, read once at import
   (`WEB_INDEX` resolves `web/index.html` from the repository root).
 - `state.py`: shared mutable state: the `bot` instance, `music_players`,
-  `sessions`, `guild_themes`, `edit_tokens`, `viewers`, `background_tasks` and
-  `clock()`.
+  `sessions`, `watch_ids`, `guild_perms`, `guild_themes`, `edit_tokens`,
+  `viewers`, `background_tasks` and `clock()`.
   Always use it as `state.music_players` (never `from .state import ...`), so
   every module and test sees the same objects.
 - `stats.py`: listening stats in SQLite (`record_play()`,
@@ -117,10 +120,14 @@ Module map, lowest layer first (each imports only the ones above it):
   written by one background thread. Imports only `config`.
 - `player.py`: `MusicPlayer`, `discard_tracks()`, `file_in_use()`,
   `push_history()`, `retire_play()`, `guild_of()`.
-- `sessions.py`: session expiry (`touch()`, `session_player()`,
-  `session_cleanup_loop()`, `open_session()`) and the status panel
-  (`refresh_panel()`, `set_action()`, `ack()`, `short()`).
 - `themes.py`: theme storage, logos and `!theme edit` tokens.
+- `permissions.py`: the DJ role (`load_perms()`, `set_dj_role()`,
+  `dj_role()`), `is_dj()`, `web_control_restricted()` and the Discord gate
+  (`DJ_COMMANDS`, `REQUESTER_COMMANDS`, `can_run_dj_command()`).
+- `sessions.py`: session expiry (`touch()`, `session_player()`,
+  `session_cleanup_loop()`, `open_session()`), link ids (`resolve_link()`,
+  `rotate_control_link()`) and the status panel (`refresh_panel()`,
+  `set_action()`, `ack()`, `short()`).
 - `media.py`: YouTube URL parsing, yt-dlp (`download_media()`,
   `get_playlist_info()`), the SponsorBlock cut, `analyse_media()`,
   `playback_options()`, `crossfade_eligible()`, and `search_youtube()` (flat
@@ -272,12 +279,45 @@ Module map, lowest layer first (each imports only the ones above it):
   state when the bot is kicked from a channel.
 - **Clip live sessions**: a session (`secrets.token_urlsafe(16)`, `sessions`
   maps sid to guild) belongs to the guild and survives leaving voice (queue
-  end, `!stop`, kick, `!reset`). A fresh join reuses the unexpired sid, or
-  makes one, and posts `{PUBLIC_BASE_URL}/{sid}`; that channel becomes
+  end, `!stop`, kick, `!reset`). It also has a view-only id
+  (`player.watch_id`, same format, `state.watch_ids` maps it to the sid). A
+  fresh join reuses the unexpired sid, or makes both, and posts the panel
+  with its links (see Permissions); that channel becomes
   `player.text_channel` for notices. It expires after `SESSION_IDLE_HOURS`
   without activity (playback or being in voice, a command via
   `bot.before_invoke`, a web control): lazily in `session_player()` plus
-  `session_cleanup_loop()` every 10 min. Expiry deletes the player's files.
+  `session_cleanup_loop()` every 10 min. Expiry deletes the player's files
+  and drops both ids. Ids are bearer secrets: never print or log them.
+- **Permissions** (`permissions.py`, `web.py`): two central gates, each a
+  single list to extend.
+  - Web: `{sid}` in every route may be the session id (control link) or the
+    view-only id. `resolve_link()` maps it to `(sid, can_control)` by
+    comparing it with every live id through `secrets.compare_digest` (never a
+    dict lookup on the raw id). `web_control()` refuses a view-only id with
+    403 before reading the body, for every action: all of `CONTROL_ACTIONS`
+    mutate, so a new web action is added to `CONTROL_ACTIONS` (and the
+    dispatch) and is gated with no other change. Anything a view-only page
+    may do belongs in a GET route. Theme routes also need the control id.
+    URLs in the state (`video_url`, `logo_url`) are built from the id the
+    request used, so a view-only page never sees the control id.
+  - Discord: the global `bot.check` `dj_gate()` calls
+    `can_run_dj_command()`: a command named in `DJ_COMMANDS` (next, pause,
+    resume, seek, stop, reset, crossfade) needs `is_dj()` (Manage Server, or
+    the guild's DJ role; no role set = everyone), except that
+    `REQUESTER_COMMANDS` (next) is allowed to `track["requester_id"]` (set by
+    `download_and_queue_song()`) on the playing track. A new mutating command
+    is added to `DJ_COMMANDS`. Refusals raise `NotDJ`, answered by
+    `on_command_error`. `!play` and `!list` stay open.
+  - Links: the DJ role (`!djrole <role>|off`, Manage Server) is stored in
+    `{DATA_DIR}/permissions.json` (`{guild id: {dj_role: id}}`, atomic write,
+    cleaned on load). `web_control_restricted(guild)` is `WEB_CONTROL ==
+    "dj"` or a DJ role set: then the panel shows only the view-only link and
+    a hint to `!weblink`, which DMs both links to `is_dj(strict=True)`
+    members (without a role: Manage Server only). Unrestricted, the panel
+    shows the control link and the view-only link in `<>` (no second
+    preview), and `!weblink` DMs anyone. Setting a role that newly restricts
+    a live session calls `rotate_control_link()`: a new sid, same view-only
+    id, so the publicly posted control link stops working.
 - **Web server**: aiohttp, started in `setup_hook` on the bot's loop, bound to
   `0.0.0.0:WEB_PORT`. Routes, the contract `web/index.html` relies on:
   `GET /` landing text; `GET /{sid}` serves `web/index.html`;
@@ -285,7 +325,11 @@ Module map, lowest layer first (each imports only the ones above it):
   paused, can_previous, crossfade, crossfading, server_time, viewers, now_playing: {id,
   title, duration, thumbnail, url, video_url, elapsed, start, end} | null, queue: [{id, title, duration,
   thumbnail, url}], downloading: [{key, title, source}], downloading_total,
-  theme: {skin, base, bg, text, accent, name, logo_url}}`
+  theme: {skin, base, bg, text, accent, name, logo_url}, can_control}`
+  (`can_control` false for a view-only id: the page sets `data-viewonly` on
+  `<html>`, shows the "View only" header pill and hides the transport
+  buttons, crossfade, add form, grips and remove buttons; its `active()`
+  guard stops every control call)
   (404 `{"active": false}` when the sid is unknown or
   expired; out of voice, `now_playing` is null and `queue` and `downloading`
   empty; `elapsed` freezes while paused; `downloading` is the first
@@ -304,8 +348,8 @@ Module map, lowest layer first (each imports only the ones above it):
   clamped, staying paused if it was, unannounced; jump plays a queued `id` now)
   and returns 200 `{"ok": true}` (202 for add, which downloads in the
   background) or `{"ok": false, "error": "<message>"}` with 400 (bad input,
-  non-YouTube URL), 404 (unknown sid or track id) or 409 (not in voice, nothing
-  playing). `GET /media/{sid}/{id}` streams the playing, a queued or a history
+  non-YouTube URL), 403 (view-only id, see Permissions), 404 (unknown sid or
+  track id) or 409 (not in voice, nothing playing). `GET /media/{sid}/{id}` streams the playing, a queued or a history
   track's mp4 with Range support. Files are found by track id, never by a path
   from the request. Theme routes: `POST /api/{sid}/theme`,
   `POST|DELETE /api/{sid}/theme/logo`, `GET /theme-logo/{sid}` (see Themes).
@@ -369,7 +413,7 @@ Module map, lowest layer first (each imports only the ones above it):
   with `textContent`.
 - **Status panel**: each web session has one message in its text channel
   (`player.panel_message`), edited in place instead of announcing events:
-  clip link, now playing / paused / idle, up next, loading progress and the
+  clip links (see Permissions), now playing / paused / idle, up next, loading progress and the
   last action. Every state change calls `refresh_panel(player)`, which is
   coalesced to one edit per `PANEL_MIN_INTERVAL` (1.5 s, last state wins). A
   deleted panel is re-posted; a rejoin posts a fresh one and deletes the old.
@@ -382,7 +426,8 @@ Module map, lowest layer first (each imports only the ones above it):
 - **Commands**: `!play` (YouTube or Spotify link), `!list`, `!next`, `!pause`, `!resume`, `!seek`
   (position relative to the track's automix `start`, as the page shows it),
   `!crossfade on|off`, `!stop`, `!reset`, `!theme [preset|reset|edit]`
-  (Manage Server permission via `commands.has_guild_permissions`).
+  and `!djrole [role|off]` (Manage Server permission via
+  `commands.has_guild_permissions`), `!weblink` (see Permissions).
 - Voice needs `PyNaCl`, `davey` (DAVE encryption, required by discord.py 2.7+)
   and, on Python 3.13+, `audioop-lts`. The Docker image uses Python 3.12. CI
   tests on 3.10 to 3.12.

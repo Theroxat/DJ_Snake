@@ -9,11 +9,12 @@ Lowest layer first; each module imports only the ones above it.
 | Module | Role |
 | --- | --- |
 | `config.py` | Environment variables and constants, read once at import. |
-| `state.py` | Shared mutable state: the `bot`, `music_players`, `sessions`, `guild_themes`, `edit_tokens`, `viewers`, `background_tasks` and `clock()`. Always used as `state.music_players`, never imported by name, so every module and test sees the same objects. |
+| `state.py` | Shared mutable state: the `bot`, `music_players`, `sessions`, `watch_ids`, `guild_perms`, `guild_themes`, `edit_tokens`, `viewers`, `background_tasks` and `clock()`. Always used as `state.music_players`, never imported by name, so every module and test sees the same objects. |
 | `stats.py` | Listening stats in SQLite, written by one background thread. |
 | `player.py` | `MusicPlayer` (per-server state), cleanup of files and history helpers. |
-| `sessions.py` | Session expiry and the status panel. |
 | `themes.py` | Theme storage, logos and `!theme edit` tokens. |
+| `permissions.py` | The DJ role (`permissions.json`), `WEB_CONTROL`, and the list of Discord commands reserved for DJs. |
+| `sessions.py` | Session expiry, control and view-only link ids, and the status panel. |
 | `media.py` | YouTube URL parsing, yt-dlp downloads, the SponsorBlock cut, audio analysis and FFmpeg options, YouTube search. |
 | `spotify.py` | Spotify link parsing, track lists, and matching to YouTube. |
 | `mixer.py` | `CrossfadeMixer`, the audio source wrapping FFmpeg. |

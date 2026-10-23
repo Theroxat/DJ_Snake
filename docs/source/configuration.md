@@ -15,14 +15,15 @@ DJ Snake is configured through environment variables. With Docker Compose, put t
 | `PUBLIC_BASE_URL` | empty (`http://localhost:WEB_PORT`) | Public address used in the clip link the bot posts, for example `https://dj.example.com`. |
 | `SESSION_IDLE_HOURS` | `6` | Hours without activity before a clip page link expires. |
 | `IDLE_DISCONNECT_SECONDS` | `300` | Seconds the bot stays in voice once the queue runs out, before leaving (30 s instead when no human is left in the channel). |
-| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), logos and listening stats (`stats.db`). Compose mounts `./data` there. |
+| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), logos, DJ roles (`permissions.json`) and listening stats (`stats.db`). Compose mounts `./data` there. |
+| `WEB_CONTROL` | `everyone` | Who gets the clip page's control link. `everyone`: the status message shows it next to the view-only link. `dj`: it shows only the view-only link, and DJs get the control link by DM with `!weblink`. A server with a DJ role always behaves as `dj`. See [Who controls the music](clip-page.md#who-controls-the-music). |
 | `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`: `arcade`, `minimal`, `night`, `vinyl`, `club`, `terminal`, `space` or `cobalt`. |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | empty | Optional Spotify Web API credentials, for playlists over 100 tracks. Both are needed. See [Spotify](spotify.md). |
 | `YTDLP_AUTO_UPDATE` | `1` | Upgrade yt-dlp on container start (`0` to skip). Used by the container entrypoint only. |
 | `DJ_SNAKE_TAG` | `latest` | Image tag to pull (Compose only), for example `1.0.0`. |
 
 ```{note}
-An invalid `WEB_THEME` is ignored with a warning in the logs, and `arcade` is used instead.
+An invalid `WEB_THEME` is ignored with a warning in the logs, and `arcade` is used instead. Likewise an invalid `WEB_CONTROL` falls back to `everyone`.
 ```
 
 ## Notes

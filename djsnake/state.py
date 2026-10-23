@@ -28,8 +28,14 @@ def clock():
 
 # Guild id -> MusicPlayer
 music_players = {}
-# Web session id -> guild id. The only way a request reaches a player.
+# Web session id (the control link's id) -> guild id. With `watch_ids`, the
+# only way a request reaches a player: look ids up with
+# sessions.resolve_link() (constant-time compare).
 sessions = {}
+# View-only link id -> web session id (one per session, dropped with it).
+watch_ids = {}
+# Guild id -> {"dj_role": role id}, persisted (see permissions.py).
+guild_perms = {}
 
 # Guild id -> stored theme record (see themes.py).
 guild_themes = {}

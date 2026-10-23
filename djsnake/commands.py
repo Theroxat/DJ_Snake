@@ -37,9 +37,18 @@ from .sessions import (
     ack,
     open_session,
     refresh_panel,
+    rotate_control_link,
     session_player,
     set_action,
     touch,
+)
+from .permissions import (
+    REQUESTER_COMMANDS,
+    can_run_dj_command,
+    dj_role,
+    is_dj,
+    set_dj_role,
+    web_control_restricted,
 )
 from .themes import issue_edit_token, reset_theme, save_themes, theme_for
 
@@ -79,6 +88,32 @@ class PlaylistChoiceView(discord.ui.View):
         self.choice = "playlist"
         await interaction.response.defer()
         self.stop()
+
+
+class NotDJ(commands.CheckFailure):
+    """A member without the DJ role ran one of DJ_COMMANDS."""
+
+
+def _dj_requirement(guild):
+    """How to become a DJ, for error messages."""
+    role_id = dj_role(guild.id)
+    role = guild.get_role(role_id) if role_id is not None else None
+    if role is not None:
+        return f"the **{role.name}** role or the **Manage Server** permission"
+    return "the **Manage Server** permission"
+
+
+@bot.check
+async def dj_gate(ctx):
+    """The one Discord permission gate: every command in DJ_COMMANDS needs a
+    DJ (see permissions.py); the member who queued the playing track may
+    still skip it."""
+    if ctx.guild is None or ctx.command is None:
+        return True
+    player = state.music_players.get(ctx.guild.id)
+    if can_run_dj_command(ctx.author, ctx.guild.id, ctx.command.name, player):
+        return True
+    raise NotDJ()
 
 
 @bot.before_invoke
@@ -230,6 +265,7 @@ async def reset_voice(ctx):
         await player.disconnect_voice_client()
         fresh = MusicPlayer()
         fresh.sid = player.sid
+        fresh.watch_id = player.watch_id
         fresh.text_channel = player.text_channel
         fresh.last_active = player.last_active
         fresh.history = player.history
@@ -363,9 +399,7 @@ async def theme(ctx, choice: str = None):
         return
 
     if choice == "edit":
-        player = state.music_players.setdefault(guild_id, MusicPlayer())
-        if player.sid and session_player(player.sid) is None:
-            player.sid = None  # Expired: open_session makes a fresh one
+        player = _live_session(guild_id)
         # The editor lives on the session's page: open one if needed (as a
         # join does, without joining voice).
         await open_session(ctx, player, announce=False)
@@ -409,6 +443,107 @@ async def theme(ctx, choice: str = None):
         set_action(player, f"🎨 Clip page theme: {label}")
 
 
+def _live_session(guild_id):
+    """The guild's player with a live web session, opened by the caller with
+    open_session() if needed (an expired sid is dropped here)."""
+    player = state.music_players.setdefault(guild_id, MusicPlayer())
+    if player.sid and session_player(player.sid) is None:
+        player.sid = None  # Expired: open_session makes a fresh one
+        player.watch_id = None
+    return player
+
+
+@bot.command(name="djrole")
+@commands.has_guild_permissions(manage_guild=True)
+async def djrole(ctx, *, choice: str = None):
+    """Show or set the role that may control the music (Manage Server)."""
+    guild_id = ctx.guild.id
+    choice = (choice or "").strip()
+    if not choice:
+        role_id = dj_role(guild_id)
+        if role_id is None:
+            current = "none, everyone controls the music"
+        else:
+            role = ctx.guild.get_role(role_id)
+            current = (
+                f"**{role.name}**"
+                if role
+                else "a deleted role (only Manage Server can control the music)"
+            )
+        await ctx.send(
+            f"🎧 DJ role: {current}\n"
+            f"`{COMMAND_PREFIX}djrole <role>` limits skip, pause, seek, stop, "
+            "reset, crossfade and the clip page's control link to that role "
+            f"and Manage Server; `{COMMAND_PREFIX}djrole off` opens them to "
+            "everyone again.",
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+        return
+
+    role = None
+    if choice.lower() != "off":
+        try:
+            role = await commands.RoleConverter().convert(ctx, choice)
+        except commands.BadArgument:
+            await ctx.send("❌ Role not found. Use its name, ID or mention.")
+            return
+        if role.is_default():
+            await ctx.send(
+                "❌ @everyone can't be the DJ role. Use "
+                f"`{COMMAND_PREFIX}djrole off` to let everyone control the music.",
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return
+
+    was_restricted = web_control_restricted(guild_id)
+    try:
+        set_dj_role(guild_id, role.id if role else None)
+    except OSError as e:
+        print(f"Could not save DJ role: {e}")
+        await ctx.send("❌ Could not save the DJ role (is DATA_DIR writable?).")
+        return
+    player = state.music_players.get(guild_id)
+    if player:
+        # The control link may have been posted publicly: once control is
+        # limited, it must stop working (the view-only link stays).
+        if not was_restricted and web_control_restricted(guild_id):
+            if player.sid and session_player(player.sid) is not None:
+                rotate_control_link(player)
+        if role:
+            set_action(player, f"🎧 DJ role: {role.name}")
+        else:
+            set_action(player, "🎧 DJ role removed: everyone controls the music")
+    await ack(ctx)
+
+
+@bot.command(name="weblink")
+@commands.guild_only()
+async def weblink(ctx):
+    """DM the clip page's control link (DJs only when control is limited)."""
+    guild_id = ctx.guild.id
+    if web_control_restricted(guild_id) and not is_dj(
+        ctx.author, guild_id, strict=True
+    ):
+        raise NotDJ()
+    player = _live_session(guild_id)
+    # As `!theme edit`: open a session (and its panel) without joining voice.
+    await open_session(ctx, player, announce=False)
+    try:
+        await ctx.author.send(
+            f"🎛️ Control link for **{ctx.guild.name}** (whoever has it controls "
+            "the music, do not share it):\n"
+            f"{PUBLIC_BASE_URL}/{player.sid}\n"
+            f"👀 View-only link, safe to share: {PUBLIC_BASE_URL}/{player.watch_id}"
+        )
+    except discord.HTTPException:
+        await ctx.send(
+            "❌ I can't send you a direct message. Allow DMs from server "
+            f"members, then run `{COMMAND_PREFIX}weblink` again."
+        )
+        return
+    await ack(ctx)
+
+
 @bot.command(name="pause")
 async def pause(ctx):
     await _run_command_control(ctx, control_pause)
@@ -429,6 +564,18 @@ async def on_command_error(ctx, error):
         return
     if isinstance(error, commands.NoPrivateMessage):
         await ctx.send("❌ This command only works in a server.")
+        return
+    if isinstance(error, NotDJ):
+        name = ctx.command.name if ctx.command else ""
+        extra = (
+            " (or be the one who queued the current track)"
+            if name in REQUESTER_COMMANDS
+            else ""
+        )
+        await ctx.send(
+            f"❌ Only DJs can use `{COMMAND_PREFIX}{name}`: you need "
+            f"{_dj_requirement(ctx.guild)}{extra}."
+        )
         return
     if isinstance(error, commands.MissingPermissions):
         await ctx.send(

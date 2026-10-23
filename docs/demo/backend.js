@@ -102,7 +102,7 @@
     };
 
     const S = {
-      sid: null, inVoice: false, current: null, queue: [], history: [],
+      sid: null, wid: null, inVoice: false, current: null, queue: [], history: [],
       startedAt: 0, pausedAt: null, pausedTotal: 0,
       crossfade: false, epoch: 0, jobs: 0, single: 0,
       pending: [], // pending_downloads: {key, title (null: link not read), source}
@@ -187,7 +187,7 @@
     function join() {
       if (S.inVoice) return false;
       S.inVoice = true;
-      if (!S.sid) S.sid = newSid();
+      if (!S.sid) { S.sid = newSid(); S.wid = newSid(); }
       S.epoch++;
       emit("voice", { inVoice: true });
       emit("panel-post");
@@ -196,7 +196,7 @@
     }
     function openSession() {
       if (S.sid) return false;
-      S.sid = newSid();
+      S.sid = newSid(); S.wid = newSid();
       emit("panel-post");
       changed();
       return true;
@@ -354,7 +354,11 @@
     // ---- status panel (sessions.render_panel)
     function renderPanel() {
       const lines = [];
-      if (S.sid) lines.push(`📺 Watch the clip live: ${BASE_URL}/${S.sid}`);
+      // WEB_CONTROL=everyone and no DJ role: both links are public.
+      if (S.sid) {
+        lines.push(`📺 Watch and control the clip live: ${BASE_URL}/${S.sid}`);
+        lines.push(`👀 View-only link: <${BASE_URL}/${S.wid}>`);
+      }
       if (!S.inVoice) lines.push(`💤 Idle — ${PREFIX}play to resume`);
       else if (!S.current && idleTimer && !S.queue.length) lines.push("💤 Queue empty — leaving in 1 min unless something is added");
       else if (S.current) lines.push(`🎵 Now playing: **${short(S.current.title)}**` + (paused() ? " ⏸️ paused" : ""));
@@ -374,7 +378,7 @@
 
     // ---- web API (web.py), errors as the real page expects
     const pub = (t) => ({ id: t.id, title: t.title, duration: t.duration, thumbnail: t.thumbnail, url: t.url });
-    function state() {
+    function state(view) {
       if (!S.sid) return { status: 404, body: { active: false } };
       const c = S.inVoice ? S.current : null;
       return {
@@ -385,6 +389,7 @@
           crossfade: S.crossfade, crossfading: false, server_time: Date.now() / 1000,
           viewers: viewers(),
           theme: S.theme,
+          can_control: !view,
           now_playing: c ? Object.assign(pub(c), { video_url: c.video_url, elapsed: elapsed(), start: START, end: END }) : null,
           queue: S.inVoice ? S.queue.map(pub) : [],
           downloading: S.inVoice ? S.pending.slice(0, 50).map((p) => Object.assign({}, p)) : [],
@@ -481,9 +486,14 @@
       setAction("🎨 Clip page theme updated via the web page");
       return { status: 200, body: { ok: true, theme: S.theme } };
     }
-    /** Fake HTTP: `route` is state | stats | control | theme | theme/logo. */
-    function http(route, method, body) {
-      if (route === "state") return state();
+    /** Fake HTTP: `route` is state | stats | control | theme | theme/logo.
+     * `view`: the page was opened with the view-only link (web.py answers
+     * `can_control: false` and refuses control and theme routes with 403). */
+    function http(route, method, body, view) {
+      if (route === "state") return state(view);
+      if (view && route !== "stats" && S.sid) {
+        return fail(403, `This is a view-only link. Ask a DJ for the control link (${PREFIX}weblink in Discord).`);
+      }
       if (route === "stats") {
         if (!S.sid) return { status: 404, body: { active: false } };
         const range = body && body.range;
@@ -497,7 +507,7 @@
     }
 
     if (standalone) {
-      S.sid = newSid();
+      S.sid = newSid(); S.wid = newSid();
       S.inVoice = true;
       while (S.queue.length < 4) S.queue.push(mkTrack(rot++));
       play(S.queue.shift());
@@ -516,6 +526,7 @@
       on, http, parseLink, queueLink, join, openSession, renderPanel, seekLabel, C, ControlError,
       catalog: CATALOG, start: START, prefix: PREFIX, presets: PRESETS, skins: SKINS, baseUrl: BASE_URL,
       get sid() { return S.sid; },
+      get wid() { return S.wid; },
       get inVoice() { return S.inVoice; },
       get playing() { return S.inVoice && !!S.current && !paused(); },
       get current() { return S.current; },

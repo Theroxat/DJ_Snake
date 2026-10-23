@@ -19,9 +19,13 @@
   if (!backend) backend = window.DJDemoBackend.create({ standalone: true });
   if (embedded) document.documentElement.classList.add("demo-embedded");
 
+  // `?view` plays the view-only link: the fake API answers as web.py does
+  // for a view-only id (no controls, 403 on control).
+  let view = false;
   // `?edit=demo` opens the theme editor: give the page a well-formed token.
   try {
     const p = new URLSearchParams(location.search);
+    view = p.has("view");
     if (p.get("edit") === "demo") {
       p.set("edit", "demo-edit-token-0000");
       history.replaceState(null, "", location.pathname + "?" + p.toString());
@@ -54,7 +58,7 @@
     }
     await new Promise((r) => setTimeout(r, 40));
     // JSON round trip: the answer comes from the parent window's realm.
-    const res = backend.http(m[1], method, body);
+    const res = backend.http(m[1], method, body, view);
     return new Response(JSON.stringify(res.body), {
       status: res.status, headers: { "Content-Type": "application/json" },
     });
