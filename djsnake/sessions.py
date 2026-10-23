@@ -252,11 +252,18 @@ def set_action(player, text):
 
 
 async def ack(ctx):
-    """React with a check mark on the user's command message."""
-    message = getattr(ctx, "message", None)
-    if message is None:
-        return
+    """Confirm a command: a check mark reaction on the user's message, or for
+    a slash command a private "✅" (its context has no real message)."""
+    interaction = getattr(ctx, "interaction", None)
     try:
-        await message.add_reaction("✅")
+        if interaction is None:
+            message = getattr(ctx, "message", None)
+            if message is not None:
+                await message.add_reaction("✅")
+        elif interaction.response.is_done():
+            # Deferred: the first reply replaces the "thinking" message.
+            await interaction.edit_original_response(content="✅")
+        else:
+            await ctx.send("✅", ephemeral=True)
     except Exception:
         pass

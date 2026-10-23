@@ -7,7 +7,7 @@ import discord
 
 from . import commands  # noqa: F401  (registers the commands)
 from . import state, stats
-from .config import COMMAND_PREFIX
+from .config import COMMAND_PREFIX, SLASH_SYNC_GUILD
 from .playback import idle_channel_emptied
 from .sessions import refresh_panel, session_cleanup_loop
 from .web import start_web_server
@@ -93,8 +93,28 @@ def _record_listeners(member, after):
         print(f"Listener count failed: {e}")
 
 
+async def sync_commands():
+    """Publish the slash commands: globally, or to SLASH_SYNC_GUILD only (which
+    shows at once). Returns how many were synced, or None on failure."""
+    try:
+        if SLASH_SYNC_GUILD:
+            guild = discord.Object(id=SLASH_SYNC_GUILD)
+            bot.tree.copy_global_to(guild=guild)
+            synced = await bot.tree.sync(guild=guild)
+            where = f"guild {SLASH_SYNC_GUILD}"
+        else:
+            synced = await bot.tree.sync()
+            where = "globally"
+    except discord.HTTPException as e:
+        print(f"Could not sync slash commands: {e}")
+        return None
+    print(f"Synced {len(synced)} slash commands ({where})")
+    return len(synced)
+
+
 async def setup_hook():
     await start_web_server()
+    await sync_commands()
     task = asyncio.get_running_loop().create_task(session_cleanup_loop())
     state.background_tasks.add(task)
 

@@ -23,7 +23,7 @@ Lowest layer first; each module imports only the ones above it.
 | `playback.py` | Voice connection, download-and-queue, playlists, and the chain that advances from track to track. |
 | `controls.py` | The `control_*` functions shared by Discord commands and the web page. |
 | `web.py` | The aiohttp routes and the web server. |
-| `commands.py` | The Discord commands and error handling. |
+| `commands.py` | The Discord commands (hybrid: `!` and `/`) and error handling. |
 | `app.py` | `on_ready`, voice-state events, `setup_hook` and `main()`. `bot.py` calls `main()`. |
 
 The web page itself is a single file, `web/index.html`, driven by the HTTP API below.

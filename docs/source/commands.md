@@ -1,6 +1,6 @@
 # Commands
 
-Commands are text messages sent in a server channel. The prefix is `!` by default (change it with `COMMAND_PREFIX`). Commands only work in a server, not in direct messages. On success the bot usually just adds a reaction to your message; only errors, `!list`, `!reset`, usage help and the playlist prompt are text replies.
+Every command works two ways: as a text message with the prefix, `!` by default (change it with `COMMAND_PREFIX`), and as a slash command (`/play`, `/next`, ...). The tables below show the prefix form. Slash commands need the bot invited with the `applications.commands` scope (see [Installation](installation.md)); they are published at startup, and Discord can take up to an hour to show them in every server (`SLASH_SYNC_GUILD` makes it instant on one server). `/crossfade` offers `on` and `off`, and `/theme` suggests the presets. Commands only work in a server, not in direct messages. On success the bot usually just adds a reaction to your message (a private ✅ for slash commands); slash command errors are only visible to you. Only errors, `!list`, `!reset`, usage help and the playlist prompt are text replies.
 
 | Command | Description |
 | --- | --- |

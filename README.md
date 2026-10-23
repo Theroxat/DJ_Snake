@@ -48,7 +48,7 @@
 
 1. In the [Discord Developer Portal](https://discord.com/developers/applications), create an application and add a bot.
 2. Under Bot, enable the **Message Content Intent**. It is the only privileged intent needed.
-3. Invite the bot with the `bot` scope and these permissions: View Channels, Send Messages, Read Message History, Add Reactions, Connect, Speak.
+3. Invite the bot with the `bot` and `applications.commands` scopes (the latter is needed for slash commands) and these permissions: View Channels, Send Messages, Read Message History, Add Reactions, Connect, Speak.
 4. Deploy, with the prebuilt image (recommended):
 
 ```bash
@@ -72,6 +72,8 @@ docker compose up -d --build
 ## Commands
 
 The prefix is `!` by default (`COMMAND_PREFIX`).
+
+Every command also works as a slash command (`/play`, `/next`, ...); the table shows the `!` form.
 
 | Command | Description |
 | --- | --- |
@@ -172,6 +174,7 @@ Set these in `.env` (see `.env.example`).
 | `PUBLIC_BASE_URL` | empty (`http://localhost:WEB_PORT`) | Public address used in the posted clip link. |
 | `SESSION_IDLE_HOURS` | `6` | Idle hours before a clip link expires. |
 | `AUTOPLAY` | `0` | Default of the per-session autoplay setting (`1` to start with it on). |
+| `SLASH_SYNC_GUILD` | empty | Server ID to publish slash commands to instantly (development). Empty: global sync. |
 | `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), volumes (`volume.json`), logos, listening stats (`stats.db`) and cached lyrics (`lyrics/`). Compose mounts `./data` there. |
 | `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`. |
 | `LYRICS` | `1` | Synced lyrics on the clip page, from lrclib.net (`0` turns them off: no lookups, no button). |

@@ -97,7 +97,8 @@ which is no longer read), `TEMP_DIR`, `POT_BASE_URL`, `WEB_PORT` (47823),
 `http://localhost:WEB_PORT`), `SESSION_IDLE_HOURS` (6), `IDLE_DISCONNECT_SECONDS` (300, the idle linger
 before leaving voice once the queue runs out), `AUTOPLAY` (0, default of the per-session autoplay), `DATA_DIR`
 (`/app/data`, mounted from `./data` by Compose; the container's UID 1000 must
-be able to write it), `WEB_THEME` (`arcade`, the theme of guilds that never
+be able to write it), `SLASH_SYNC_GUILD` (empty: slash commands sync globally at startup; a server
+ID syncs to it only, at once, for development), `WEB_THEME` (`arcade`, the theme of guilds that never
 chose one), `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` (optional, both
 needed to use the Spotify Web API), `METRICS` (`0`; `1` enables `GET /metrics`),
 `APP_VERSION` (set by the Dockerfile build arg, `dev` otherwise; shown by
@@ -145,8 +146,9 @@ Module map, lowest layer first (each imports only the ones above it):
   `open_track_source()`.
 - `controls.py`: `ControlError`, the `control_*` functions, `WebContext`.
 - `web.py`: the aiohttp routes and `start_web_server()`.
-- `commands.py`: the Discord commands, `before_invoke`, `on_command_error`.
-- `app.py`: `on_ready`, `on_voice_state_update`, `setup_hook`, `main()`;
+- `commands.py`: the Discord commands (all hybrid, see "Adding a command"),
+  `before_invoke`, `on_command_error`, `on_app_command_error`.
+- `app.py`: `on_ready`, `on_voice_state_update`, `setup_hook` (starts the web server and `sync_commands()`), `main()`;
   importing it registers the commands. `bot.py` calls `main()`.
 
 - **Per-guild state**: `music_players` maps guild ID to a `MusicPlayer` holding
@@ -591,6 +593,30 @@ To diagnose a download failure, reproduce it directly:
 docker exec dj-snake python -m yt_dlp --remote-components ejs:github \
     -f bestaudio/best -o /tmp/t.%(ext)s --no-playlist "<url>"
 ```
+
+## Adding a command
+
+Every command is a hybrid command: `!name` and `/name` from one function. Use
+the `hybrid(name, description)` decorator in `commands.py` (it registers a
+guild-only `bot.hybrid_command`), and put `@app_commands.describe(param=...)`
+and, for fixed values, `@app_commands.choices(param=[...])` under it. Keep the
+function plain (`async def name(ctx, arg: str = None)`); tests call
+`commands.name.callback(ctx, ...)`. Reply paths must work for both contexts:
+
+- `await defer(ctx)` first if it can take over 3 s (downloads, voice); it is a
+  no-op for `!`. A slash `ctx.message` is synthetic: never use it. `ack(ctx)`
+  reacts for `!` and sends or edits a private "✅" for `/`.
+- Report user mistakes with `await fail(ctx, "text")` (private on `/`). Other
+  replies use `ctx.send`.
+- A context kept past the command (download jobs, `play_next`, timers) must be
+  `ChannelContext(ctx)`: an interaction's replies expire after 15 minutes.
+- Permission checks (`commands.has_guild_permissions`) work for both; their
+  errors are worded in `error_message()`, shared by `on_command_error` and
+  the slash tree's `on_app_command_error`.
+- Add an autocomplete with `@name.autocomplete("param")`.
+
+Slash commands are synced in `app.sync_commands()`. `tests/fakes.py` has
+`make_slash_ctx()` for the interaction side.
 
 ## Conventions
 

@@ -16,6 +16,7 @@ DJ Snake is configured through environment variables. With Docker Compose, put t
 | `SESSION_IDLE_HOURS` | `6` | Hours without activity before a clip page link expires. |
 | `IDLE_DISCONNECT_SECONDS` | `300` | Seconds the bot stays in voice once the queue runs out, before leaving (30 s instead when no human is left in the channel). |
 | `AUTOPLAY` | `0` | Default of the per-session autoplay setting (`1`, `true`, `on` or `yes` to start with it on). Change it per session with `!autoplay` or the clip page. |
+| `SLASH_SYNC_GUILD` | empty | Server ID. When set, slash commands are published to that server only, and show up at once (for development). Empty publishes them globally, which Discord can take up to an hour to show. |
 | `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), volumes (`volume.json`), logos, listening stats (`stats.db`) and cached lyrics (`lyrics/`). Compose mounts `./data` there. |
 | `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`: `arcade`, `minimal`, `night`, `vinyl`, `club`, `terminal`, `space` or `cobalt`. |
 | `LYRICS` | `1` | Synced lyrics on the clip page, from [LRCLIB](https://lrclib.net). `0` turns them off: the bot sends no lookups and the page hides the Lyrics button. See [Lyrics](clip-page.md#lyrics). |

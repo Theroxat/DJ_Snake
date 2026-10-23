@@ -76,6 +76,42 @@ def make_ctx(guild_id, channel, author=None, command=None, name=None):
     )
 
 
+class FakeInteraction:
+    """The slice of discord.Interaction a slash command context uses."""
+
+    def __init__(self, channel):
+        self.channel, self.done = channel, False
+        self.deferred = []  # `ephemeral` of each defer()
+        self.edits = []  # edit_original_response(content=...)
+        self.response = types.SimpleNamespace(is_done=lambda: self.done)
+
+    async def edit_original_response(self, content=None, **kwargs):
+        self.edits.append(content)
+
+
+def make_slash_ctx(guild_id, channel, author=None, command=None, name=None):
+    """A hybrid command context invoked as `/command`: an interaction, a
+    synthetic message that cannot take reactions, and replies recorded in
+    `ctx.replies` as (content, ephemeral)."""
+    interaction = FakeInteraction(channel)
+    ctx = make_ctx(guild_id, channel, author, command, name)
+    ctx.interaction = interaction
+    ctx.message = None
+    ctx.replies = []
+
+    async def send(content=None, ephemeral=False, **kwargs):
+        interaction.done = True
+        ctx.replies.append((content, ephemeral))
+        return await channel.send(content, **kwargs)
+
+    async def defer(ephemeral=False):
+        interaction.done = True
+        interaction.deferred.append(ephemeral)
+
+    ctx.send, ctx.defer = send, defer
+    return ctx
+
+
 class FakeVoiceClient:
     """Plays nothing; stop() calls `after` from another thread, like
     discord.py's audio thread does."""

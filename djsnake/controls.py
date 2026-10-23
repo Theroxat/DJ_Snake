@@ -51,6 +51,7 @@ class WebContext:
         self.channel = player.text_channel
 
     async def send(self, content=None, **kwargs):
+        kwargs.pop("ephemeral", None)  # Channel messages cannot be private
         if self.channel is None:
             return _NullMessage()
         try:
@@ -58,6 +59,22 @@ class WebContext:
         except Exception as e:
             print(f"Could not send: {e}")
             return _NullMessage()
+
+
+class ChannelContext:
+    """A command context reduced to what outlives the command: guild, channel
+    and author, replying with plain channel messages. A slash command's own
+    replies stop working 15 minutes after the interaction, but downloads, the
+    playback chain and the idle timer keep a context for much longer."""
+
+    def __init__(self, ctx):
+        self.guild, self.channel = ctx.guild, ctx.channel
+        self.author, self.command = ctx.author, getattr(ctx, "command", None)
+        self.message = self.interaction = None
+
+    async def send(self, content=None, **kwargs):
+        kwargs.pop("ephemeral", None)
+        return await self.channel.send(content, **kwargs)
 
 
 class ControlError(Exception):

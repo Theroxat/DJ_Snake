@@ -7,7 +7,7 @@ DJ Snake is meant to be self-hosted. The recommended setup is Docker Compose, wh
 1. In the [Discord Developer Portal](https://discord.com/developers/applications), create an application and add a bot.
 2. Under **Bot**, enable the **Message Content Intent**. It is the only privileged intent needed; without it the bot ignores your commands.
 3. Copy the bot token. You will put it in `.env` as `DISCORD_TOKEN`. Never share or commit it.
-4. Invite the bot to your server with the `bot` scope and these permissions: **View Channels, Send Messages, Read Message History, Add Reactions, Connect, Speak**.
+4. Invite the bot to your server with the `bot` and `applications.commands` scopes (the latter makes the `/` commands appear) and these permissions: **View Channels, Send Messages, Read Message History, Add Reactions, Connect, Speak**.
 
 ## 2. Docker Compose quick start
 

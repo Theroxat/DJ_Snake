@@ -4,6 +4,7 @@ import asyncio
 import math
 
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 from . import catalog, media, spotify, state
@@ -14,10 +15,12 @@ from .config import (
     MAX_SEARCH_LENGTH,
     PUBLIC_BASE_URL,
     THEME_EDIT_SECONDS,
+    THEME_PRESETS,
     THEME_SKINS,
     WEB_THEME,
 )
 from .controls import (
+    ChannelContext,
     ControlError,
     control_autoplay,
     control_crossfade,
@@ -58,6 +61,53 @@ from .themes import issue_edit_token, reset_theme, save_themes, theme_for
 from .volume import parse_volume, volume_for
 
 bot = state.bot
+
+
+def hybrid(name, description):
+    """Register a command that works as `!name` and as `/name`.
+
+    Every command goes through this decorator (see "Adding a command" in
+    CLAUDE.md). It is guild-only. Put `@app_commands.describe(...)` /
+    `@app_commands.choices(...)` under it; the `ctx` helpers below make the
+    reply paths work for both kinds of context.
+    """
+
+    def decorate(func):
+        command = bot.hybrid_command(name=name, description=description)(func)
+        return commands.guild_only()(command)
+
+    return decorate
+
+
+async def defer(ctx):
+    """Acknowledge a slash command that may take over 3 s (no-op for `!`).
+    The thinking message is private; ack() or the first reply replaces it."""
+    if getattr(ctx, "interaction", None) is not None:
+        await ctx.defer(ephemeral=True)
+
+
+async def fail(ctx, text):
+    """Report a user mistake: private on a slash command, a plain reply on `!`."""
+    await ctx.send(f"❌ {text}", ephemeral=True)
+
+
+def error_message(error, command=None, slash=False):
+    """The English message for a command error, or None to stay silent. Shared
+    by the prefix handler and the slash command tree."""
+    if isinstance(error, (commands.CommandNotFound, app_commands.CommandNotFound)):
+        return None
+    if isinstance(error, commands.MissingRequiredArgument):
+        return f"❌ Missing argument. Try `{COMMAND_PREFIX}help`."
+    if isinstance(error, (commands.NoPrivateMessage, app_commands.NoPrivateMessage)):
+        return "❌ This command only works in a server."
+    if isinstance(
+        error, (commands.MissingPermissions, app_commands.MissingPermissions)
+    ):
+        return (
+            "❌ You need the **Manage Server** permission to use "
+            f"`{'/' if slash else COMMAND_PREFIX}{command}`."
+        )
+    return f"❌ Error: {error}"
 
 
 class PlaylistChoiceView(discord.ui.View):
@@ -101,29 +151,30 @@ async def record_command_activity(ctx):
         touch(state.music_players[ctx.guild.id])
 
 
-@bot.command(name="play")
-async def play(ctx, url: str = None, *, rest: str = ""):
-    # `url` is the first word, `rest` the other words (a text search).
-    query = f"{url or ''} {rest}".strip()
+@hybrid("play", "Queue a music link, or the best YouTube match for some text")
+@app_commands.describe(
+    query="YouTube, SoundCloud, Bandcamp, Spotify, Deezer or Apple Music link, "
+    "or text to search on YouTube"
+)
+async def play(ctx, *, query: str = None):
+    await defer(ctx)  # Joining voice and reading the link take over 3 s
+    query = (query or "").strip()
     if not query:
-        await ctx.send(
-            f"❌ Usage: `{COMMAND_PREFIX}play <YouTube or Spotify link or search text>`"
-        )
+        await fail(ctx, f"Usage: `{COMMAND_PREFIX}play <link or search text>`")
         return
 
-    query = query.strip()
     text_search = not looks_like_url(query)
     # A link is read up to the first space, as before.
     url = query if text_search else query.split()[0]
     if text_search and len(query) > MAX_SEARCH_LENGTH:
-        await ctx.send(f"❌ Search text is limited to {MAX_SEARCH_LENGTH} characters.")
+        await fail(ctx, f"Search text is limited to {MAX_SEARCH_LENGTH} characters.")
         return
 
     try:
         # Spotify, Deezer or Apple Music
         spotify_ref = None if text_search else catalog.check_link(url)
     except spotify.SpotifyError as e:
-        await ctx.send(f"❌ {ControlError(e.code).message}")
+        await fail(ctx, ControlError(e.code).message)
         return
 
     if not await join_voice_channel(ctx):
@@ -141,6 +192,7 @@ async def play(ctx, url: str = None, *, rest: str = ""):
 
     if text_search:
         await ack(ctx)
+        ctx = ChannelContext(ctx)  # The search outlives the interaction token
         try:
             await queue_search(ctx, player, query)
         except Exception as e:
@@ -149,6 +201,9 @@ async def play(ctx, url: str = None, *, rest: str = ""):
 
     try:
         await ack(ctx)
+        # From here on only the channel is needed: an interaction's reply
+        # token expires after 15 minutes, a playlist or the idle timer outlives it.
+        ctx = ChannelContext(ctx)
         player.load_line, player.load_final = "🔎 Analyzing the link…", False
         refresh_panel(player)
 
@@ -213,6 +268,7 @@ async def _play_spotify(ctx, player, kind, ref, provider="spotify"):
     then queue the YouTube match of each track."""
     try:
         await ack(ctx)
+        ctx = ChannelContext(ctx)
         label = catalog.LABELS[provider]
         player.load_line, player.load_final = f"🔎 Reading the {label} link…", False
         refresh_panel(player)
@@ -229,11 +285,12 @@ async def _play_spotify(ctx, player, kind, ref, provider="spotify"):
         await ctx.send(f"❌ An error occurred: {str(e)}")
 
 
-@bot.command(name="stop")
+@hybrid("stop", "Stop, clear the queue and leave voice")
 async def stop(ctx):
+    await defer(ctx)
     player = state.music_players.get(ctx.guild.id)
     if not player:
-        await ctx.send("❌ No music is currently playing.")
+        await fail(ctx, "No music is currently playing.")
         return
 
     async with player.lock:
@@ -247,7 +304,7 @@ async def stop(ctx):
     await ack(ctx)
 
 
-@bot.command(name="reset")
+@hybrid("reset", "Force a clean voice reconnect")
 async def reset_voice(ctx):
     """Force reset the voice connection"""
     await ctx.send("🔧 Resetting voice connection...")
@@ -295,11 +352,11 @@ async def reset_voice(ctx):
     await ctx.send("✅ Voice connection reset!")
 
 
-@bot.command(name="list")
+@hybrid("list", "Show the queue")
 async def list_queue(ctx):
     player = state.music_players.get(ctx.guild.id)
     if not player or not player.queue:
-        await ctx.send("❌ The queue is empty.")
+        await fail(ctx, "The queue is empty.")
         return
 
     queue_items = [f"{i+1}. {song['title']}" for i, song in enumerate(player.queue)]
@@ -319,19 +376,19 @@ async def _run_command_control(ctx, control):
     None) or _FAILED after replying with the error."""
     player = state.music_players.get(ctx.guild.id)
     if not player:
-        await ctx.send("❌ No music is currently playing.")
+        await fail(ctx, "No music is currently playing.")
         return _FAILED
     try:
         result = await control(player)
     except ControlError as e:
-        await ctx.send(f"❌ {e.message}")
+        await fail(ctx, e.message)
         return _FAILED
     await ack(ctx)
     refresh_panel(player)
     return result
 
 
-@bot.command(name="next")
+@hybrid("next", "Skip to the next track")
 async def next_track(ctx):
     # Stopping triggers the after_playing callback, which plays the next track.
     if await _run_command_control(ctx, control_next) is not _FAILED:
@@ -352,11 +409,14 @@ def parse_position(text):
     return seconds
 
 
-@bot.command(name="seek")
+@hybrid("seek", "Jump to a position in the current track")
+@app_commands.describe(
+    position="Seconds (90) or mm:ss (1:30), as the clip page shows it"
+)
 async def seek(ctx, position: str):
     seconds = parse_position(position)
     if seconds is None:
-        await ctx.send("❌ Invalid position. Use seconds or mm:ss.")
+        await fail(ctx, "Invalid position. Use seconds or mm:ss.")
         return
 
     def relative_seek(player):
@@ -370,11 +430,18 @@ async def seek(ctx, position: str):
         set_action(player, seek_label(player, applied))
 
 
-@bot.command(name="crossfade")
+@hybrid("crossfade", "Turn crossfade on or off for this session")
+@app_commands.describe(mode="on or off")
+@app_commands.choices(
+    mode=[
+        app_commands.Choice(name="on", value="on"),
+        app_commands.Choice(name="off", value="off"),
+    ]
+)
 async def crossfade(ctx, mode: str = None):
     mode = (mode or "").lower()
     if mode not in ("on", "off"):
-        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}crossfade on|off`")
+        await fail(ctx, f"Usage: `{COMMAND_PREFIX}crossfade on|off`")
         return
     player = state.music_players.setdefault(ctx.guild.id, MusicPlayer())
     touch(player)
@@ -382,12 +449,14 @@ async def crossfade(ctx, mode: str = None):
     await ack(ctx)
 
 
-@bot.command(name="loop")
+@hybrid("loop", "Set the loop mode (off, track, queue); empty cycles")
+@app_commands.describe(mode="off, track or queue (leave empty to cycle)")
+@app_commands.choices(mode=[app_commands.Choice(name=m, value=m) for m in LOOP_MODES])
 async def loop_command(ctx, mode: str = None):
     """Set the loop mode (off, track, queue); with no argument, cycle."""
     mode = mode.lower() if mode else None
     if mode is not None and mode not in LOOP_MODES:
-        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}loop [off|track|queue]`")
+        await fail(ctx, f"Usage: `{COMMAND_PREFIX}loop [off|track|queue]`")
         return
     player = state.music_players.setdefault(ctx.guild.id, MusicPlayer())
     touch(player)
@@ -395,36 +464,45 @@ async def loop_command(ctx, mode: str = None):
     await ack(ctx)
 
 
-@bot.command(name="shuffle")
+@hybrid("shuffle", "Shuffle the upcoming queue once")
 async def shuffle(ctx):
     if await _run_command_control(ctx, control_shuffle) is not _FAILED:
         set_action(state.music_players[ctx.guild.id], "🔀 Queue shuffled")
 
 
-@bot.command(name="volume")
+@hybrid("volume", "Show the server's volume, or set it (0-150 %, 100 = normal)")
+@app_commands.describe(level="0 to 150 (percent); leave empty to show it")
 async def volume(ctx, level: str = None):
     """Show the server's volume, or set it (0-150 %, 100 = normal)."""
     if level is None:
         await ctx.send(
             f"🔊 Volume: **{volume_for(ctx.guild.id)}%**\n"
-            f"`{COMMAND_PREFIX}volume <0-150>` changes it (100 is the normal level)."
+            f"`{COMMAND_PREFIX}volume <0-150>` changes it (100 is the normal level).",
+            ephemeral=True,
         )
         return
     percent = parse_volume(level)
     if percent is None:
-        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}volume [0-150]`")
+        await fail(ctx, f"Usage: `{COMMAND_PREFIX}volume [0-150]`")
         return
     player = state.music_players.setdefault(ctx.guild.id, MusicPlayer())
     touch(player)
     try:
         control_volume(player, ctx.guild.id, percent)
     except ControlError as e:
-        await ctx.send(f"⚠️ {e.message}")
+        await ctx.send(f"⚠️ {e.message}", ephemeral=True)
         return
     await ack(ctx)
 
 
-@bot.command(name="autoplay")
+@hybrid("autoplay", "Keep playing related tracks when the queue runs out")
+@app_commands.describe(mode="on or off (leave empty to show the setting)")
+@app_commands.choices(
+    mode=[
+        app_commands.Choice(name="on", value="on"),
+        app_commands.Choice(name="off", value="off"),
+    ]
+)
 async def autoplay(ctx, mode: str = None):
     """Keep playing related tracks when the queue runs out."""
     player = state.music_players.setdefault(ctx.guild.id, MusicPlayer())
@@ -433,17 +511,22 @@ async def autoplay(ctx, mode: str = None):
     if mode not in ("on", "off"):
         status = "on" if player.autoplay else "off"
         await ctx.send(
-            f"📻 Autoplay is {status}. Usage: `{COMMAND_PREFIX}autoplay on|off`"
+            f"📻 Autoplay is {status}. Usage: `{COMMAND_PREFIX}autoplay on|off`",
+            ephemeral=True,
         )
         return
     control_autoplay(player, mode == "on")
     await ack(ctx)
 
 
-@bot.command(name="theme")
+@hybrid("theme", "Show or set the clip page theme of this server")
 @commands.has_guild_permissions(manage_guild=True)
+@app_commands.describe(
+    choice="A preset, reset or edit (leave empty to show the current theme)"
+)
 async def theme(ctx, choice: str = None):
     """Show or set the clip page's default theme for this server."""
+    await defer(ctx)
     guild_id = ctx.guild.id
     choice = (choice or "").strip().lower()
     player = state.music_players.get(guild_id)
@@ -476,9 +559,10 @@ async def theme(ctx, choice: str = None):
             )
         except discord.HTTPException:
             state.edit_tokens.pop(token, None)
-            await ctx.send(
-                "❌ I can't send you a direct message. Allow DMs from server "
-                f"members, then run `{COMMAND_PREFIX}theme edit` again."
+            await fail(
+                ctx,
+                "I can't send you a direct message. Allow DMs from server "
+                f"members, then run `{COMMAND_PREFIX}theme edit` again.",
             )
             return
         await ack(ctx)
@@ -493,28 +577,36 @@ async def theme(ctx, choice: str = None):
             save_themes()
             label = choice
         else:
-            await ctx.send(
-                f"❌ Unknown theme. Presets: {', '.join(THEME_SKINS)}, "
-                "or `reset` / `edit`."
+            await fail(
+                ctx,
+                f"Unknown theme. Presets: {', '.join(THEME_SKINS)}, "
+                "or `reset` / `edit`.",
             )
             return
     except OSError as e:
         print(f"Could not save theme: {e}")
-        await ctx.send("❌ Could not save the theme (is DATA_DIR writable?).")
+        await fail(ctx, "Could not save the theme (is DATA_DIR writable?).")
         return
     await ack(ctx)
     if player:
         set_action(player, f"🎨 Clip page theme: {label}")
 
 
-@bot.command(name="pause")
+@hybrid("pause", "Pause playback")
 async def pause(ctx):
     await _run_command_control(ctx, control_pause)
 
 
-@bot.command(name="resume")
+@hybrid("resume", "Resume playback")
 async def resume(ctx):
     await _run_command_control(ctx, control_resume)
+
+
+@theme.autocomplete("choice")
+async def theme_autocomplete(interaction, current):
+    options = THEME_PRESETS + ("reset", "edit")
+    current = current.strip().lower()
+    return [app_commands.Choice(name=o, value=o) for o in options if current in o][:25]
 
 
 # --- Saved playlists ------------------------------------------------------------
@@ -556,24 +648,30 @@ async def _playlist_reply(ctx, call):
     try:
         return await call
     except ControlError as e:
-        await ctx.send(f"❌ {e.message}")
+        await fail(ctx, e.message)
         return _FAILED
 
 
-@bot.group(name="playlist", invoke_without_command=True)
+@bot.hybrid_group(
+    name="playlist",
+    description="Saved playlists of this server",
+    invoke_without_command=True,
+)
+@commands.guild_only()
 async def playlist(ctx):
-    await ctx.send(_playlist_usage())
+    await ctx.send(_playlist_usage(), ephemeral=True)
 
 
-@playlist.command(name="save")
+@playlist.command(name="save", description="Save the current track and the queue")
+@app_commands.describe(name="Playlist name")
 async def playlist_save(ctx, *, name: str = None):
     """Save the current track and the queue under a name."""
     if name is None:
-        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}playlist save <name>`")
+        await fail(ctx, f"Usage: `{COMMAND_PREFIX}playlist save <name>`")
         return
     player = state.music_players.get(ctx.guild.id)
     if player is None:
-        await ctx.send("❌ No music is currently playing.")
+        await fail(ctx, "No music is currently playing.")
         return
     result = await _playlist_reply(
         ctx,
@@ -587,15 +685,16 @@ async def playlist_save(ctx, *, name: str = None):
     set_action(player, f"💾 Saved playlist {result['name']} ({result['count']} tracks)")
 
 
-@playlist.command(name="add")
+@playlist.command(name="add", description="Add the current track to a playlist")
+@app_commands.describe(name="Playlist name")
 async def playlist_add(ctx, *, name: str = None):
     """Add the current track to a saved playlist."""
     if name is None:
-        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}playlist add <name>`")
+        await fail(ctx, f"Usage: `{COMMAND_PREFIX}playlist add <name>`")
         return
     player = state.music_players.get(ctx.guild.id)
     if player is None:
-        await ctx.send("❌ No music is currently playing.")
+        await fail(ctx, "No music is currently playing.")
         return
     result = await _playlist_reply(
         ctx, control_playlist_add(player, ctx.guild.id, name)
@@ -607,36 +706,39 @@ async def playlist_add(ctx, *, name: str = None):
         )
 
 
-@playlist.command(name="load")
+@playlist.command(name="load", description="Queue every track of a playlist")
+@app_commands.describe(name="Playlist name")
 async def playlist_load(ctx, *, name: str = None):
     """Queue every track of a saved playlist."""
+    await defer(ctx)  # Joining voice takes over 3 s
     if name is None:
-        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}playlist load <name>`")
+        await fail(ctx, f"Usage: `{COMMAND_PREFIX}playlist load <name>`")
         return
     saved = await _playlist_reply(ctx, control_playlist_get(ctx.guild.id, name))
     if saved is _FAILED:
         return
     entries = playlist_entries(saved)
     if not entries:
-        await ctx.send(f"❌ {ControlError('playlist_empty').message}")
+        await fail(ctx, ControlError("playlist_empty").message)
         return
     if not await join_voice_channel(ctx):
         return
     player = state.music_players.setdefault(ctx.guild.id, MusicPlayer())
     player.should_stop = False
     await ack(ctx)
-    await queue_playlist(ctx, player, entries)
+    # The loading outlives a slash command's 15-minute reply token
+    await queue_playlist(ChannelContext(ctx), player, entries)
 
 
-@playlist.command(name="list")
+@playlist.command(name="list", description="List the saved playlists")
 async def playlist_list(ctx):
     """List the server's saved playlists."""
     found = await _playlist_reply(ctx, control_playlist_list(ctx.guild.id))
     if found is _FAILED:
         return
     if not found:
-        await ctx.send(
-            f"❌ No saved playlists. Use `{COMMAND_PREFIX}playlist save <name>`."
+        await fail(
+            ctx, f"No saved playlists. Use `{COMMAND_PREFIX}playlist save <name>`."
         )
         return
     lines = [
@@ -648,11 +750,12 @@ async def playlist_list(ctx):
     )
 
 
-@playlist.command(name="show")
+@playlist.command(name="show", description="Show the tracks of a playlist")
+@app_commands.describe(name="Playlist name")
 async def playlist_show(ctx, *, name: str = None):
     """Show the tracks of a saved playlist."""
     if name is None:
-        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}playlist show <name>`")
+        await fail(ctx, f"Usage: `{COMMAND_PREFIX}playlist show <name>`")
         return
     saved = await _playlist_reply(ctx, control_playlist_get(ctx.guild.id, name))
     if saved is _FAILED:
@@ -665,11 +768,12 @@ async def playlist_show(ctx, *, name: str = None):
     await ctx.send(_fit(header, lines), allowed_mentions=_NO_MENTIONS)
 
 
-@playlist.command(name="delete")
+@playlist.command(name="delete", description="Delete a saved playlist")
+@app_commands.describe(name="Playlist name")
 async def playlist_delete(ctx, *, name: str = None):
     """Delete a saved playlist (its creator, or Manage Server)."""
     if name is None:
-        await ctx.send(f"❌ Usage: `{COMMAND_PREFIX}playlist delete <name>`")
+        await fail(ctx, f"Usage: `{COMMAND_PREFIX}playlist delete <name>`")
         return
     result = await _playlist_reply(
         ctx,
@@ -682,22 +786,33 @@ async def playlist_delete(ctx, *, name: str = None):
 @bot.event
 async def on_command_error(ctx, error):
     """Global command error handler to avoid ugly tracebacks."""
-    if isinstance(error, commands.CommandNotFound):
+    message = error_message(
+        error, ctx.command, slash=getattr(ctx, "interaction", None) is not None
+    )
+    if message is None:
         return
-    if isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"❌ Missing argument. Try `{COMMAND_PREFIX}help`.")
-        return
-    if isinstance(error, commands.NoPrivateMessage):
-        await ctx.send("❌ This command only works in a server.")
-        return
-    if isinstance(error, commands.MissingPermissions):
-        await ctx.send(
-            f"❌ You need the **Manage Server** permission to use "
-            f"`{COMMAND_PREFIX}{ctx.command}`."
-        )
-        return
-    print(f"Command error in '{ctx.command}': {error}")
+    if message.startswith("❌ Error:"):
+        print(f"Command error in '{ctx.command}': {error}")
     try:
-        await ctx.send(f"❌ Error: {error}")
+        await ctx.send(message, ephemeral=True)
+    except Exception:
+        pass
+
+
+@bot.tree.error
+async def on_app_command_error(interaction, error):
+    """Errors raised before a hybrid command's context exists, and any pure
+    slash command, get the same messages."""
+    command = interaction.command.name if interaction.command else None
+    message = error_message(error, command, slash=True)
+    if message is None:
+        return
+    if message.startswith("❌ Error:"):
+        print(f"Slash command error in '{command}': {error}")
+    try:
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
     except Exception:
         pass
