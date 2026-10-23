@@ -269,6 +269,8 @@ async def web_state(request):
             track = player.now_playing
             now_playing = _track_summary(track)
             now_playing["video_url"] = f"/media/{sid}/{track['id']}"
+            # No video stream: the page shows the artwork instead.
+            now_playing["audio_only"] = bool(track.get("audio_only"))
             now_playing["elapsed"] = player.elapsed()  # File time
             # Automix window (file time): the page's progress bar spans it.
             now_playing["start"] = track.get("start") or 0.0

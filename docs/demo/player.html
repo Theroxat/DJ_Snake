@@ -451,6 +451,9 @@ main {
 }
 .frame:fullscreen { border-radius: 0; aspect-ratio: auto; width: 100%; height: 100%; }
 video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: var(--video-bg); z-index: 0; }
+/* Audio-only tracks (SoundCloud, Bandcamp): the artwork replaces the empty video. */
+.artwork { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: var(--video-bg); z-index: 2; }
+.artwork[hidden] { display: none; }
 /* Two stacked players: the active one on top. A crossfade fades the new one in over the old. */
 video.front { z-index: 1; }
 video.dissolving { opacity: 0; }
@@ -941,6 +944,7 @@ html.demo-embedded .demo-ribbon { display: none; }
       <div class="frame" id="frame">
         <video id="video" class="front" muted playsinline preload="auto"></video>
         <video id="video2" muted playsinline preload="auto" aria-hidden="true"></video>
+        <img class="artwork" id="artwork" alt="" hidden referrerpolicy="no-referrer">
         <div class="pausebadge hud" id="pausebadge" hidden><i>❚❚</i> PAUSED</div>
         <div class="overlay" id="overlay">
           <div class="hud blink" id="overlayhud" style="color:var(--accent-3)">PLAYER 1 — READY</div>
@@ -1049,7 +1053,7 @@ html.demo-embedded .demo-ribbon { display: none; }
         <button id="autoplay" class="synctoggle xfade" type="button" role="switch" aria-checked="false" title="Keep playing related tracks when the queue runs out (for everyone in the channel)" disabled><span class="box" aria-hidden="true"></span>Autoplay</button>
       </h2>
       <form id="addform" class="addform" autocomplete="off">
-        <input id="addurl" type="text" placeholder="Paste a YouTube or Spotify link, or type a song…" aria-label="YouTube or Spotify link, or song to search, to add" disabled>
+        <input id="addurl" type="text" placeholder="Paste a music link (YouTube, Spotify, SoundCloud…) or type a song…" aria-label="Music link, or song to search, to add" disabled>
         <button id="addbtn" type="submit" aria-label="Add to queue" disabled>Add</button>
       </form>
       <form id="plform" class="addform plform" autocomplete="off">
@@ -1376,6 +1380,7 @@ html.demo-embedded .demo-ribbon { display: none; }
     else if (d) d.textContent = "";
   }
 
+  const SOURCE_LABELS = { spotify: "Spotify", deezer: "Deezer", apple: "Apple Music", soundcloud: "SoundCloud", bandcamp: "Bandcamp" };
   let lastDlSig = "";
   function renderDownloading(list, total) {
     const items = Array.isArray(list) ? list : [];
@@ -1390,7 +1395,7 @@ html.demo-embedded .demo-ribbon { display: none; }
       li.appendChild(mk("span", "spin"));
       const known = typeof t.title === "string" && t.title !== "";
       li.appendChild(mk("span", known ? "n" : "n unknown", known ? t.title : "Reading link…"));
-      li.appendChild(mk("span", "src", t.source === "spotify" ? "Spotify" : "YouTube"));
+      li.appendChild(mk("span", "src", SOURCE_LABELS[t.source] || "YouTube"));
       ol.appendChild(li);
     });
     if (total > items.length) {
@@ -1545,6 +1550,14 @@ html.demo-embedded .demo-ribbon { display: none; }
     clearVideo(back);
   }
 
+  // A track without a video stream shows its artwork full size in the frame.
+  function setArtwork(np) {
+    const art = $("artwork");
+    const url = np.audio_only && np.thumbnail ? np.thumbnail : "";
+    if (url) { if (art.getAttribute("src") !== url) art.src = url; }
+    else art.removeAttribute("src");
+    art.hidden = !url;
+  }
   function loadTrack(np, crossfading, retry) {
     // Crossfade (the server says the audio overlaps): the clip on screen stays
     // and keeps playing underneath while the new one loads in the other
@@ -1557,6 +1570,7 @@ html.demo-embedded .demo-ribbon { display: none; }
     loadAt = performance.now();
     errAt = 0;
     pendingSeek = true;
+    setArtwork(np);
     if (dissolve) {
       [video, back] = [back, video];
       video.removeAttribute("aria-hidden");

@@ -39,7 +39,7 @@
     nothing_to_shuffle: [409, "Not enough queued tracks to shuffle."],
     bad_volume: [400, "Volume must be a whole number from 0 to 150."],
     bad_url: [400,
-      "Only YouTube (video or playlist) and Spotify (track, album or playlist) links are accepted."],
+      "Only YouTube, SoundCloud and Bandcamp links (track or playlist) and Spotify, Deezer and Apple Music (track, album or playlist) links are accepted."],
     spotify_short_link: [400,
       "Short spotify.link links are not supported: open it and copy the open.spotify.com link."],
     bad_playlist_name: [400, "Invalid playlist name: use up to 32 letters, digits, spaces or . ' & ! + ( ) -"],

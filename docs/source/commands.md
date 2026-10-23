@@ -31,7 +31,9 @@ You must be in a voice channel. The bot joins it, posts the clip page link and a
 - **Plain text** (anything that is not a link, e.g. `!play daft punk one more time`, up to 200 characters) searches YouTube and queues the best match, using the same scoring as Spotify tracks. If nothing scores high enough the bot replies that no match was found.
 - **A Spotify link** (`/playlist/`, `/album/` or `/track/`) is matched to YouTube videos. See [Spotify](spotify.md).
 
-Only YouTube and Spotify hosts are accepted. Without a link, the bot answers with a usage message.
+- **A SoundCloud or Bandcamp link** (track, set or album) is downloaded from the platform; **a Deezer or Apple Music link** is matched to YouTube like Spotify. See [More sources](sources.md).
+
+The clip page's add box accepts only YouTube, SoundCloud, Bandcamp, Spotify, Deezer and Apple Music hosts. Without a link, the bot answers with a usage message.
 
 ### `!list`
 

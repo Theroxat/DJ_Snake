@@ -45,6 +45,7 @@ NOW_PLAYING_KEYS = {
     "start",
     "end",
     "autoplay",
+    "audio_only",
 }
 QUEUE_KEYS = {"id", "title", "duration", "thumbnail", "url", "autoplay"}
 

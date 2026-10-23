@@ -6,7 +6,7 @@ DJ Snake is configured through environment variables. With Docker Compose, put t
 | --- | --- | --- |
 | `DISCORD_TOKEN` | none (required) | Bot token. A `token` file is a fallback. |
 | `COMMAND_PREFIX` | `!` | Prefix for text commands. |
-| `MAX_PLAYLIST_SIZE` | `30` | Maximum tracks loaded from a playlist (YouTube or Spotify). |
+| `MAX_PLAYLIST_SIZE` | `30` | Maximum tracks loaded from a playlist (YouTube, Spotify, SoundCloud, Bandcamp, Deezer or Apple Music). |
 | `MEDIA_FORMAT` | max 720p H.264 + m4a | yt-dlp format selector. The default is `bestvideo[height<=720][vcodec^=avc1]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]/best`. |
 | `TEMP_DIR` | a fresh temporary directory | Where downloaded tracks are stored. Files are deleted once played. |
 | `POT_BASE_URL` | `http://pot-provider:4416` | URL of the PO token provider. The default matches Docker Compose. |

@@ -9,6 +9,7 @@
 ## What you get
 
 - **Spotify playlists, albums and tracks.** Paste a link and the bot finds every song on YouTube, preferring the official music video, with no Spotify account or API key needed ([details](spotify.md)).
+- **SoundCloud, Bandcamp, Deezer and Apple Music links** too, without any account ([details](sources.md)).
 - **YouTube URLs and playlists.** Tracks are fully downloaded before they play (no streaming).
 - **An independent queue per server.**
 - **A live clip page**: a muted video synced with the audio, plus web controls (next, previous, pause, resume, seek, jump, remove, reorder, add, shuffle, loop) ([details](clip-page.md)).
@@ -40,6 +41,7 @@ configuration
 commands
 clip-page
 spotify
+sources
 youtube
 troubleshooting
 ```

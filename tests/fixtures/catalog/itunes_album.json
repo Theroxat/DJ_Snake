@@ -1,0 +1,9 @@
+{
+  "resultCount": 4,
+  "results": [
+    {"wrapperType": "collection", "collectionType": "Album", "artistName": "Daft Punk", "collectionName": "Discovery", "trackCount": 3},
+    {"wrapperType": "track", "kind": "song", "trackName": "One More Time", "artistName": "Daft Punk", "trackTimeMillis": 320357},
+    {"wrapperType": "track", "kind": "music-video", "trackName": "One More Time (Video)", "artistName": "Daft Punk", "trackTimeMillis": 330000},
+    {"wrapperType": "track", "kind": "song", "trackName": "Aerodynamic", "artistName": "Daft Punk", "trackTimeMillis": 212000}
+  ]
+}

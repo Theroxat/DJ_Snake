@@ -164,13 +164,15 @@ def spotify_fields(spotify_track):
 def pending_label(entry):
     """(title, source) listing a playlist entry in pending_downloads."""
     if "spotify" in entry:
+        # A metadata track (Spotify, Deezer or Apple Music), see catalog.py.
         track = entry["spotify"]
         artists = ", ".join(a for a in track.get("artists") or [] if a)
         title = track.get("title") or None
         if artists and title:
             title = f"{artists} – {title}"
-        return title, "spotify"
-    return entry.get("title") or None, "youtube"
+        return title, track.get("source") or "spotify"
+    url = entry.get("url") or entry.get("webpage_url")
+    return entry.get("title") or None, media.source_of(url)
 
 
 async def download_and_queue_song(
@@ -190,7 +192,7 @@ async def download_and_queue_song(
     listed here, title unknown. Either way the entry goes when this returns."""
     epoch = player.epoch
     if pending_key is None and not cancelled(player, epoch):
-        pending_key = player.add_pending(None)
+        pending_key = player.add_pending(None, media.source_of(url))
     try:
         return await _download_and_queue(
             ctx, player, url, epoch, skip_voice_check, quiet, extra, pending_key
@@ -324,17 +326,10 @@ async def queue_playlist(ctx, player, entries, from_web=False):
                     continue
             else:
                 # Build video URL
-                video_id = (
-                    entry.get("id") or entry.get("url") or entry.get("webpage_url")
-                )
-                if not video_id:
+                video_url = media.entry_url(entry)
+                if not video_url:
                     player.drop_pending(key)
                     continue
-
-                if isinstance(video_id, str) and video_id.startswith("http"):
-                    video_url = video_id
-                else:
-                    video_url = f"https://www.youtube.com/watch?v={video_id}"
 
             track = await download_and_queue_song(
                 ctx,

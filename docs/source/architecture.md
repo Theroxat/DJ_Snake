@@ -17,6 +17,7 @@ Lowest layer first; each module imports only the ones above it.
 | `volume.py` | Per-server volume storage and the percent to gain mapping. |
 | `media.py` | YouTube URL parsing, yt-dlp downloads, the SponsorBlock cut, audio analysis and FFmpeg options, YouTube search. |
 | `spotify.py` | Spotify link parsing, track lists, and matching to YouTube. |
+| `catalog.py` | Deezer and Apple Music link parsing and track lists (no credentials); entry point for every metadata link. |
 | `mixer.py` | `CrossfadeMixer`, the audio source wrapping FFmpeg. |
 | `playback.py` | Voice connection, download-and-queue, playlists, and the chain that advances from track to track. |
 | `controls.py` | The `control_*` functions shared by Discord commands and the web page. |
@@ -42,7 +43,7 @@ Controls never choose the next track themselves. They set a pending action under
 
 ### Controls and the web API
 
-Next, previous, pause, resume, remove, move, add, seek, jump, crossfade, loop, shuffle, volume, autoplay and the saved-playlist actions are shared between Discord and the page. They raise one error type carrying an HTTP status and an English message, shown in Discord and on the page. Added URLs must be YouTube hosts (rebuilt into a canonical URL) or Spotify links, which avoids server-side request forgery through yt-dlp. Anything that does not look like a link (`media.looks_like_url()`) is a text search instead: `spotify.find_text_match()` scores the YouTube results like a Spotify track with no artist.
+Next, previous, pause, resume, remove, move, add, seek, jump, crossfade, loop, shuffle, volume, autoplay and the saved-playlist actions are shared between Discord and the page. They raise one error type carrying an HTTP status and an English message, shown in Discord and on the page. Added URLs must be YouTube, SoundCloud or Bandcamp hosts (rebuilt into a canonical URL) or Spotify, Deezer or Apple Music links, which avoids server-side request forgery through yt-dlp. Anything that does not look like a link (`media.looks_like_url()`) is a text search instead: `spotify.find_text_match()` scores the YouTube results like a Spotify track with no artist.
 
 The page uses these routes:
 

@@ -18,6 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Clip page: a volume button with a slider popover next to Sync, a `volume` control action and a `volume` field in `/api/{sid}/state`. The status panel shows the volume only when it is not 100%.
 - Autoplay ("radio"): `!autoplay [on|off]`, a switch on the clip page and the `AUTOPLAY` default. When the queue runs out, a track related to the last one (YouTube's `RD<id>` mix) is prepared during playback and plays next; recent tracks, live streams, tracks over 10 minutes and non-music titles are skipped, and the bot lingers idle when nothing is found. Loop modes take precedence. Autoplay tracks are marked in the status panel and on the page.
 - Saved playlists per server: `!playlist save|add|load|show|delete <name>` and `!playlist list`, kept in `playlists.db` under `DATA_DIR` (links and titles only, up to 50 playlists of 200 tracks). The clip page can save the queue and load a playlist (`GET /api/{sid}/playlists`, `save_playlist` and `load_playlist` control actions).
+- SoundCloud and Bandcamp links: `!play` and the clip page's add action accept
+  tracks and sets/albums (`soundcloud.com`, `*.bandcamp.com`). Playlists respect
+  `MAX_PLAYLIST_SIZE`; the page shows the artwork for tracks without video
+  (`now_playing.audio_only` in the state), and the "Downloading" list names the
+  platform.
+- Deezer and Apple Music links (tracks, albums, playlists), read without
+  credentials (Deezer's public API, Apple's iTunes lookup API and playlist page)
+  and matched on YouTube like Spotify tracks (new `djsnake/catalog.py`).
+
+### Changed
+
+- The "link not accepted" message lists every supported source.
 
 ## [1.3.0] - 2026-10-22
 
