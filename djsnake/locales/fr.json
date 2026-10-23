@@ -193,6 +193,7 @@
   "web.too_many_streams": "Trop de connexions en direct.",
   "web.unknown_track": "Titre inconnu.",
   "web.no_lyrics": "Aucune parole trouvée.",
+  "web.lyrics_unavailable": "Les paroles sont indisponibles pour l’instant.",
   "loop.mode.off": "désactivée",
   "loop.mode.track": "titre",
   "loop.mode.queue": "file d’attente"

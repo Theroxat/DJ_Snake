@@ -193,6 +193,7 @@
   "web.too_many_streams": "Too many live connections.",
   "web.unknown_track": "Unknown track.",
   "web.no_lyrics": "No lyrics found.",
+  "web.lyrics_unavailable": "Lyrics are unavailable right now.",
   "loop.mode.off": "off",
   "loop.mode.track": "track",
   "loop.mode.queue": "queue"

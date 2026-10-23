@@ -2261,7 +2261,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
 
   // ---- lyrics (LRCLIB, through the bot): GET /api/{sid}/lyrics/{track id}
   // answers {synced: [[ms, line]...] | null, plain}, 202 while the bot is
-  // still looking, 404 when there are none. Synced lines follow targetPos(),
+  // still looking, 404 when there are none, 503 when LRCLIB is unreachable. Synced lines follow targetPos(),
   // the clock the video follows (offset included), so they match the sound.
   const LYR_KEY = "djsnake.lyrics";
   let lyrOn = false, lyrAvail = false;
@@ -2293,6 +2293,8 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
         return;
       }
       ans = cleanLyrics(id, r.ok ? await r.json() : null);
+      // Only a real answer is kept: 503 (LRCLIB unreachable) is asked again.
+      keep = r.ok || r.status === 404;
     } catch (e) {
       ans = { id, kind: "none" };
       keep = false; // network trouble: try again next time

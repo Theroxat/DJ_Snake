@@ -569,6 +569,13 @@ async def web_lyrics(request):
     result = await lyrics.get(track)
     if result == lyrics.PENDING:
         return web.json_response({"pending": True}, status=202, headers=headers)
+    if result == lyrics.UNAVAILABLE:
+        # Not "none": the page asks again later instead of caching it.
+        return web.json_response(
+            {"ok": False, "error": t("web.lyrics_unavailable", request_lang(request))},
+            status=503,
+            headers=headers,
+        )
     if not result:
         return web.json_response(
             {"ok": False, "error": t("web.no_lyrics", request_lang(request))},

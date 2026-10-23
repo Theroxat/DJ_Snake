@@ -116,16 +116,19 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 _opener = urllib.request.build_opener(_NoRedirect)
 
 
-def _read_capped(response):
+def _read_capped(response, max_bytes=None, timeout=None):
     """Body of a response, read in chunks under one overall deadline: the
     socket timeout alone lets a server trickle bytes forever. Stops one byte
-    past the size cap, which the caller then refuses."""
-    deadline = time.monotonic() + SPOTIFY_TIMEOUT
+    past the size cap (SPOTIFY_MAX_BYTES by default), which the caller then
+    refuses."""
+    max_bytes = SPOTIFY_MAX_BYTES if max_bytes is None else max_bytes
+    timeout = SPOTIFY_TIMEOUT if timeout is None else timeout
+    deadline = time.monotonic() + timeout
     chunks, size = [], 0
-    while size <= SPOTIFY_MAX_BYTES:
+    while size <= max_bytes:
         if time.monotonic() > deadline:
             raise TimeoutError("response too slow")
-        chunk = response.read(min(65536, SPOTIFY_MAX_BYTES + 1 - size))
+        chunk = response.read(min(65536, max_bytes + 1 - size))
         if not chunk:
             break
         chunks.append(chunk)

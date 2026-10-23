@@ -190,7 +190,7 @@ async def test_prefetch_disabled(monkeypatch):
 async def test_unavailable_is_not_cached(monkeypatch):
     monkeypatch.setattr(lyrics, "_http", FakeLrclib(status=503))
     track = {"id": "t2", "title": "Artist - Song", "duration": 200.0}
-    assert await lyrics.get(track) is None
+    assert await lyrics.get(track) == lyrics.UNAVAILABLE
     assert "track:t2" not in lyrics._cache  # Asked again next time
     monkeypatch.setattr(lyrics, "_http", FakeLrclib(get=RECORD))
     assert await lyrics.get(track) == EXPECTED
@@ -267,3 +267,51 @@ async def test_route_disabled(client, player, media_dir, lrclib, monkeypatch):
     assert lrclib.calls == []
     s = await (await client.get(f"/api/{player.sid}/state")).json()
     assert s["lyrics"] is False
+
+
+async def test_route_503_when_lrclib_is_unreachable(
+    client, player, media_dir, monkeypatch
+):
+    monkeypatch.setattr(lyrics, "_http", FakeLrclib(status=503))
+    track = make_track(media_dir, "A", title="Artist - Song")
+    player.add_to_queue(track)
+    r = await client.get(f"/api/{player.sid}/lyrics/{track['id']}")
+    assert r.status == 503
+    assert (await r.json())["ok"] is False
+    monkeypatch.setattr(lyrics, "_http", FakeLrclib(get=RECORD))
+    r = await client.get(f"/api/{player.sid}/lyrics/{track['id']}")
+    assert r.status == 200
+
+
+async def test_lookups_are_limited(monkeypatch):
+    import threading
+
+    running, peak, gate = [0], [0], threading.Event()
+    lock = threading.Lock()
+
+    def slow_load(key, artist, title, duration):
+        with lock:
+            running[0] += 1
+            peak[0] = max(peak[0], running[0])
+        gate.wait(2)
+        with lock:
+            running[0] -= 1
+        return None
+
+    monkeypatch.setattr(lyrics, "_load", slow_load)
+    tasks = [
+        lyrics.prefetch({"id": f"x{i}", "title": f"A - S{i}", "duration": 100.0})
+        for i in range(6)
+    ]
+    await asyncio.sleep(0.2)
+    gate.set()
+    await asyncio.gather(*tasks)
+    assert peak[0] == lyrics.MAX_CONCURRENT
+
+
+def test_http_uses_the_no_redirect_opener():
+    from djsnake import spotify
+
+    # The same opener as Spotify's: redirects are never followed.
+    assert lyrics._opener is spotify._opener
+    assert lyrics._read_capped is spotify._read_capped

@@ -28,6 +28,7 @@ from .config import (
     LYRICS_TIMEOUT,
     LYRICS_WAIT_SECONDS,
 )
+from .spotify import _opener, _read_capped
 from .stats import clean_artist
 
 API_BASE = "https://lrclib.net/api"
@@ -171,8 +172,11 @@ def _http(url):
         url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"}
     )
     try:
-        with urllib.request.urlopen(request, timeout=LYRICS_TIMEOUT) as response:
-            return response.status, response.read(LYRICS_MAX_BYTES + 1)
+        # No redirect is followed (LRCLIB answers directly), and the body is
+        # read under one deadline and a size cap, as for Spotify.
+        with _opener.open(request, timeout=LYRICS_TIMEOUT) as response:
+            body = _read_capped(response, LYRICS_MAX_BYTES, LYRICS_TIMEOUT)
+            return response.status, body
     except urllib.error.HTTPError as e:
         return e.code, b""
     except Exception as e:
@@ -329,17 +333,35 @@ def _load(key, artist, title, duration):
     return result
 
 
+# At most this many lookups run at once (a long playlist prefetches every
+# track; the default executor also runs the downloads).
+MAX_CONCURRENT = 2
+_limits = {}  # event loop -> its semaphore
+
+
+def _limit():
+    loop = asyncio.get_running_loop()
+    sem = _limits.get(loop)
+    if sem is None:
+        _limits.clear()  # Only one loop runs (tests make a new one each)
+        sem = _limits[loop] = asyncio.Semaphore(MAX_CONCURRENT)
+    return sem
+
+
 async def _run(key, track):
     artist, title, duration = lookup_fields(track)
     loop = asyncio.get_running_loop()
     try:
-        result = await loop.run_in_executor(None, _load, key, artist, title, duration)
+        async with _limit():
+            result = await loop.run_in_executor(
+                None, _load, key, artist, title, duration
+            )
     except LyricsUnavailable as e:
         print(f"Lyrics unavailable for {title!r}: {e}")
-        return None  # Not cached: a later request tries again
+        return UNAVAILABLE  # Not cached: a later request tries again
     except Exception as e:
         print(f"Lyrics lookup failed for {title!r}: {e}")
-        return None
+        return UNAVAILABLE
     else:
         _remember(key, result)
         return result
@@ -369,11 +391,13 @@ def prefetch(track):
 
 
 PENDING = "pending"
+UNAVAILABLE = "unavailable"  # LRCLIB could not be reached: ask again later
 
 
 async def get(track, wait=LYRICS_WAIT_SECONDS):
-    """A track's lyrics: {synced, plain}, None (none found, LRCLIB down or
-    lyrics off) or PENDING (still being fetched after `wait` seconds).
+    """A track's lyrics: {synced, plain}, None (none found or lyrics off),
+    UNAVAILABLE (LRCLIB could not be reached) or PENDING (still being
+    fetched after `wait` seconds).
     Starts a fetch if none ran yet."""
     if not ENABLED:
         return None
