@@ -618,10 +618,10 @@ li .d { font-family: var(--font-mono); font-size: var(--hud-size); color: var(--
 li:hover .d { color: var(--hover-text); }
 
 /* Transport: secondary toggles left, prev / play / next centered, tools right */
-.transport { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; margin-top: 6px; }
+.transport { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; margin-top: 6px; }
 .tside { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .tside.end { justify-content: flex-end; }
-.tcenter { display: flex; align-items: center; gap: 14px; }
+.tcenter { justify-self: center; display: flex; align-items: center; gap: 14px; }
 .tcenter button { min-width: 48px; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; padding: 6px 12px; }
 .tcenter button:not(#pp) { background: transparent; border-color: var(--ghost-border, transparent); box-shadow: var(--ghost-shadow, none); border-radius: var(--radius-pp); }
 .tcenter button:not(#pp):hover { background: var(--hover-bg); color: var(--hover-text); }
