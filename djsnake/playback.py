@@ -635,10 +635,19 @@ def autoplay_wanted(player):
     )
 
 
+def _youtube_id(track):
+    """The track's YouTube video id, or None (SoundCloud and Bandcamp tracks
+    have ids of their own, which YouTube's mixes know nothing about)."""
+    if not track or media.source_of(track.get("url")) != "youtube":
+        return None
+    video_id = track.get("video_id")
+    return video_id if media._VIDEO_ID_RE.match(video_id or "") else None
+
+
 def _autoplay_seed(player, finished=None):
     track = finished or player.now_playing
-    if track and track.get("video_id"):
-        return track["video_id"]
+    if track:
+        return _youtube_id(track)  # None after a SoundCloud/Bandcamp track
     return player.recent_ids[-1] if player.recent_ids else None
 
 

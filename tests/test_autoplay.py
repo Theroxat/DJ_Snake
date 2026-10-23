@@ -302,3 +302,15 @@ async def test_no_autoplay_into_an_empty_channel(player, ctx, media_dir, yt):
     await settle()
     assert yt.related_calls == [] and not player.is_playing
     assert player.lingering()
+
+
+async def test_soundcloud_track_is_not_a_seed(player, ctx, media_dir, yt):
+    player.autoplay = True
+    yt.related = [entry(1)]
+    track = make_track(
+        media_dir, "sc", video_id="12345678901", url="https://soundcloud.com/a/b"
+    )
+    player.add_to_queue(track)
+    await play_next(ctx)
+    await settle()
+    assert yt.related_calls == []
