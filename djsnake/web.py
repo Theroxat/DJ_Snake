@@ -20,6 +20,7 @@ from .config import (
     MAX_LOGO_BYTES,
     MAX_STREAMS_PER_CLIENT,
     MAX_STREAMS_PER_SESSION,
+    MAX_STREAMS_TOTAL,
     MAX_VIEWERS_PER_SESSION,
     METRICS_ENABLED,
     PUBLIC_BASE_URL,
@@ -364,7 +365,7 @@ async def web_state(request):
 # `data:` events: one on connect, then one after each notify_state(player)
 # (coalesced to one per SSE_MIN_INTERVAL), plus one whenever a state diff run
 # every SSE_CHECK_SECONDS finds a change nobody notified (crossfade drain,
-# viewers that poll). A `: ping` comment goes out after SSE_HEARTBEAT_SECONDS
+# viewers that poll). A `ping` event goes out after SSE_HEARTBEAT_SECONDS
 # of silence. When the session ends the stream sends {"active": false} and
 # closes. An open stream counts as a viewer.
 
@@ -443,6 +444,7 @@ async def web_events(request):
     if (
         len(state.streams.get(sid, ())) >= MAX_STREAMS_PER_SESSION
         or same_client >= MAX_STREAMS_PER_CLIENT
+        or sum(len(s) for s in state.streams.values()) >= MAX_STREAMS_TOTAL
     ):
         # The page falls back to polling and retries later.
         return _fail(request, 429, "web.too_many_streams")
@@ -450,7 +452,8 @@ async def web_events(request):
     response = web.StreamResponse(
         headers={
             "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
+            # no-transform: a compressing proxy must not buffer the stream.
+            "Cache-Control": "no-cache, no-transform",
             # nginx: never buffer the stream (see the reverse proxy docs).
             "X-Accel-Buffering": "no",
         }
@@ -512,7 +515,9 @@ async def web_events(request):
                 last_sig = sig
                 last_sent = last_write = loop.time()
             elif loop.time() - last_write >= SSE_HEARTBEAT_SECONDS:
-                await response.write(b": ping\n\n")
+                # A real event (comments never reach the page's
+                # EventSource): the page's liveness check counts on it.
+                await response.write(b"event: ping\ndata: {}\n\n")
                 last_write = loop.time()
     except (ConnectionResetError, ConnectionError):
         pass  # Closed by the client mid-write

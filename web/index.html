@@ -1594,6 +1594,10 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
   // polling is only the fallback. After a stream error the page polls and
   // tries the stream again after SSE_RETRY_MS, doubling up to SSE_RETRY_MAX_MS.
   const SSE_RETRY_MS = 15000, SSE_RETRY_MAX_MS = 120000;
+  // The server sends a state or a `ping` event at least every 10 s. Nothing
+  // for SSE_STALE_MS (a half-open connection after a network switch, a dead
+  // tunnel) or a tab coming back after SSE_RESUME_MS: drop the stream, poll.
+  const SSE_STALE_MS = 25000, SSE_RESUME_MS = 10000;
   // A state request that never settles (mobile network switch, a tab resumed
   // from the background, a dead tunnel connection) must not freeze the page on
   // the old track: it is aborted after POLL_TIMEOUT_MS. A clip that has not
@@ -1636,6 +1640,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
   const pending = new Set();
   let es = null, streaming = false;   // EventSource, and whether it delivers
   let sseTimer = null, sseRetry = SSE_RETRY_MS; // no stream until sseTimer fires
+  let sseSeen = 0, sseLive = null; // last message (Date.now()), liveness timer
   let skew = null, bestRtt = Infinity; // client clock minus server clock (s)
 
   const fmt = (s) => {
@@ -3143,7 +3148,11 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     if (document.visibilityState === "visible") {
       clearTimeout(timer);
       // A request left over from the background may never settle: drop it.
-      if (streaming) return; // the stream keeps the page current
+      if (streaming) {
+        // The stream keeps the page current, unless it died meanwhile.
+        if (Date.now() - sseSeen > SSE_RESUME_MS) dropStream();
+        return;
+      }
       if (pollCtl) { again = true; pollCtl.abort(); } else poll();
     }
   });
@@ -3169,7 +3178,10 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     try {
       es = new EventSource("/api/" + encodeURIComponent(sid) + "/events?viewer=" + encodeURIComponent(viewerId));
     } catch (e) { es = null; return; }
+    es.onopen = alive;
+    es.addEventListener("ping", alive);
     es.onmessage = (ev) => {
+      alive();
       let d = null;
       try { d = JSON.parse(ev.data); } catch (e) { return; }
       if (!streaming) { // first state: polling can stop
@@ -3189,16 +3201,24 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
       }
       apply(d, pushLatency(d));
     };
-    es.onerror = () => {
-      // Closed, refused (429, 404) or cut by a proxy: poll, retry later.
-      stopStream();
-      sseTimer = setTimeout(() => { sseTimer = null; }, sseRetry);
-      sseRetry = Math.min(sseRetry * 2, SSE_RETRY_MAX_MS);
-      pollNow();
-    };
+    // Closed, refused (429, 404) or cut by a proxy: poll, retry later.
+    es.onerror = dropStream;
+  }
+  function alive() {
+    sseSeen = Date.now();
+    clearTimeout(sseLive);
+    sseLive = setTimeout(dropStream, SSE_STALE_MS);
+  }
+  function dropStream() {
+    if (!es) return;
+    stopStream();
+    sseTimer = setTimeout(() => { sseTimer = null; }, sseRetry);
+    sseRetry = Math.min(sseRetry * 2, SSE_RETRY_MAX_MS);
+    pollNow(); // the 8 s poll timeout and the clip watchdog apply again
   }
   function stopStream() {
-    if (es) { es.onmessage = es.onerror = null; es.close(); es = null; }
+    clearTimeout(sseLive);
+    if (es) { es.onopen = es.onmessage = es.onerror = null; es.close(); es = null; }
     streaming = false;
   }
 

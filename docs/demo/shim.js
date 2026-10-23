@@ -62,13 +62,14 @@
       this._tick = setInterval(() => this._queue(), 5000);
       this._timer = setTimeout(() => this._send(), 40);
     }
+    addEventListener() {} // `ping`: the 5 s states keep the page's liveness check happy
     _queue() { if (!this._timer) this._timer = setTimeout(() => this._send(), 100); }
     _send() {
       this._timer = null;
       if (this.readyState === 2) return;
       this.readyState = 1;
       // JSON round trip: the answer comes from the parent window's realm.
-      const res = backend.http("state", "GET", null);
+      const res = backend.http("state", "GET", null, view);
       const data = JSON.stringify(res.status === 200 ? res.body : { active: false });
       if (this.onmessage) this.onmessage({ data });
       if (res.status !== 200) this.close(); // the server ends the stream too

@@ -38,6 +38,8 @@ async def next_event(response, timeout=2.0):
         block = await next_block(response, timeout)
         if block is None:
             return None
+        if block.startswith("event: ping"):
+            continue
         for line in block.splitlines():
             if line.startswith("data: "):
                 return json.loads(line[len("data: ") :])
@@ -55,7 +57,7 @@ async def test_initial_event_is_the_full_state(client, player):
     r = await open_stream(client, player)
     assert r.status == 200
     assert r.headers["Content-Type"].startswith("text/event-stream")
-    assert r.headers["Cache-Control"] == "no-cache"
+    assert r.headers["Cache-Control"] == "no-cache, no-transform"
     assert r.headers["X-Accel-Buffering"] == "no"
     event = await next_event(r)
     polled = await (await client.get(f"/api/{player.sid}/state")).json()
@@ -131,8 +133,8 @@ async def test_heartbeat(client, player, monkeypatch):
     monkeypatch.setattr(web, "SSE_HEARTBEAT_SECONDS", 0.2)
     r = await open_stream(client, player)
     await next_event(r)
-    assert (await next_block(r)).startswith(": ping")
-    assert (await next_block(r)).startswith(": ping")
+    assert (await next_block(r)).startswith("event: ping\ndata: {}")
+    assert (await next_block(r)).startswith("event: ping\ndata: {}")
     r.close()
 
 
@@ -219,6 +221,12 @@ async def test_stream_caps(client, player, monkeypatch):
         client, player, headers={"X-Forwarded-For": "203.0.113.10"}
     )
     assert third.status == 429
+    monkeypatch.setattr(web, "MAX_STREAMS_PER_SESSION", 100)
+    monkeypatch.setattr(web, "MAX_STREAMS_TOTAL", 2)
+    fourth = await open_stream(
+        client, player, headers={"X-Forwarded-For": "203.0.113.11"}
+    )
+    assert fourth.status == 429  # Global cap: the page polls instead
     r.close()
     other.close()
 
