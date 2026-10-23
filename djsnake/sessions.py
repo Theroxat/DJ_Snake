@@ -74,6 +74,10 @@ def rotate_control_link(player):
         if sid == old:
             state.watch_ids[wid] = new
     player.sid = new
+    # `!theme edit` links point at the old control id: retire them too.
+    for token, (gid, _) in list(state.edit_tokens.items()):
+        if gid == guild_id:
+            state.edit_tokens.pop(token, None)
     refresh_panel(player)
 
 

@@ -759,7 +759,6 @@ async def djrole(ctx, *, choice: str = None):
             )
             return
 
-    was_restricted = web_control_restricted(guild_id)
     try:
         set_dj_role(guild_id, role.id if role else None)
     except OSError as e:
@@ -768,11 +767,10 @@ async def djrole(ctx, *, choice: str = None):
         return
     player = state.music_players.get(guild_id)
     if player:
-        # The control link may have been posted publicly: once control is
-        # limited, it must stop working (the view-only link stays).
-        if not was_restricted and web_control_restricted(guild_id):
-            if player.sid and session_player(player.sid) is not None:
-                rotate_control_link(player)
+        # Who may control changed: the control link (maybe posted publicly,
+        # maybe held by former DJs) stops working, the view-only link stays.
+        if player.sid and session_player(player.sid) is not None:
+            rotate_control_link(player)
         panel_lang = player_lang(player)
         if role:
             set_action(player, t("action.djrole", panel_lang, role=role.name))

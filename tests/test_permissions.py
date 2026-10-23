@@ -321,6 +321,29 @@ async def test_djrole_rotates_a_public_control_link(player, channel, monkeypatch
     await settle()
 
 
+async def test_every_djrole_change_rotates_and_retires_edit_links(
+    player, channel, monkeypatch
+):
+    from djsnake.themes import check_edit_token, issue_edit_token
+
+    roles = iter([DJ_ROLE, DJ_ROLE + 1])
+
+    async def convert(self, ctx, argument):
+        rid = next(roles)
+        return types.SimpleNamespace(id=rid, name=f"R{rid}", is_default=lambda: False)
+
+    monkeypatch.setattr(ext_commands.RoleConverter, "convert", convert)
+    ctx = guild_ctx(channel, member(manager=True), "djrole")
+    seen = {player.sid}
+    for choice in ("DJ", "Other", "off"):
+        token = issue_edit_token(GUILD_ID)
+        await commands.djrole.callback(ctx, choice=choice)
+        assert player.sid not in seen  # A new control id each time
+        seen.add(player.sid)
+        assert not check_edit_token(token, GUILD_ID)
+    await settle()
+
+
 async def test_weblink_refused_to_non_djs(player, channel, monkeypatch):
     monkeypatch.setattr(permissions, "WEB_CONTROL", "dj")
     author = member()
