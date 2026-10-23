@@ -108,15 +108,15 @@ Module map, lowest layer first (each imports only the ones above it):
 - `config.py`: environment variables and constants, read once at import
   (`WEB_INDEX` resolves `web/index.html` from the repository root).
 - `state.py`: shared mutable state: the `bot` instance, `music_players`,
-  `sessions`, `guild_themes`, `edit_tokens`, `viewers`, `background_tasks` and
-  `clock()`.
+  `sessions`, `guild_themes`, `edit_tokens`, `viewers`, `streams` (open live
+  update streams per sid), `background_tasks` and `clock()`.
   Always use it as `state.music_players` (never `from .state import ...`), so
   every module and test sees the same objects.
 - `stats.py`: listening stats in SQLite (`record_play()`,
   `record_session()`, `record_listeners()`, `summary()`, `guess_artist()`),
   written by one background thread. Imports only `config`.
-- `player.py`: `MusicPlayer`, `discard_tracks()`, `file_in_use()`,
-  `push_history()`, `retire_play()`, `guild_of()`.
+- `player.py`: `MusicPlayer`, `notify_state()`, `discard_tracks()`,
+  `file_in_use()`, `push_history()`, `retire_play()`, `guild_of()`.
 - `sessions.py`: session expiry (`touch()`, `session_player()`,
   `session_cleanup_loop()`, `open_session()`) and the status panel
   (`refresh_panel()`, `set_action()`, `ack()`, `short()`).
@@ -294,7 +294,12 @@ Module map, lowest layer first (each imports only the ones above it):
   `X-Viewer` header, a random id `[A-Za-z0-9_-]{8,40}` each tab keeps in
   sessionStorage, within `VIEWER_WINDOW_SECONDS` (30): `state.viewers[sid]` is
   `{id: last seen}` in poll order, pruned from the front, capped at
-  `MAX_VIEWERS_PER_SESSION`, and dropped when the session expires).
+  `MAX_VIEWERS_PER_SESSION`, and dropped when the session expires; plus the
+  open live streams (a tab id counted once whether it streams, polls or both,
+  a stream without a valid id on its own). `/state` is unchanged by live
+  updates and stays the page's fallback.
+  `GET /api/{sid}/events?viewer=<tab id>` streams the same body as
+  Server-Sent Events, see Live updates.
   `GET /api/{sid}/stats?range=week|month|all` (default week, 400 otherwise,
   404 for an unknown sid) returns `stats.summary()` for the session's guild,
   cached `STATS_CACHE_SECONDS` (15) per guild and range (see Stats). `POST /api/{sid}/control` takes `{action:
@@ -309,6 +314,37 @@ Module map, lowest layer first (each imports only the ones above it):
   track's mp4 with Range support. Files are found by track id, never by a path
   from the request. Theme routes: `POST /api/{sid}/theme`,
   `POST|DELETE /api/{sid}/theme/logo`, `GET /theme-logo/{sid}` (see Themes).
+- **Live updates** (`web_events()`, `state_body()` builds the JSON shared with
+  `/state`): one `data:` event with the full state on connect, then one per
+  wake-up, coalesced to one per `SSE_MIN_INTERVAL` (0.1 s, last state wins);
+  a `: ping` comment after `SSE_HEARTBEAT_SECONDS` (15) of silence; and every
+  `SSE_CHECK_SECONDS` (2) a diff of the state (clock fields excluded) that
+  sends anything nobody notified (a crossfade drain ending, polling viewers).
+  Headers `Cache-Control: no-cache` and `X-Accel-Buffering: no`. When the
+  session ends it sends `{"active": false}` and closes; a closed transport
+  ends the stream within a check period; the app's `on_shutdown`
+  (`_close_streams`, run by `stop_web_server()` from `bot.close`) ends them
+  all. Caps: `MAX_STREAMS_PER_SESSION` (100) and `MAX_STREAMS_PER_CLIENT`
+  (10, by `_client_key()`: the peer, or the last `X-Forwarded-For` hop when
+  the peer is loopback or private), 429 beyond. Each stream puts an
+  `asyncio.Event` in `player.watchers` (moved to the new player after
+  `!reset`). **The rule: after any change the page shows, call
+  `notify_state(player)`** (on the loop; it bumps `player.state_version` and
+  sets the watchers' events). It is already called by `refresh_panel()` (so
+  by `set_action()` and every control and command), by
+  `add_pending()`/`drop_pending()`/`name_pending()`/`stop_and_clear()`, and
+  after every `POST /api/{sid}/control` and theme route (the `_notifies()`
+  wrapper in `build_web_app()`), so a new control action or state field
+  needs nothing more; anything missed still lands within
+  `SSE_CHECK_SECONDS`. The page uses `EventSource` after its first poll and
+  stops polling once a state arrives; on an error it closes the stream, polls
+  (2 s, backing off to 10 s on failures) and retries the stream after 15 s,
+  doubling to 2 min. A pushed state's delay is `Date.now()` minus the
+  client-server clock offset (measured by the polls) minus `server_time`,
+  clamped to 0..2 s, and added to `elapsed` as the poll's half round trip
+  was. The demo shim replaces `EventSource` with a fake fed by the fake bot's
+  change events. Tests: `tests/test_live_updates.py` (patch the `SSE_*`
+  and `MAX_STREAMS_*` names on `web`).
 - **Themes**: the page is fully token-driven: each preset is a `[data-skin]`
   block of CSS custom properties on `<html>` (Arcade is the original look;
   the presets are `THEME_PRESETS` in `config.py`: arcade, minimal, night,

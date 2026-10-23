@@ -27,7 +27,7 @@ Web actions are applied exactly like Discord commands and are reflected in the s
 
 ### Sync
 
-The page polls the bot for its state and keeps the muted video aligned with the audio position, including pauses and seeks. When crossfade is on, the page cross-dissolves its two videos during an overlap; skips are an instant swap.
+The bot pushes every change to the page as it happens (a Server-Sent Events stream); if the stream cannot get through, the page polls every 2 seconds instead and tries the stream again later. The page keeps the muted video aligned with the audio position, including pauses and seeks. When crossfade is on, the page cross-dissolves its two videos during an overlap; skips are an instant swap.
 
 ### Listening stats
 
@@ -58,6 +58,29 @@ dj.example.com {
 # or a Cloudflare Tunnel, then PUBLIC_BASE_URL=https://dj.example.com
 cloudflared tunnel --url http://127.0.0.1:47823
 ```
+
+### Live updates through a proxy
+
+The page receives its state over a long-lived Server-Sent Events stream, `GET /api/<session>/events`, with a heartbeat comment every 15 seconds. A proxy that buffers responses holds those events back, so:
+
+- **Caddy** and **Cloudflare Tunnel** need no settings.
+- **nginx** must not buffer the stream. The bot sends `X-Accel-Buffering: no`, which nginx honours, but set it explicitly anyway and keep the connection open longer than the heartbeat:
+
+```nginx
+# nginx: the page's live updates are a long-lived stream, so no buffering
+location / {
+    proxy_pass http://127.0.0.1:47823;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_buffering off;
+    proxy_read_timeout 1h;
+}
+```
+
+- Pass the client address in `X-Forwarded-For` (as above). The bot caps open streams per client (10) and per session (100); behind a local proxy without that header, every visitor would share one address.
+
+If the stream still cannot get through, the page falls back to polling on its own, so it keeps working, only with up to 2 seconds of delay.
 
 ```{warning}
 Anyone who has the link can control the queue. Treat it as a secret and share it only with people you trust.

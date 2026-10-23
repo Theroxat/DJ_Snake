@@ -57,6 +57,15 @@ STATS_CACHE_SECONDS = 15  # The stats route serves a guild's answer this long
 # timer per second (one per minute after several minutes hidden).
 VIEWER_WINDOW_SECONDS = 30
 MAX_VIEWERS_PER_SESSION = 500
+# Live updates (GET /api/{sid}/events, Server-Sent Events): a comment line
+# every SSE_HEARTBEAT_SECONDS keeps proxies from closing an idle stream, at
+# most one state per SSE_MIN_INTERVAL (bursts are coalesced), and a state
+# diff every SSE_CHECK_SECONDS catches changes nobody notified.
+SSE_HEARTBEAT_SECONDS = 15
+SSE_MIN_INTERVAL = 0.1
+SSE_CHECK_SECONDS = 2
+MAX_STREAMS_PER_SESSION = 100
+MAX_STREAMS_PER_CLIENT = 10  # Per client IP (see web._client_key)
 # Clip page themes. "custom" is a custom palette on top of a preset's shapes.
 THEME_PRESETS = (
     "arcade",

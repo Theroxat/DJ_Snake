@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Live updates: the clip page now gets each change pushed by the bot over a
+  Server-Sent Events stream (`GET /api/{sid}/events`) instead of polling every
+  2 seconds, and falls back to polling when the stream cannot get through.
+  Behind nginx, turn off `proxy_buffering` (see "Exposing the page").
+
 ## [1.3.0] - 2026-10-22
 
 ### Added

@@ -49,6 +49,7 @@ The page uses these routes:
 | --- | --- |
 | `GET /{sid}` | Serves the page. |
 | `GET /api/{sid}/state` | The full player state: now playing, queue, downloads, viewers, theme. `404 {"active": false}` for an unknown or expired session. |
+| `GET /api/{sid}/events?viewer=<tab id>` | Live updates (Server-Sent Events): the same JSON as `/state` on connect and after each change, coalesced to 10 per second, plus a heartbeat comment every 15 seconds. Sends `{"active": false}` and closes when the session ends. The page falls back to polling `/state` when the stream fails. |
 | `GET /api/{sid}/stats?range=week\|month\|all` | Listening stats, cached for a few seconds. |
 | `POST /api/{sid}/control` | Runs a control action. |
 | `GET /media/{sid}/{id}` | Streams a track's mp4 with Range support. Files are found by track id, never by a path from the request. |

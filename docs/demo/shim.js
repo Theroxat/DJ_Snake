@@ -1,7 +1,8 @@
 /* DJ Snake demo shim. Replaces window.fetch for the bot's web API so the real
  * clip page (web/index.html, built into player.html) runs on static hosting.
  * Intercepted: GET /api/{sid}/state, GET /api/{sid}/stats, POST /api/{sid}/control,
- * POST /api/{sid}/theme, POST|DELETE /api/{sid}/theme/logo.
+ * POST /api/{sid}/theme, POST|DELETE /api/{sid}/theme/logo, and the live
+ * update stream GET /api/{sid}/events (a fake EventSource).
  * Embedded in the Discord demo (index.html), it talks to the wrapper's fake
  * bot (window.parent.DJDemoBackend.shared), so both sides share one session;
  * opened on its own, it runs a standalone fake bot that is always playing and
@@ -40,6 +41,41 @@
     const f = document.getElementById("addurl");
     if (f) f.placeholder = "https://www.youtube.com/watch?v=" + backend.catalog[0][1];
   });
+
+  // Live updates (GET /api/{sid}/events): a fake EventSource fed by the fake
+  // bot's change events, coalesced like the server's stream, plus a state
+  // every 5 s standing in for the server's state diff (viewers come and go).
+  class FakeEventSource {
+    constructor(url) {
+      this.url = url;
+      this.readyState = 0;
+      this.onopen = this.onmessage = this.onerror = null;
+      this._timer = null;
+      this._off = backend.on((ev) => {
+        if (ev.type === "change" || ev.type === "voice") this._queue();
+      });
+      this._tick = setInterval(() => this._queue(), 5000);
+      this._timer = setTimeout(() => this._send(), 40);
+    }
+    _queue() { if (!this._timer) this._timer = setTimeout(() => this._send(), 100); }
+    _send() {
+      this._timer = null;
+      if (this.readyState === 2) return;
+      this.readyState = 1;
+      // JSON round trip: the answer comes from the parent window's realm.
+      const res = backend.http("state", "GET", null);
+      const data = JSON.stringify(res.status === 200 ? res.body : { active: false });
+      if (this.onmessage) this.onmessage({ data });
+      if (res.status !== 200) this.close(); // the server ends the stream too
+    }
+    close() {
+      this.readyState = 2;
+      this._off();
+      clearInterval(this._tick);
+      clearTimeout(this._timer);
+    }
+  }
+  window.EventSource = FakeEventSource;
 
   const realFetch = window.fetch.bind(window);
   window.fetch = async (input, init) => {

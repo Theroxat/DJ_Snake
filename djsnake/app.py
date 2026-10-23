@@ -10,7 +10,7 @@ from . import state, stats
 from .config import COMMAND_PREFIX
 from .playback import idle_channel_emptied
 from .sessions import refresh_panel, session_cleanup_loop
-from .web import start_web_server
+from .web import start_web_server, stop_web_server
 
 bot = state.bot
 
@@ -100,6 +100,20 @@ async def setup_hook():
 
 
 bot.setup_hook = setup_hook
+
+_close_bot = bot.close
+
+
+async def close_bot():
+    """Shutdown: end the page's live streams before the loop goes away."""
+    try:
+        await stop_web_server()
+    except Exception as e:
+        print(f"Web server shutdown error: {e}")
+    await _close_bot()
+
+
+bot.close = close_bot
 
 
 def get_discord_token():

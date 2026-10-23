@@ -39,6 +39,8 @@ edit_tokens = {}
 # Web session id -> {viewer id: last seen on clock()}, in poll order (see
 # web.py). Dropped with the session.
 viewers = {}
+# Web session id -> set of open live update streams (web.LiveStream).
+streams = {}
 
 # Strong references to fire-and-forget tasks, so they are not collected.
 background_tasks = set()

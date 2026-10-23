@@ -176,8 +176,9 @@
   // ---- the clip page iframe
   let frame = null, frameNotify = 0;
   function notifyFrame() {
-    // The page polls every 2 s; it also polls at once on visibilitychange,
-    // so a Discord command shows up on the page right away.
+    // The page gets pushed states (the shim's fake EventSource); should it
+    // fall back to polling, it polls at once on visibilitychange, so a
+    // Discord command still shows up on the page right away.
     if (!frame || frameNotify) return;
     frameNotify = setTimeout(() => {
       frameNotify = 0;
