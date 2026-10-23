@@ -53,6 +53,7 @@ def fresh_state(tmp_path, monkeypatch):
         state.guild_volumes,
         state.edit_tokens,
         state.viewers,
+        state.streams,
         stats._peaks,
         web._stats_cache,
         lyrics._cache,

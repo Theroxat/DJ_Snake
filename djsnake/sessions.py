@@ -14,7 +14,7 @@ from .config import (
     SESSION_IDLE_HOURS,
     VOLUME_DEFAULT,
 )
-from .player import discard_tracks
+from .player import discard_tracks, notify_state
 from .volume import volume_for
 
 # --- Sessions ---------------------------------------------------------------
@@ -230,7 +230,9 @@ async def _panel_worker(player):
 
 def refresh_panel(player):
     """Schedule a panel update. Coalesced: at most one edit per
-    PANEL_MIN_INTERVAL, and the last state wins."""
+    PANEL_MIN_INTERVAL, and the last state wins. It also wakes the page's
+    live streams (notify_state), panel or not."""
+    notify_state(player)
     if player.text_channel is None:
         return
     player.panel_dirty = True

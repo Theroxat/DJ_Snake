@@ -1160,7 +1160,11 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
   video.muted = back.muted = true; // always muted: sound comes from Discord
   const XFADE_S = 6;
 
-  const POLL_MS = 2000, ENDED_POLL_MS = 10000;
+  const POLL_MS = 2000, ENDED_POLL_MS = 10000, POLL_MAX_MS = 10000;
+  // Live updates: the server pushes each new state (Server-Sent Events) and
+  // polling is only the fallback. After a stream error the page polls and
+  // tries the stream again after SSE_RETRY_MS, doubling up to SSE_RETRY_MAX_MS.
+  const SSE_RETRY_MS = 15000, SSE_RETRY_MAX_MS = 120000;
   // A state request that never settles (mobile network switch, a tab resumed
   // from the background, a dead tunnel connection) must not freeze the page on
   // the old track: it is aborted after POLL_TIMEOUT_MS. A clip that has not
@@ -1193,6 +1197,9 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
   let focusAfterRender = null;
   let again = false;
   const pending = new Set();
+  let es = null, streaming = false;   // EventSource, and whether it delivers
+  let sseTimer = null, sseRetry = SSE_RETRY_MS; // no stream until sseTimer fires
+  let skew = null, bestRtt = Infinity; // client clock minus server clock (s)
 
   const fmt = (s) => {
     if (s == null || !isFinite(s)) return "--:--";
@@ -2309,7 +2316,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
       clearTimeout(kill);
       pending.delete(action);
       updateControls();
-      pollNow();
+      if (!streaming) pollNow(); // else the server pushes the new state
     }
     return ok;
   }
@@ -2591,16 +2598,21 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
       if (!d.active) { $("net").hidden = true; showEnded(); next = ENDED_POLL_MS; return; }
       failures = 0;
       $("net").hidden = true;
+      noteClock(d, rtt);
+      if (streaming) return; // a pushed state may be newer
       apply(d, rtt / 2);
+      startStream();
     } catch (e) {
+      if (streaming) return;
       failures++;
       if (failures >= 2) $("net").hidden = false;
+      next = Math.min(POLL_MAX_MS, POLL_MS * Math.pow(2, failures - 1));
     } finally {
       clearTimeout(kill);
       pollCtl = null;
       polling = false;
       clearTimeout(timer);
-      timer = setTimeout(poll, again ? 0 : next);
+      if (!streaming) timer = setTimeout(poll, again ? 0 : next);
     }
   }
   function pollNow() { clearTimeout(timer); poll(); }
@@ -2609,9 +2621,64 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     if (document.visibilityState === "visible") {
       clearTimeout(timer);
       // A request left over from the background may never settle: drop it.
+      if (streaming) return; // the stream keeps the page current
       if (pollCtl) { again = true; pollCtl.abort(); } else poll();
     }
   });
+
+  // ---- live updates (Server-Sent Events)
+  // A pushed state carries no round trip to halve: its delay is estimated
+  // from the server's clock (server_time) and the offset between both
+  // clocks measured by the polls (the one with the smallest round trip).
+  function noteClock(d, rtt) {
+    if (typeof d.server_time !== "number") return;
+    if (rtt <= bestRtt) {
+      bestRtt = rtt;
+      skew = Date.now() / 1000 - rtt / 2 - d.server_time;
+    }
+    bestRtt *= 1.02; // let a newer sample win now and then (clock drift)
+  }
+  function pushLatency(d) {
+    if (skew === null || typeof d.server_time !== "number") return 0;
+    return Math.max(0, Math.min(2, Date.now() / 1000 - skew - d.server_time));
+  }
+  function startStream() {
+    if (es || sseTimer || typeof EventSource !== "function") return;
+    try {
+      es = new EventSource("/api/" + encodeURIComponent(sid) + "/events?viewer=" + encodeURIComponent(viewerId));
+    } catch (e) { es = null; return; }
+    es.onmessage = (ev) => {
+      let d = null;
+      try { d = JSON.parse(ev.data); } catch (e) { return; }
+      if (!streaming) { // first state: polling can stop
+        streaming = true;
+        sseRetry = SSE_RETRY_MS;
+        clearTimeout(timer);
+        if (pollCtl) pollCtl.abort();
+      }
+      failures = 0;
+      $("net").hidden = true;
+      if (!d.active) { // the session ended: polling notices a revival
+        stopStream();
+        showEnded();
+        clearTimeout(timer);
+        timer = setTimeout(poll, ENDED_POLL_MS);
+        return;
+      }
+      apply(d, pushLatency(d));
+    };
+    es.onerror = () => {
+      // Closed, refused (429, 404) or cut by a proxy: poll, retry later.
+      stopStream();
+      sseTimer = setTimeout(() => { sseTimer = null; }, sseRetry);
+      sseRetry = Math.min(sseRetry * 2, SSE_RETRY_MAX_MS);
+      pollNow();
+    };
+  }
+  function stopStream() {
+    if (es) { es.onmessage = es.onerror = null; es.close(); es = null; }
+    streaming = false;
+  }
 
   poll();
 })();

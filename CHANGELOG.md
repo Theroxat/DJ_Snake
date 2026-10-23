@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Synced lyrics on the clip page: a Lyrics button shows the words over the clip, the sung line highlighted and scrolled in time, or plain lyrics when no timing exists. Lyrics come from [LRCLIB](https://lrclib.net) (free, no key), are looked up in the background when a track is queued and cached in `DATA_DIR/lyrics/`. `LYRICS=0` turns them off.
 - Slash commands: every command also works as `/play`, `/next`, `/list`, `/seek`, `/pause`, `/resume`, `/stop`, `/reset`, `/crossfade` and `/theme` (with suggestions for the preset). The `!` versions are unchanged. Re-invite the bot with the `applications.commands` scope if the commands do not show up.
 - `SLASH_SYNC_GUILD` publishes the slash commands to one server at once, for development. The number of synced commands is logged at startup.
+- Live updates: the clip page now gets each change pushed by the bot over a
+  Server-Sent Events stream (`GET /api/{sid}/events`) instead of polling every
+  2 seconds, and falls back to polling when the stream cannot get through.
+  Behind nginx, turn off `proxy_buffering` (see "Exposing the page").
 
 ## [1.3.0] - 2026-10-22
 

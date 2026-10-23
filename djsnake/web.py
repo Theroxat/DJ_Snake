@@ -1,6 +1,7 @@
 """Web server for the synced clip page (aiohttp, on the bot's loop)."""
 
 import asyncio
+import ipaddress
 import json
 import math
 import os
@@ -16,9 +17,14 @@ from .config import (
     LOOP_MODES,
     MAX_CONTROL_BODY,
     MAX_LOGO_BYTES,
+    MAX_STREAMS_PER_CLIENT,
+    MAX_STREAMS_PER_SESSION,
     MAX_VIEWERS_PER_SESSION,
     METRICS_ENABLED,
     PUBLIC_BASE_URL,
+    SSE_CHECK_SECONDS,
+    SSE_HEARTBEAT_SECONDS,
+    SSE_MIN_INTERVAL,
     STATS_CACHE_SECONDS,
     THEME_NAME_MAX,
     THEME_PRESETS,
@@ -48,6 +54,7 @@ from .controls import (
     control_volume,
     seek_label,
 )
+from .player import notify_state
 from .sessions import refresh_panel, session_player, set_action, short, touch
 from .themes import (
     check_edit_token,
@@ -72,6 +79,8 @@ from .volume import valid_volume, volume_for
 #                              the tab in `viewers`; `downloading` lists the
 #                              first MAX_DOWNLOADING tracks asked for but not
 #                              queued yet, `downloading_total` counts them all
+#   GET /api/{sid}/events      ?viewer=<tab id>, the same state pushed as
+#                              Server-Sent Events (see Live updates below)
 #   GET /api/{sid}/stats       ?range=week|month|all, the guild's listening stats
 #   POST /api/{sid}/control    {"action", "id"?, "index"?, "url"?, "position"?,
 #                              "enabled"?} -> {"ok": ...}; actions: next,
@@ -233,7 +242,7 @@ _VIEWER_RE = re.compile(r"^[A-Za-z0-9_-]{8,40}$")
 
 def count_viewer(sid, viewer):
     """Note that tab `viewer` (None: not given) polls `sid`; returns how
-    many tabs polled within VIEWER_WINDOW_SECONDS. The map keeps poll order
+    many tabs polled within VIEWER_WINDOW_SECONDS or have a live stream open. The map keeps poll order
     (a tab moves to the end each time), so pruning stops at the first fresh
     entry, and it holds at most MAX_VIEWERS_PER_SESSION ids."""
     now = state.clock()
@@ -248,17 +257,17 @@ def count_viewer(sid, viewer):
         del seen[key]
     while len(seen) > MAX_VIEWERS_PER_SESSION:
         del seen[next(iter(seen))]
-    return len(seen)
+    # Open live streams count too (a tab that streams and polled lately
+    # counts once; a stream without an id counts on its own).
+    streaming = state.streams.get(sid, ())
+    ids = {s.viewer for s in streaming if s.viewer is not None} - seen.keys()
+    anonymous = sum(1 for s in streaming if s.viewer is None)
+    return min(MAX_VIEWERS_PER_SESSION, len(seen) + len(ids) + anonymous)
 
 
-async def web_state(request):
-    sid = request.match_info["sid"]
-    headers = {"Cache-Control": "no-store"}
-    player = session_player(sid)
-    if player is None:
-        return web.json_response({"active": False}, status=404, headers=headers)
-    viewers = count_viewer(sid, request.headers.get("X-Viewer"))
-
+def state_body(sid, player, viewers):
+    """The session state the page renders (GET /api/{sid}/state and each
+    live update event)."""
     guild = state.bot.get_guild(state.sessions[sid])
     in_voice = player.in_voice()
     channel = None
@@ -281,35 +290,208 @@ async def web_state(request):
         queue = [_track_summary(t) for t in player.queue]
         downloading = list(player.pending_downloads)
 
-    return web.json_response(
-        {
-            "active": True,
-            "in_voice": in_voice,
-            "guild": guild.name if guild else "",
-            "channel": channel,
-            "loading": player.loading,
-            "paused": now_playing is not None and player.paused_at is not None,
-            "can_previous": now_playing is not None and player.pending_action is None,
-            "crossfade": player.crossfade,
-            "loop": player.loop,
-            "volume": volume_for(state.sessions[sid]),
-            "autoplay": player.autoplay,
-            # True while the previous track still drains under this one.
-            "crossfading": now_playing is not None
-            and player.mixer is not None
-            and player.mixer.outgoing is not None,
-            "server_time": time.time(),
-            "viewers": viewers,
-            "now_playing": now_playing,
-            "queue": queue,
-            # Asked for, not queued yet (title None: link not read yet).
-            "downloading": [dict(item) for item in downloading[:MAX_DOWNLOADING]],
-            "downloading_total": len(downloading),
-            "theme": theme_state(sid, state.sessions[sid]),
-            "lyrics": lyrics.ENABLED,
-        },
-        headers=headers,
+    return {
+        "active": True,
+        "in_voice": in_voice,
+        "guild": guild.name if guild else "",
+        "channel": channel,
+        "loading": player.loading,
+        "paused": now_playing is not None and player.paused_at is not None,
+        "can_previous": now_playing is not None and player.pending_action is None,
+        "crossfade": player.crossfade,
+        "loop": player.loop,
+        "volume": volume_for(state.sessions[sid]),
+        "autoplay": player.autoplay,
+        # True while the previous track still drains under this one.
+        "crossfading": now_playing is not None
+        and player.mixer is not None
+        and player.mixer.outgoing is not None,
+        "server_time": time.time(),
+        "viewers": viewers,
+        "now_playing": now_playing,
+        "queue": queue,
+        # Asked for, not queued yet (title None: link not read yet).
+        "downloading": [dict(item) for item in downloading[:MAX_DOWNLOADING]],
+        "downloading_total": len(downloading),
+        "theme": theme_state(sid, state.sessions[sid]),
+        "lyrics": lyrics.ENABLED,
+    }
+
+
+async def web_state(request):
+    sid = request.match_info["sid"]
+    headers = {"Cache-Control": "no-store"}
+    player = session_player(sid)
+    if player is None:
+        return web.json_response({"active": False}, status=404, headers=headers)
+    viewers = count_viewer(sid, request.headers.get("X-Viewer"))
+    return web.json_response(state_body(sid, player, viewers), headers=headers)
+
+
+# --- Live updates (Server-Sent Events) ---------------------------------------
+#
+# GET /api/{sid}/events?viewer=<tab id> streams the same JSON as /state, as
+# `data:` events: one on connect, then one after each notify_state(player)
+# (coalesced to one per SSE_MIN_INTERVAL), plus one whenever a state diff run
+# every SSE_CHECK_SECONDS finds a change nobody notified (crossfade drain,
+# viewers that poll). A `: ping` comment goes out after SSE_HEARTBEAT_SECONDS
+# of silence. When the session ends the stream sends {"active": false} and
+# closes. An open stream counts as a viewer.
+
+# {"closing": bool}: set at shutdown, every stream then ends.
+_STREAMS = web.AppKey("live_streams", dict)
+
+
+class LiveStream:
+    def __init__(self, sid, viewer, client):
+        self.sid = sid
+        self.viewer = viewer  # Tab id, or None (counted anyway)
+        self.client = client  # _client_key() of the connection
+        self.wake = asyncio.Event()
+        self.player = None  # Whose watchers hold `wake`
+
+    def watch(self, player):
+        if self.player is player:
+            return
+        self.unwatch()
+        player.watchers.add(self.wake)
+        self.player = player
+
+    def unwatch(self):
+        if self.player is not None:
+            self.player.watchers.discard(self.wake)
+            self.player = None
+
+
+def _client_key(request):
+    """The client's address for the per-client stream cap. Behind a local
+    reverse proxy or tunnel (loopback or private peer), the last
+    X-Forwarded-For hop, which that proxy appended itself."""
+    remote = request.remote or ""
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    try:
+        peer = ipaddress.ip_address(remote)
+    except ValueError:
+        return remote
+    if forwarded and (peer.is_loopback or peer.is_private):
+        return forwarded.split(",")[-1].strip()[:64] or remote
+    return remote
+
+
+def _wake_streams(sid):
+    """Wake every stream of `sid` (the viewer count changed)."""
+    for stream in list(state.streams.get(sid, ())):
+        stream.wake.set()
+
+
+def _signature(body):
+    """What a state diff compares: everything but the clock fields."""
+    body = dict(body, server_time=None)
+    if body.get("now_playing"):
+        body["now_playing"] = dict(body["now_playing"], elapsed=None)
+    return json.dumps(body, sort_keys=True, default=str)
+
+
+def _sse(body):
+    return b"data: " + json.dumps(body, separators=(",", ":")).encode() + b"\n\n"
+
+
+async def web_events(request):
+    sid = request.match_info["sid"]
+    headers = {"Cache-Control": "no-store"}
+    player = session_player(sid)
+    if player is None:
+        return web.json_response({"active": False}, status=404, headers=headers)
+    if request.app[_STREAMS]["closing"]:
+        return _control_error(503, "Shutting down.")
+    viewer = request.query.get("viewer")
+    if viewer is not None and not _VIEWER_RE.match(viewer):
+        viewer = None
+    client = _client_key(request)
+    same_client = sum(
+        1 for s in state.streams.values() for x in s if x.client == client
     )
+    if (
+        len(state.streams.get(sid, ())) >= MAX_STREAMS_PER_SESSION
+        or same_client >= MAX_STREAMS_PER_CLIENT
+    ):
+        # The page falls back to polling and retries later.
+        return _control_error(429, "Too many live connections.")
+
+    response = web.StreamResponse(
+        headers={
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            # nginx: never buffer the stream (see the reverse proxy docs).
+            "X-Accel-Buffering": "no",
+        }
+    )
+    stream = LiveStream(sid, viewer, client)
+    open_streams = state.streams.setdefault(sid, set())
+    open_streams.add(stream)
+    stream.watch(player)
+    try:
+        await response.prepare(request)
+        await response.write(b"retry: 5000\n\n")
+        _wake_streams(sid)  # Everyone's viewer count, this stream's first state
+        loop = asyncio.get_running_loop()
+        last_sig = None
+        last_sent = float("-inf")  # loop.time() of the last state
+        last_write = loop.time()  # ... of the last state or ping
+        last_check = loop.time()
+        while not request.app[_STREAMS]["closing"]:
+            now = loop.time()
+            timeout = min(
+                last_write + SSE_HEARTBEAT_SECONDS, last_check + SSE_CHECK_SECONDS
+            )
+            try:
+                await asyncio.wait_for(stream.wake.wait(), max(0.0, timeout - now))
+                woken = True
+            except asyncio.TimeoutError:
+                woken = False
+            if request.app[_STREAMS]["closing"]:
+                break
+            transport = request.transport
+            if transport is None or transport.is_closing():
+                break  # The tab went away
+            if woken:
+                # Coalesce a burst: later changes land in this same state.
+                wait = last_sent + SSE_MIN_INTERVAL - loop.time()
+                if wait > 0:
+                    await asyncio.sleep(wait)
+                stream.wake.clear()
+            player = session_player(sid)
+            if player is None:
+                await response.write(_sse({"active": False}))
+                break
+            stream.watch(player)  # !reset may have replaced the player
+            last_check = loop.time()
+            body = state_body(sid, player, count_viewer(sid, None))
+            sig = _signature(body)
+            if woken or sig != last_sig:
+                await response.write(_sse(body))
+                last_sig = sig
+                last_sent = last_write = loop.time()
+            elif loop.time() - last_write >= SSE_HEARTBEAT_SECONDS:
+                await response.write(b": ping\n\n")
+                last_write = loop.time()
+    except (ConnectionResetError, ConnectionError):
+        pass  # Closed by the client mid-write
+    finally:
+        stream.unwatch()
+        open_streams.discard(stream)
+        if not open_streams and state.streams.get(sid) is open_streams:
+            del state.streams[sid]
+        _wake_streams(sid)  # The others' viewer count
+    return response
+
+
+async def _close_streams(app):
+    """On shutdown: end every stream now instead of waiting for a timeout."""
+    app[_STREAMS]["closing"] = True
+    for streams in list(state.streams.values()):
+        for stream in list(streams):
+            stream.wake.set()
 
 
 def _find_track(player, track_id):
@@ -685,19 +867,39 @@ async def web_theme_logo_file(request):
     )
 
 
+def _notifies(handler):
+    """Wrap a route that changes the session: whatever it did (even a failed
+    action), the page's live streams get a fresh state. New control actions
+    need nothing more."""
+
+    async def wrapped(request):
+        try:
+            return await handler(request)
+        finally:
+            sid = request.match_info["sid"]
+            player = state.music_players.get(state.sessions.get(sid))
+            if player is not None and player.sid == sid:
+                notify_state(player)
+
+    return wrapped
+
+
 def build_web_app():
     app = web.Application()
+    app[_STREAMS] = {"closing": False}
+    app.on_shutdown.append(_close_streams)
     app.router.add_get("/", web_landing)
     app.router.add_get("/healthz", web_healthz)
     app.router.add_get("/metrics", web_metrics)
     app.router.add_get("/api/{sid}/state", web_state)
-    app.router.add_post("/api/{sid}/control", web_control)
+    app.router.add_get("/api/{sid}/events", web_events)
+    app.router.add_post("/api/{sid}/control", _notifies(web_control))
     app.router.add_get("/api/{sid}/stats", web_stats)
     app.router.add_get("/api/{sid}/playlists", web_playlists)
     app.router.add_get("/api/{sid}/lyrics/{track_id}", web_lyrics)
-    app.router.add_post("/api/{sid}/theme", web_theme)
-    app.router.add_post("/api/{sid}/theme/logo", web_theme_logo)
-    app.router.add_delete("/api/{sid}/theme/logo", web_theme_logo)
+    app.router.add_post("/api/{sid}/theme", _notifies(web_theme))
+    app.router.add_post("/api/{sid}/theme/logo", _notifies(web_theme_logo))
+    app.router.add_delete("/api/{sid}/theme/logo", _notifies(web_theme_logo))
     app.router.add_get("/media/{sid}/{track_id}", web_media)
     app.router.add_get("/theme-logo/{sid}", web_theme_logo_file)
     app.router.add_get("/{sid}", web_page)
@@ -712,7 +914,8 @@ async def start_web_server():
     global web_runner
     if web_runner is not None:
         return
-    runner = web.AppRunner(build_web_app(), access_log=None)
+    # Open streams end at once on shutdown (_close_streams): no long wait.
+    runner = web.AppRunner(build_web_app(), access_log=None, shutdown_timeout=5)
     await runner.setup()
     try:
         await web.TCPSite(runner, "0.0.0.0", WEB_PORT).start()
@@ -723,3 +926,11 @@ async def start_web_server():
         return
     web_runner = runner
     print(f"Web server listening on port {WEB_PORT} ({PUBLIC_BASE_URL})")
+
+
+async def stop_web_server():
+    """Close the live streams and the server (bot shutdown)."""
+    global web_runner
+    runner, web_runner = web_runner, None
+    if runner is not None:
+        await runner.cleanup()

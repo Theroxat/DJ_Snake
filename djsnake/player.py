@@ -71,6 +71,10 @@ class MusicPlayer:
         self.autoplay_next = None
         self.autoplay_task = None
         self.recent_ids = []
+        # Live updates: bumped by notify_state(); the open streams of the
+        # page (web.py) each put an asyncio.Event in `watchers`.
+        self.state_version = 0
+        self.watchers = set()
 
     @property
     def loading(self):
@@ -143,18 +147,21 @@ class MusicPlayer:
         the caller must hand to drop_pending() (in a finally)."""
         key = secrets.token_hex(6)
         self.pending_downloads.append({"key": key, "title": title, "source": source})
+        notify_state(self)
         return key
 
     def drop_pending(self, key):
         self.pending_downloads = [
             item for item in self.pending_downloads if item["key"] != key
         ]
+        notify_state(self)
 
     def name_pending(self, key, title):
         """Fill in the title once yt-dlp knows it."""
         for item in self.pending_downloads:
             if item["key"] == key and title:
                 item["title"] = str(title)
+                notify_state(self)
 
     def stop_and_clear(self):
         self.cancel_idle()
@@ -180,6 +187,7 @@ class MusicPlayer:
         self.paused_at = None
         self.paused_total = 0.0
         self.is_playing = False
+        notify_state(self)
 
     async def disconnect_voice_client(self):
         """Safely disconnect and cleanup voice client"""
@@ -193,6 +201,17 @@ class MusicPlayer:
                 print(f"Error during voice client disconnect: {e}")
             finally:
                 self.voice_client = None
+
+
+def notify_state(player):
+    """Tell the page's live streams that the session state changed. Cheap
+    (a counter and a few Event.set()), coalesced by the streams themselves:
+    call it after any change the page shows. Call it on the event loop.
+    refresh_panel() calls it, so every change that refreshes the panel is
+    covered."""
+    player.state_version += 1
+    for event in list(player.watchers):
+        event.set()
 
 
 def file_in_use(filepath):

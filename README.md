@@ -142,6 +142,20 @@ dj.example.com {
 cloudflared tunnel --url http://127.0.0.1:47823
 ```
 
+```nginx
+# nginx: the page's live updates are a long-lived stream, so no buffering
+location / {
+    proxy_pass http://127.0.0.1:47823;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_buffering off;
+    proxy_read_timeout 1h;
+}
+```
+
+The page gets live updates as a Server-Sent Events stream (`/api/<session>/events`), and falls back to polling if the stream cannot get through. Caddy and Cloudflare Tunnel work as is. With nginx, turn off `proxy_buffering` for the bot (the bot also sends `X-Accel-Buffering: no`) and raise `proxy_read_timeout` above the 15 s heartbeat. Behind any proxy, pass the client address in `X-Forwarded-For`: the bot caps open streams per client.
+
 Anyone who has the link can control the queue. Treat it as a secret and share it only with people you trust.
 
 ### Themes
