@@ -111,6 +111,10 @@
     opts = opts || {};
     const standalone = !!opts.standalone;
     const base = opts.baseURI || document.baseURI;
+    // The guild's bot language ("en" or "fr"), as the real state sends it;
+    // `?lang=fr` on the demo's URL shows the French page.
+    let lang = opts.lang === "fr" ? "fr" : "en";
+    try { if (new URLSearchParams(location.search).get("lang") === "fr") lang = "fr"; } catch (e) {}
     const now = () => performance.now() / 1000;
     const media = (k) => new URL("media/clip" + (k + 1) + ".webm", base).href;
     const thumb = (k) => new URL("media/thumb" + (k + 1) + ".jpg", base).href;
@@ -468,7 +472,7 @@
           active: true, in_voice: S.inVoice, guild: "Friday Night", channel: "Lounge",
           loading: S.jobs > 0, paused: !!c && paused(), can_previous: !!c,
           crossfade: S.crossfade, loop: S.loop, volume: S.volume, autoplay: S.autoplay, crossfading: false, server_time: Date.now() / 1000,
-          viewers: viewers(),
+          viewers: viewers(), lang,
           theme: S.theme,
           lyrics: true,
           can_control: !view,

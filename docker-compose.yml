@@ -9,7 +9,7 @@ services:
     restart: unless-stopped
     # Reads DISCORD_TOKEN and the optional COMMAND_PREFIX / MAX_PLAYLIST_SIZE /
     # MEDIA_FORMAT / WEB_PORT / WEB_BIND / PUBLIC_BASE_URL / SESSION_IDLE_HOURS /
-    # WEB_THEME variables from your local .env file (never committed).
+    # WEB_THEME / BOT_LANGUAGE variables from your local .env file (never committed).
     env_file:
       - .env
     # Persistent data: per-server clip page themes and logos (DATA_DIR). The

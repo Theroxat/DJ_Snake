@@ -13,6 +13,7 @@ os.environ.update(
         "DATA_DIR": os.path.join(_ROOT, "data"),
         "WEB_THEME": "minimal",
         "COMMAND_PREFIX": "!",
+        "BOT_LANGUAGE": "en",
         "SESSION_IDLE_HOURS": "6",
     }
 )
@@ -22,6 +23,7 @@ import pytest  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 
 from djsnake import (  # noqa: E402
+    i18n,
     lyrics,
     media,
     permissions,
@@ -54,6 +56,7 @@ def fresh_state(tmp_path, monkeypatch):
         state.guild_perms,
         state.guild_themes,
         state.guild_volumes,
+        state.guild_languages,
         state.edit_tokens,
         state.viewers,
         state.streams,
@@ -79,6 +82,7 @@ def fresh_state(tmp_path, monkeypatch):
     monkeypatch.setattr(
         permissions, "PERMISSIONS_FILE", str(data_dir / "permissions.json")
     )
+    monkeypatch.setattr(i18n, "LANGUAGES_FILE", str(data_dir / "languages.json"))
     media_dir = tmp_path / "media"
     media_dir.mkdir()
     monkeypatch.setattr(media, "TEMP_DIR", str(media_dir))

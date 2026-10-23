@@ -8,6 +8,7 @@ import discord
 from . import commands  # noqa: F401  (registers the commands)
 from . import state, stats
 from .config import COMMAND_PREFIX, SLASH_SYNC_GUILD
+from .i18n import t
 from .playback import idle_channel_emptied
 from .sessions import refresh_panel, session_cleanup_loop
 from .web import start_web_server, stop_web_server
@@ -23,7 +24,7 @@ async def on_ready():
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.listening,
-            name=f"{COMMAND_PREFIX}help for command list",
+            name=t("presence"),
         )
     )
 

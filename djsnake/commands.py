@@ -7,7 +7,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from . import catalog, media, spotify, state
+from . import catalog, i18n, media, spotify, state
 from .config import (
     COMMAND_PREFIX,
     LOOP_MODES,
@@ -40,6 +40,7 @@ from .controls import (
     read_spotify,
     seek_label,
 )
+from .i18n import ctx_lang, lang_for, language_name, t
 from .media import get_video_id_from_url, looks_like_url
 from .playback import (
     download_and_queue_song,
@@ -52,6 +53,7 @@ from .player import MusicPlayer, discard_tracks, retire_play
 from .sessions import (
     ack,
     open_session,
+    player_lang,
     refresh_panel,
     rotate_control_link,
     session_player,
@@ -100,55 +102,56 @@ async def fail(ctx, text, **kwargs):
     await ctx.send(f"❌ {text}", ephemeral=True, **kwargs)
 
 
+async def fail_t(ctx, key, **params):
+    """fail() with the `key` message (which starts with ❌) in the guild's
+    language."""
+    await ctx.send(t(key, ctx_lang(ctx), **params), ephemeral=True)
+
+
 def error_message(error, command=None, slash=False, guild=None):
-    """The English message for a command error, or None to stay silent. Shared
-    by the prefix handler and the slash command tree."""
+    """The message for a command error in the guild's language, or None to
+    stay silent. Shared by the prefix handler and the slash command tree."""
+    lang = lang_for(getattr(guild, "id", None))
+    prefix = "/" if slash else COMMAND_PREFIX
     if isinstance(error, (commands.HybridCommandError, commands.CommandInvokeError)):
         error = getattr(error, "original", error)
     if isinstance(error, app_commands.CommandInvokeError):
         error = error.original
     if isinstance(error, NotDJ):
         name = getattr(command, "name", command) or ""
-        extra = (
-            " (or be the one who queued the current track)"
-            if name in REQUESTER_COMMANDS
-            else ""
-        )
-        need = _dj_requirement(guild) if guild is not None else "the DJ role"
-        return (
-            f"❌ Only DJs can use `{'/' if slash else COMMAND_PREFIX}{name}`: "
-            f"you need {need}{extra}."
-        )
+        extra = t("cmd.not_dj_requester", lang) if name in REQUESTER_COMMANDS else ""
+        need = _dj_requirement(guild, lang)
+        return t("cmd.not_dj", lang, prefix=prefix, name=name, need=need, extra=extra)
     if isinstance(error, (commands.CommandNotFound, app_commands.CommandNotFound)):
         return None
     if isinstance(error, commands.MissingRequiredArgument):
-        return f"❌ Missing argument. Try `{COMMAND_PREFIX}help`."
+        return t("cmd.missing_argument", lang)
     if isinstance(error, (commands.NoPrivateMessage, app_commands.NoPrivateMessage)):
-        return "❌ This command only works in a server."
+        return t("cmd.guild_only", lang)
     if isinstance(
         error, (commands.MissingPermissions, app_commands.MissingPermissions)
     ):
-        return (
-            "❌ You need the **Manage Server** permission to use "
-            f"`{'/' if slash else COMMAND_PREFIX}{command}`."
-        )
-    return f"❌ Error: {error}"
+        return t("cmd.missing_permission", lang, prefix=prefix, command=command)
+    return t("cmd.error_generic", lang, error=error)
 
 
 class PlaylistChoiceView(discord.ui.View):
     """Buttons shown when a link contains both a specific song and a playlist,
     letting the user pick just the song or the whole playlist."""
 
-    def __init__(self, author_id, timeout=30):
+    def __init__(self, author_id, timeout=30, lang=None):
         super().__init__(timeout=timeout)
         self.author_id = author_id
+        self.lang = lang
         self.choice = None  # "single" | "playlist" | None (timeout)
+        self.single.label = t("cmd.choice_single", lang)
+        self.playlist.label = t("cmd.choice_playlist", lang)
 
     async def interaction_check(self, interaction):
         # Only the person who ran the command may use the buttons.
         if interaction.user.id != self.author_id:
             await interaction.response.send_message(
-                "❌ This isn't your command.", ephemeral=True
+                t("cmd.not_your_command", self.lang), ephemeral=True
             )
             return False
         return True
@@ -174,13 +177,15 @@ class NotDJ(commands.CheckFailure):
     """A member without the DJ role ran one of DJ_COMMANDS."""
 
 
-def _dj_requirement(guild):
+def _dj_requirement(guild, lang=None):
     """How to become a DJ, for error messages."""
+    if guild is None:
+        return t("cmd.dj_need_role_unknown", lang)
     role_id = dj_role(guild.id)
     role = guild.get_role(role_id) if role_id is not None else None
     if role is not None:
-        return f"the **{role.name}** role or the **Manage Server** permission"
-    return "the **Manage Server** permission"
+        return t("cmd.dj_need_role", lang, role=role.name)
+    return t("cmd.dj_need_manager", lang)
 
 
 @bot.check
@@ -209,23 +214,24 @@ async def record_command_activity(ctx):
 )
 async def play(ctx, *, query: str = None):
     await defer(ctx)  # Joining voice and reading the link take over 3 s
+    lang = ctx_lang(ctx)
     query = (query or "").strip()
     if not query:
-        await fail(ctx, f"Usage: `{COMMAND_PREFIX}play <link or search text>`")
+        await fail_t(ctx, "cmd.play_usage")
         return
 
     text_search = not looks_like_url(query)
     # A link is read up to the first space, as before.
     url = query if text_search else query.split()[0]
     if text_search and len(query) > MAX_SEARCH_LENGTH:
-        await fail(ctx, f"Search text is limited to {MAX_SEARCH_LENGTH} characters.")
+        await fail_t(ctx, "cmd.search_too_long", max=MAX_SEARCH_LENGTH)
         return
 
     try:
         # Spotify, Deezer or Apple Music
         spotify_ref = None if text_search else catalog.check_link(url)
     except spotify.SpotifyError as e:
-        await fail(ctx, ControlError(e.code).message)
+        await fail(ctx, ControlError(e.code).text(lang))
         return
 
     if not await join_voice_channel(ctx):
@@ -247,7 +253,7 @@ async def play(ctx, *, query: str = None):
         try:
             await queue_search(ctx, player, query)
         except Exception as e:
-            await ctx.send(f"❌ An error occurred: {str(e)}")
+            await ctx.send(t("cmd.error", lang, error=e))
         return
 
     try:
@@ -255,7 +261,8 @@ async def play(ctx, *, query: str = None):
         # From here on only the channel is needed: an interaction's reply
         # token expires after 15 minutes, a playlist or the idle timer outlives it.
         ctx = ChannelContext(ctx)
-        player.load_line, player.load_final = "🔎 Analyzing the link…", False
+        player.load_line = t("cmd.analyzing_link", lang)
+        player.load_final = False
         refresh_panel(player)
 
         # Try to extract as playlist
@@ -276,10 +283,9 @@ async def play(ctx, *, query: str = None):
             # (e.g. watch?v=XXX&list=RD...), ask the user what they want.
             specific_video_id = get_video_id_from_url(url)
             if specific_video_id:
-                view = PlaylistChoiceView(ctx.author.id)
+                view = PlaylistChoiceView(ctx.author.id, lang=lang)
                 prompt = await ctx.send(
-                    f"🎧 This link contains a playlist of **{len(playlist_entries)}** tracks.\n"
-                    "Do you want just this track or the whole playlist?",
+                    t("cmd.playlist_prompt", lang, count=len(playlist_entries)),
                     view=view,
                 )
                 await view.wait()
@@ -299,7 +305,7 @@ async def play(ctx, *, query: str = None):
             # Make sure we're connected
             if not player.voice_client or not player.voice_client.is_connected():
                 if not await join_voice_channel(ctx):
-                    await ctx.send("❌ Unable to join voice channel!")
+                    await ctx.send(t("cmd.cannot_join", lang))
                     return
 
             # Limit based on configuration
@@ -311,17 +317,19 @@ async def play(ctx, *, query: str = None):
                 await download_and_queue_song(ctx, player, url)
 
     except Exception as e:
-        await ctx.send(f"❌ An error occurred: {str(e)}")
+        await ctx.send(t("cmd.error", lang, error=e))
 
 
 async def _play_spotify(ctx, player, kind, ref, provider="spotify"):
     """!play with a Spotify, Deezer or Apple Music link: read its track list,
     then queue the YouTube match of each track."""
+    lang = ctx_lang(ctx)
     try:
         await ack(ctx)
         ctx = ChannelContext(ctx)
         label = catalog.LABELS[provider]
-        player.load_line, player.load_final = f"🔎 Reading the {label} link…", False
+        player.load_line = t("cmd.reading_link", lang, service=label)
+        player.load_final = False
         refresh_panel(player)
         try:
             tracks = await read_spotify(kind, ref, provider)
@@ -331,9 +339,9 @@ async def _play_spotify(ctx, player, kind, ref, provider="spotify"):
         if not player.should_stop:
             await queue_spotify(ctx, player, kind, tracks)
     except ControlError as e:
-        await ctx.send(f"❌ {e.message}")
+        await ctx.send(f"❌ {e.text(lang)}")
     except Exception as e:
-        await ctx.send(f"❌ An error occurred: {str(e)}")
+        await ctx.send(t("cmd.error", lang, error=e))
 
 
 @hybrid("stop", "Stop, clear the queue and leave voice")
@@ -341,7 +349,7 @@ async def stop(ctx):
     await defer(ctx)
     player = state.music_players.get(ctx.guild.id)
     if not player:
-        await fail(ctx, "No music is currently playing.")
+        await fail(ctx, ControlError("nothing_playing").text(ctx_lang(ctx)))
         return
 
     async with player.lock:
@@ -351,14 +359,15 @@ async def stop(ctx):
     # The web session stays (same link on the next !play) until it expires.
     if not player.loading:
         player.load_line, player.load_final = None, False
-    set_action(player, "⏹️ Stopped")
+    set_action(player, t("action.stopped", player_lang(player)))
     await ack(ctx)
 
 
 @hybrid("reset", "Force a clean voice reconnect")
 async def reset_voice(ctx):
     """Force reset the voice connection"""
-    await ctx.send("🔧 Resetting voice connection...")
+    lang = ctx_lang(ctx)
+    await ctx.send(t("cmd.reset_start", lang))
 
     player = state.music_players.get(ctx.guild.id)
 
@@ -401,21 +410,22 @@ async def reset_voice(ctx):
     await asyncio.sleep(2)
     if player:
         refresh_panel(state.music_players[ctx.guild.id])
-    await ctx.send("✅ Voice connection reset!")
+    await ctx.send(t("cmd.reset_done", lang))
 
 
 @hybrid("list", "Show the queue")
 async def list_queue(ctx):
+    lang = ctx_lang(ctx)
     player = state.music_players.get(ctx.guild.id)
     if not player or not player.queue:
-        await fail(ctx, "The queue is empty.")
+        await fail_t(ctx, "cmd.queue_empty")
         return
 
     queue_items = [f"{i+1}. {song['title']}" for i, song in enumerate(player.queue)]
-    message = "🎶 **Queue:**\n" + "\n".join(queue_items[:10])
+    message = t("cmd.queue_title", lang) + "\n" + "\n".join(queue_items[:10])
 
     if len(player.queue) > 10:
-        message += f"\n... and {len(player.queue) - 10} more tracks"
+        message += t("cmd.queue_more", lang, count=len(player.queue) - 10)
 
     await ctx.send(message)
 
@@ -426,14 +436,15 @@ _FAILED = object()
 async def _run_command_control(ctx, control):
     """Run a control for a Discord command; returns its result (possibly
     None) or _FAILED after replying with the error."""
+    lang = ctx_lang(ctx)
     player = state.music_players.get(ctx.guild.id)
     if not player:
-        await fail(ctx, "No music is currently playing.")
+        await fail(ctx, ControlError("nothing_playing").text(lang))
         return _FAILED
     try:
         result = await control(player)
     except ControlError as e:
-        await fail(ctx, e.message)
+        await fail(ctx, e.text(lang))
         return _FAILED
     await ack(ctx)
     refresh_panel(player)
@@ -444,7 +455,8 @@ async def _run_command_control(ctx, control):
 async def next_track(ctx):
     # Stopping triggers the after_playing callback, which plays the next track.
     if await _run_command_control(ctx, control_next) is not _FAILED:
-        set_action(state.music_players[ctx.guild.id], "⏭️ Skipped")
+        player = state.music_players[ctx.guild.id]
+        set_action(player, t("action.skipped", player_lang(player)))
 
 
 def parse_position(text):
@@ -468,7 +480,7 @@ def parse_position(text):
 async def seek(ctx, position: str):
     seconds = parse_position(position)
     if seconds is None:
-        await fail(ctx, "Invalid position. Use seconds or mm:ss.")
+        await fail_t(ctx, "cmd.bad_position")
         return
 
     def relative_seek(player):
@@ -493,7 +505,7 @@ async def seek(ctx, position: str):
 async def crossfade(ctx, mode: str = None):
     mode = (mode or "").lower()
     if mode not in ("on", "off"):
-        await fail(ctx, f"Usage: `{COMMAND_PREFIX}crossfade on|off`")
+        await fail_t(ctx, "cmd.crossfade_usage")
         return
     player = state.music_players.setdefault(ctx.guild.id, MusicPlayer())
     touch(player)
@@ -508,7 +520,7 @@ async def loop_command(ctx, mode: str = None):
     """Set the loop mode (off, track, queue); with no argument, cycle."""
     mode = mode.lower() if mode else None
     if mode is not None and mode not in LOOP_MODES:
-        await fail(ctx, f"Usage: `{COMMAND_PREFIX}loop [off|track|queue]`")
+        await fail_t(ctx, "cmd.loop_usage")
         return
     player = state.music_players.setdefault(ctx.guild.id, MusicPlayer())
     touch(player)
@@ -519,30 +531,29 @@ async def loop_command(ctx, mode: str = None):
 @hybrid("shuffle", "Shuffle the upcoming queue once")
 async def shuffle(ctx):
     if await _run_command_control(ctx, control_shuffle) is not _FAILED:
-        set_action(state.music_players[ctx.guild.id], "🔀 Queue shuffled")
+        player = state.music_players[ctx.guild.id]
+        set_action(player, t("action.shuffled", player_lang(player)))
 
 
 @hybrid("volume", "Show the server's volume, or set it (0-150 %, 100 = normal)")
 @app_commands.describe(level="0 to 150 (percent); leave empty to show it")
 async def volume(ctx, level: str = None):
     """Show the server's volume, or set it (0-150 %, 100 = normal)."""
+    lang = ctx_lang(ctx)
     if level is None:
-        await ctx.send(
-            f"🔊 Volume: **{volume_for(ctx.guild.id)}%**\n"
-            f"`{COMMAND_PREFIX}volume <0-150>` changes it (100 is the normal level).",
-            ephemeral=True,
-        )
+        info = t("cmd.volume_info", lang, volume=volume_for(ctx.guild.id))
+        await ctx.send(info, ephemeral=True)
         return
     percent = parse_volume(level)
     if percent is None:
-        await fail(ctx, f"Usage: `{COMMAND_PREFIX}volume [0-150]`")
+        await fail_t(ctx, "cmd.volume_usage")
         return
     player = state.music_players.setdefault(ctx.guild.id, MusicPlayer())
     touch(player)
     try:
         control_volume(player, ctx.guild.id, percent)
     except ControlError as e:
-        await ctx.send(f"⚠️ {e.message}", ephemeral=True)
+        await ctx.send(f"⚠️ {e.text(lang)}", ephemeral=True)
         return
     await ack(ctx)
 
@@ -561,11 +572,9 @@ async def autoplay(ctx, mode: str = None):
     touch(player)
     mode = (mode or "").lower()
     if mode not in ("on", "off"):
-        status = "on" if player.autoplay else "off"
-        await ctx.send(
-            f"📻 Autoplay is {status}. Usage: `{COMMAND_PREFIX}autoplay on|off`",
-            ephemeral=True,
-        )
+        lang = ctx_lang(ctx)
+        key = "cmd.autoplay_info_on" if player.autoplay else "cmd.autoplay_info_off"
+        await ctx.send(t(key, lang), ephemeral=True)
         return
     control_autoplay(player, mode == "on")
     await ack(ctx)
@@ -580,18 +589,24 @@ async def theme(ctx, choice: str = None):
     """Show or set the clip page's default theme for this server."""
     await defer(ctx)
     guild_id = ctx.guild.id
+    lang = ctx_lang(ctx)
     choice = (choice or "").strip().lower()
     player = state.music_players.get(guild_id)
     if not choice:
         current = theme_for(guild_id)["skin"]
-        source = "server default" if guild_id in state.guild_themes else "fallback"
+        if guild_id in state.guild_themes:
+            source = t("cmd.theme_source_server", lang)
+        else:
+            source = t("cmd.theme_source_fallback", lang)
         await ctx.send(
-            f"🎨 Clip page theme: **{current}** ({source})\n"
-            f"Presets: {', '.join(THEME_SKINS)}\n"
-            f"`{COMMAND_PREFIX}theme <preset>` sets it, "
-            f"`{COMMAND_PREFIX}theme reset` restores `{WEB_THEME}`, "
-            f"`{COMMAND_PREFIX}theme edit` sends you an editor link "
-            "(custom colors, name, logo)."
+            t(
+                "cmd.theme_info",
+                lang,
+                current=current,
+                source=source,
+                presets=", ".join(THEME_SKINS),
+                default=WEB_THEME,
+            )
         )
         return
 
@@ -603,17 +618,17 @@ async def theme(ctx, choice: str = None):
         token = issue_edit_token(guild_id)
         try:
             await ctx.author.send(
-                f"🎨 Theme editor for **{ctx.guild.name}** (valid "
-                f"{THEME_EDIT_SECONDS // 60} min, do not share it):\n"
-                f"{PUBLIC_BASE_URL}/{player.sid}?edit={token}"
+                t(
+                    "cmd.theme_editor_dm",
+                    lang,
+                    guild=ctx.guild.name,
+                    minutes=THEME_EDIT_SECONDS // 60,
+                    url=f"{PUBLIC_BASE_URL}/{player.sid}?edit={token}",
+                )
             )
         except discord.HTTPException:
             state.edit_tokens.pop(token, None)
-            await fail(
-                ctx,
-                "I can't send you a direct message. Allow DMs from server "
-                f"members, then run `{COMMAND_PREFIX}theme edit` again.",
-            )
+            await fail_t(ctx, "cmd.theme_dm_failed")
             return
         await ack(ctx)
         return
@@ -627,19 +642,68 @@ async def theme(ctx, choice: str = None):
             save_themes()
             label = choice
         else:
-            await fail(
-                ctx,
-                f"Unknown theme. Presets: {', '.join(THEME_SKINS)}, "
-                "or `reset` / `edit`.",
-            )
+            await fail_t(ctx, "cmd.theme_unknown", presets=", ".join(THEME_SKINS))
             return
     except OSError as e:
         print(f"Could not save theme: {e}")
-        await fail(ctx, "Could not save the theme (is DATA_DIR writable?).")
+        await fail_t(ctx, "cmd.theme_save_failed")
         return
     await ack(ctx)
     if player:
-        set_action(player, f"🎨 Clip page theme: {label}")
+        set_action(player, t("action.theme", player_lang(player), theme=label))
+
+
+def _language_list():
+    return ", ".join(f"`{code}` ({language_name(code)})" for code in i18n.LANGUAGES)
+
+
+@bot.hybrid_command(
+    name="language",
+    aliases=["lang", "langue"],
+    description="Show or set the language of the bot and the clip page",
+)
+@commands.guild_only()
+@commands.has_guild_permissions(manage_guild=True)
+@app_commands.describe(choice="A language code (en, fr), or reset")
+async def language(ctx, choice: str = None):
+    """Show or set the language of the bot and the clip page here."""
+    guild_id = ctx.guild.id
+    lang = ctx_lang(ctx)
+    choice = (choice or "").strip().lower()
+    if not choice:
+        if guild_id in state.guild_languages:
+            source = t("cmd.theme_source_server", lang)
+        else:
+            source = t("cmd.theme_source_fallback", lang)
+        await ctx.send(
+            t(
+                "cmd.language_info",
+                lang,
+                current=language_name(lang),
+                source=source,
+                languages=_language_list(),
+                default=i18n.DEFAULT_LANGUAGE,
+            )
+        )
+        return
+    if choice == "reset":
+        code = None
+    else:
+        code = i18n.normalize(choice)
+        if code is None:
+            await fail_t(ctx, "cmd.language_unknown", languages=_language_list())
+            return
+    try:
+        i18n.set_language(guild_id, code)
+    except OSError as e:
+        print(f"Could not save language: {e}")
+        await fail_t(ctx, "cmd.language_save_failed")
+        return
+    await ack(ctx)
+    player = state.music_players.get(guild_id)
+    if player:
+        new = player_lang(player)
+        set_action(player, t("action.language", new, language=language_name(new)))
 
 
 def _live_session(guild_id):
@@ -658,25 +722,17 @@ def _live_session(guild_id):
 async def djrole(ctx, *, choice: str = None):
     """Show or set the role that may control the music (Manage Server)."""
     guild_id = ctx.guild.id
+    lang = ctx_lang(ctx)
     choice = (choice or "").strip()
     if not choice:
         role_id = dj_role(guild_id)
         if role_id is None:
-            current = "none, everyone controls the music"
+            current = t("cmd.djrole_none", lang)
         else:
             role = ctx.guild.get_role(role_id)
-            current = (
-                f"**{role.name}**"
-                if role
-                else "a deleted role (only Manage Server can control the music)"
-            )
+            current = f"**{role.name}**" if role else t("cmd.djrole_deleted", lang)
         await ctx.send(
-            f"🎧 DJ role: {current}\n"
-            f"`{COMMAND_PREFIX}djrole <role>` limits skip, pause, seek, stop, "
-            "reset, crossfade, loop, shuffle, volume, autoplay and the clip "
-            "page's control link to that role "
-            f"and Manage Server; `{COMMAND_PREFIX}djrole off` opens them to "
-            "everyone again.",
+            t("cmd.djrole_info", lang, current=current),
             allowed_mentions=discord.AllowedMentions.none(),
         )
         return
@@ -686,13 +742,12 @@ async def djrole(ctx, *, choice: str = None):
         try:
             role = await commands.RoleConverter().convert(ctx, choice)
         except commands.BadArgument:
-            await fail(ctx, "Role not found. Use its name, ID or mention.")
+            await fail_t(ctx, "cmd.djrole_not_found")
             return
         if role.is_default():
-            await fail(
-                ctx,
-                "@everyone can't be the DJ role. Use "
-                f"`{COMMAND_PREFIX}djrole off` to let everyone control the music.",
+            await ctx.send(
+                t("cmd.djrole_everyone", lang),
+                ephemeral=True,
                 allowed_mentions=discord.AllowedMentions.none(),
             )
             return
@@ -702,7 +757,7 @@ async def djrole(ctx, *, choice: str = None):
         set_dj_role(guild_id, role.id if role else None)
     except OSError as e:
         print(f"Could not save DJ role: {e}")
-        await fail(ctx, "Could not save the DJ role (is DATA_DIR writable?).")
+        await fail_t(ctx, "cmd.djrole_save_failed")
         return
     player = state.music_players.get(guild_id)
     if player:
@@ -711,10 +766,11 @@ async def djrole(ctx, *, choice: str = None):
         if not was_restricted and web_control_restricted(guild_id):
             if player.sid and session_player(player.sid) is not None:
                 rotate_control_link(player)
+        panel_lang = player_lang(player)
         if role:
-            set_action(player, f"🎧 DJ role: {role.name}")
+            set_action(player, t("action.djrole", panel_lang, role=role.name))
         else:
-            set_action(player, "🎧 DJ role removed: everyone controls the music")
+            set_action(player, t("action.djrole_removed", panel_lang))
     await ack(ctx)
 
 
@@ -731,17 +787,16 @@ async def weblink(ctx):
     await open_session(ctx, player, announce=False)
     try:
         await ctx.author.send(
-            f"🎛️ Control link for **{ctx.guild.name}** (whoever has it controls "
-            "the music, do not share it):\n"
-            f"{PUBLIC_BASE_URL}/{player.sid}\n"
-            f"👀 View-only link, safe to share: {PUBLIC_BASE_URL}/{player.watch_id}"
+            t(
+                "cmd.weblink_dm",
+                ctx_lang(ctx),
+                guild=ctx.guild.name,
+                control=f"{PUBLIC_BASE_URL}/{player.sid}",
+                watch=f"{PUBLIC_BASE_URL}/{player.watch_id}",
+            )
         )
     except discord.HTTPException:
-        await fail(
-            ctx,
-            "I can't send you a direct message. Allow DMs from server "
-            f"members, then run `{COMMAND_PREFIX}weblink` again.",
-        )
+        await fail_t(ctx, "cmd.weblink_dm_failed")
         return
     await ack(ctx)
 
@@ -773,20 +828,12 @@ def _can_manage(ctx):
     return bool(getattr(perms, "manage_guild", False))
 
 
-def _playlist_usage():
-    p = COMMAND_PREFIX
-    return (
-        "❌ Usage: "
-        f"`{p}playlist save|load|show|delete|add <name>` or `{p}playlist list`"
-    )
-
-
-def _fit(header, lines, limit=1900):
+def _fit(header, lines, lang=None, limit=1900):
     """A message of `header` and as many `lines` as fit Discord's limit."""
     text = header
     for i, line in enumerate(lines):
         if len(text) + len(line) + 30 > limit:
-            return text + f"\n... and {len(lines) - i} more"
+            return text + t("cmd.queue_more", lang, count=len(lines) - i)
         text += "\n" + line
     return text
 
@@ -802,7 +849,7 @@ async def _playlist_reply(ctx, call):
     try:
         return await call
     except ControlError as e:
-        await fail(ctx, e.message)
+        await fail(ctx, e.text(ctx_lang(ctx)))
         return _FAILED
 
 
@@ -813,7 +860,7 @@ async def _playlist_reply(ctx, call):
 )
 @commands.guild_only()
 async def playlist(ctx):
-    await ctx.send(_playlist_usage(), ephemeral=True)
+    await fail_t(ctx, "cmd.playlist_usage")
 
 
 @playlist.command(name="save", description="Save the current track and the queue")
@@ -821,11 +868,11 @@ async def playlist(ctx):
 async def playlist_save(ctx, *, name: str = None):
     """Save the current track and the queue under a name."""
     if name is None:
-        await fail(ctx, f"Usage: `{COMMAND_PREFIX}playlist save <name>`")
+        await fail_t(ctx, "cmd.playlist_usage_name", sub="save")
         return
     player = state.music_players.get(ctx.guild.id)
     if player is None:
-        await fail(ctx, "No music is currently playing.")
+        await fail(ctx, ControlError("nothing_playing").text(ctx_lang(ctx)))
         return
     result = await _playlist_reply(
         ctx,
@@ -836,7 +883,15 @@ async def playlist_save(ctx, *, name: str = None):
     if result is _FAILED:
         return
     await ack(ctx)
-    set_action(player, f"💾 Saved playlist {result['name']} ({result['count']} tracks)")
+    set_action(
+        player,
+        t(
+            "action.playlist_saved",
+            player_lang(player),
+            name=result["name"],
+            count=result["count"],
+        ),
+    )
 
 
 @playlist.command(name="add", description="Add the current track to a playlist")
@@ -844,11 +899,11 @@ async def playlist_save(ctx, *, name: str = None):
 async def playlist_add(ctx, *, name: str = None):
     """Add the current track to a saved playlist."""
     if name is None:
-        await fail(ctx, f"Usage: `{COMMAND_PREFIX}playlist add <name>`")
+        await fail_t(ctx, "cmd.playlist_usage_name", sub="add")
         return
     player = state.music_players.get(ctx.guild.id)
     if player is None:
-        await fail(ctx, "No music is currently playing.")
+        await fail(ctx, ControlError("nothing_playing").text(ctx_lang(ctx)))
         return
     result = await _playlist_reply(
         ctx, control_playlist_add(player, ctx.guild.id, name)
@@ -856,7 +911,13 @@ async def playlist_add(ctx, *, name: str = None):
     if result is not _FAILED:
         await ack(ctx)
         set_action(
-            player, f"💾 Added to playlist {result['name']} ({result['count']} tracks)"
+            player,
+            t(
+                "action.playlist_added",
+                player_lang(player),
+                name=result["name"],
+                count=result["count"],
+            ),
         )
 
 
@@ -866,14 +927,14 @@ async def playlist_load(ctx, *, name: str = None):
     """Queue every track of a saved playlist."""
     await defer(ctx)  # Joining voice takes over 3 s
     if name is None:
-        await fail(ctx, f"Usage: `{COMMAND_PREFIX}playlist load <name>`")
+        await fail_t(ctx, "cmd.playlist_usage_name", sub="load")
         return
     saved = await _playlist_reply(ctx, control_playlist_get(ctx.guild.id, name))
     if saved is _FAILED:
         return
     entries = playlist_entries(saved)
     if not entries:
-        await fail(ctx, ControlError("playlist_empty").message)
+        await fail(ctx, ControlError("playlist_empty").text(ctx_lang(ctx)))
         return
     if not await join_voice_channel(ctx):
         return
@@ -887,21 +948,25 @@ async def playlist_load(ctx, *, name: str = None):
 @playlist.command(name="list", description="List the saved playlists")
 async def playlist_list(ctx):
     """List the server's saved playlists."""
+    lang = ctx_lang(ctx)
     found = await _playlist_reply(ctx, control_playlist_list(ctx.guild.id))
     if found is _FAILED:
         return
     if not found:
-        await fail(
-            ctx, f"No saved playlists. Use `{COMMAND_PREFIX}playlist save <name>`."
-        )
+        await fail_t(ctx, "cmd.playlist_none")
         return
     lines = [
-        f"• **{p['name']}** ({p['tracks']} tracks, {_mmss(p['duration'])})"
+        t(
+            "cmd.playlist_line",
+            lang,
+            name=p["name"],
+            count=p["tracks"],
+            duration=_mmss(p["duration"]),
+        )
         for p in found
     ]
-    await ctx.send(
-        _fit("📚 **Saved playlists:**", lines), allowed_mentions=_NO_MENTIONS
-    )
+    header = t("cmd.playlist_list_title", lang)
+    await ctx.send(_fit(header, lines, lang), allowed_mentions=_NO_MENTIONS)
 
 
 @playlist.command(name="show", description="Show the tracks of a playlist")
@@ -909,17 +974,18 @@ async def playlist_list(ctx):
 async def playlist_show(ctx, *, name: str = None):
     """Show the tracks of a saved playlist."""
     if name is None:
-        await fail(ctx, f"Usage: `{COMMAND_PREFIX}playlist show <name>`")
+        await fail_t(ctx, "cmd.playlist_usage_name", sub="show")
         return
     saved = await _playlist_reply(ctx, control_playlist_get(ctx.guild.id, name))
     if saved is _FAILED:
         return
+    lang = ctx_lang(ctx)
     lines = [
-        f"{i + 1}. {t['title']} ({_mmss(t['duration'])})"
-        for i, t in enumerate(saved["tracks"])
+        f"{i + 1}. {track['title']} ({_mmss(track['duration'])})"
+        for i, track in enumerate(saved["tracks"])
     ]
-    header = f"📚 **{saved['name']}** ({len(lines)} tracks)"
-    await ctx.send(_fit(header, lines), allowed_mentions=_NO_MENTIONS)
+    header = t("cmd.playlist_show_title", lang, name=saved["name"], count=len(lines))
+    await ctx.send(_fit(header, lines, lang), allowed_mentions=_NO_MENTIONS)
 
 
 @playlist.command(name="delete", description="Delete a saved playlist")
@@ -927,7 +993,7 @@ async def playlist_show(ctx, *, name: str = None):
 async def playlist_delete(ctx, *, name: str = None):
     """Delete a saved playlist (its creator, or Manage Server)."""
     if name is None:
-        await fail(ctx, f"Usage: `{COMMAND_PREFIX}playlist delete <name>`")
+        await fail_t(ctx, "cmd.playlist_usage_name", sub="delete")
         return
     result = await _playlist_reply(
         ctx,
@@ -935,6 +1001,19 @@ async def playlist_delete(ctx, *, name: str = None):
     )
     if result is not _FAILED:
         await ack(ctx)
+
+
+# Errors with their own message (anything else is also logged).
+_KNOWN_ERRORS = (
+    NotDJ,
+    commands.CommandNotFound,
+    app_commands.CommandNotFound,
+    commands.MissingRequiredArgument,
+    commands.NoPrivateMessage,
+    app_commands.NoPrivateMessage,
+    commands.MissingPermissions,
+    app_commands.MissingPermissions,
+)
 
 
 @bot.event
@@ -948,7 +1027,7 @@ async def on_command_error(ctx, error):
     )
     if message is None:
         return
-    if message.startswith("❌ Error:"):
+    if not isinstance(error, _KNOWN_ERRORS):
         print(f"Command error in '{ctx.command}': {error}")
     try:
         await ctx.send(message, ephemeral=True)
@@ -965,7 +1044,7 @@ async def on_app_command_error(interaction, error):
     message = error_message(error, command, slash=True, guild=guild)
     if message is None:
         return
-    if message.startswith("❌ Error:"):
+    if not isinstance(error, _KNOWN_ERRORS):
         print(f"Slash command error in '{command}': {error}")
     try:
         if interaction.response.is_done():
@@ -974,3 +1053,61 @@ async def on_app_command_error(interaction, error):
             await interaction.response.send_message(message, ephemeral=True)
     except Exception:
         pass
+
+
+# Commands listed by !help, in this order; any other visible command follows
+# (its `help.cmd.<name>` line, or just its name).
+HELP_ORDER = (
+    "play",
+    "list",
+    "next",
+    "pause",
+    "resume",
+    "seek",
+    "crossfade",
+    "stop",
+    "reset",
+    "loop",
+    "shuffle",
+    "volume",
+    "autoplay",
+    "playlist",
+    "theme",
+    "djrole",
+    "weblink",
+    "language",
+    "help",
+)
+
+
+def help_line(name, lang):
+    key = f"help.cmd.{name}"
+    text = t(key, lang)
+    return text if text != key else f"`{COMMAND_PREFIX}{name}`"
+
+
+class HelpCommand(commands.HelpCommand):
+    """!help in the guild's language: one line per command."""
+
+    async def send_bot_help(self, mapping):
+        lang = ctx_lang(self.context)
+        names = [c.name for c in self.context.bot.commands if not c.hidden]
+        names.sort(key=lambda n: (HELP_ORDER.index(n) if n in HELP_ORDER else 99, n))
+        lines = [t("help.title", lang)] + [help_line(n, lang) for n in names]
+        await self.get_destination().send("\n".join(lines))
+
+    async def send_command_help(self, command):
+        await self.get_destination().send(
+            help_line(command.name, ctx_lang(self.context))
+        )
+
+    def command_not_found(self, string):
+        return t("help.unknown_command", ctx_lang(self.context), name=string)
+
+    async def send_error_message(self, error):
+        await self.get_destination().send(
+            error, allowed_mentions=discord.AllowedMentions.none()
+        )
+
+
+bot.help_command = HelpCommand()

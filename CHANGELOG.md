@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - The status message now shows the view-only link next to the control link. With the defaults, everyone can still control the music as before.
 - Session ids are no longer written to the logs.
+- French translation, and a framework for more languages: `!language en|fr` (Manage Server) switches a server's command replies, errors, `!help`, status message and web API error messages; the clip page follows it (or the browser's language) and has a language picker in its settings menu. `BOT_LANGUAGE` sets the default (`en`). Messages live in `djsnake/locales/{en,fr}.json`.
 
 ## [1.3.0] - 2026-10-22
 

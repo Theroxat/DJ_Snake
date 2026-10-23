@@ -39,6 +39,7 @@
 - Listening stats per server on the clip page: top tracks and artists, the most skipped track, hours played, sessions, peak listeners and a day-by-hour heatmap, for the last week, month or all time.
 - Live viewer count in the clip page header.
 - Synced lyrics over the clip, from [LRCLIB](https://lrclib.net) (free, no key; `LYRICS=0` turns them off).
+- English and French: `!language fr` switches the bot's replies, the status message and the clip page for the whole server (see [Language](#language)).
 - Themable clip page: eight looks, including a custom one with your colors, name and logo (see [Themes](#themes) below).
 - One live status message per session, edited in place instead of spamming the channel.
 - Radio/mix links ask whether to play the single track or the whole playlist.
@@ -95,6 +96,11 @@ Every command also works as a slash command (`/play`, `/next`, ...); the table s
 | `!djrole [role\|off]` | Show, set or remove the DJ role. Needs the Manage Server permission. |
 
 When a server has a DJ role, `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!stop` and `!reset` need that role or the Manage Server permission; whoever queued the playing track may still skip it with `!next`. `!play` and `!list` stay open to everyone. See [Who controls the music](#who-controls-the-music).
+| `!language [code\|reset]` | Show or set the language of the bot and the clip page for the server (`en`, `fr`). Needs the Manage Server permission. |
+
+## Language
+
+DJ Snake speaks English and French. `!language fr` (Manage Server) switches the server to French: command replies, errors, the status message and `!help`, plus the clip page, which follows the server's language unless a viewer picks another one in its settings menu. `!language` shows the current setting and `!language reset` goes back to `BOT_LANGUAGE` (`en` by default). The choice is saved in `DATA_DIR/languages.json`.
 
 ## Spotify links
 
@@ -212,6 +218,9 @@ Set these in `.env` (see `.env.example`).
 | `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), logos, DJ roles (`permissions.json`) and listening stats (`stats.db`). Compose mounts `./data` there. |
 | `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`. |
 | `WEB_CONTROL` | `everyone` | `everyone`: the status message shows the control link and the view-only link. `dj`: only the view-only link; DJs get the control link with `!weblink`. A server with a DJ role always behaves as `dj`. |
+| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`) and languages (`languages.json`), logos and listening stats (`stats.db`). Compose mounts `./data` there. |
+| `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`. |
+| `BOT_LANGUAGE` | `en` | Language of the bot's messages and the clip page for servers that never ran `!language`: `en` or `fr`. |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | empty | Optional Spotify Web API credentials, for playlists over 100 tracks. Without them, Spotify links are read from the public embed page. |
 | `YTDLP_AUTO_UPDATE` | `1` | Upgrade yt-dlp on container start (`0` to skip). |
 | `METRICS` | `0` | `1` serves Prometheus metrics on `GET /metrics`. `GET /healthz` (used by the Docker health check) is always on. |

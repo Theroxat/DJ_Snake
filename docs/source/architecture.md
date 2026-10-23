@@ -10,6 +10,8 @@ Lowest layer first; each module imports only the ones above it.
 | --- | --- |
 | `config.py` | Environment variables and constants, read once at import. |
 | `state.py` | Shared mutable state: the `bot`, `music_players`, `sessions`, `watch_ids`, `guild_perms`, `guild_themes`, `edit_tokens`, `viewers`, `background_tasks` and `clock()`. Always used as `state.music_players`, never imported by name, so every module and test sees the same objects. |
+| `state.py` | Shared mutable state: the `bot`, `music_players`, `sessions`, `guild_themes`, `guild_languages`, `edit_tokens`, `viewers`, `background_tasks` and `clock()`. Always used as `state.music_players`, never imported by name, so every module and test sees the same objects. |
+| `i18n.py` | Translations: `t(key, lang, **params)` over the catalogs in `djsnake/locales/` (`en.json`, `fr.json`), and each server's language (`!language`, `languages.json`). |
 | `stats.py` | Listening stats in SQLite, written by one background thread. |
 | `lyrics.py` | Lyrics from LRCLIB: LRC and YouTube title parsing, the lookup run in the background when a track is queued, and its memory and disk cache. |
 | `player.py` | `MusicPlayer` (per-server state), cleanup of files and history helpers. |
@@ -75,6 +77,7 @@ discord.py drops and resumes the gateway roughly every couple of hours. Do no cl
 ### Persistent data
 
 Everything persistent lives in `DATA_DIR`: `themes.json` (per-server themes, written atomically), `volume.json` (per-server volume), `playlists.db` (saved playlists), `logos/`, `stats.db` (SQLite, WAL) and `lyrics/` (lyrics found on LRCLIB, one JSON file per YouTube video id).
+Everything persistent lives in `DATA_DIR`: `themes.json` (per-server themes, written atomically), `languages.json` (per-server languages), `logos/` and `stats.db` (SQLite, WAL).
 
 ## Demo site
 

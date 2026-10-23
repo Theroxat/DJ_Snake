@@ -55,6 +55,7 @@ from .controls import (
     control_volume,
     seek_label,
 )
+from .i18n import lang_for, t
 from .player import notify_state
 from .sessions import (
     refresh_panel,
@@ -342,6 +343,8 @@ def state_body(link, sid, player, viewers, can_control):
         "lyrics": lyrics.ENABLED,
         # False on a view-only link: the page hides its controls.
         "can_control": can_control,
+        # The guild's language (`!language`): the page's default.
+        "lang": lang_for(state.sessions[sid]),
     }
 
 
@@ -429,7 +432,7 @@ async def web_events(request):
     if player is None:
         return web.json_response({"active": False}, status=404, headers=headers)
     if request.app[_STREAMS]["closing"]:
-        return _control_error(503, "Shutting down.")
+        return _fail(request, 503, "web.shutting_down")
     viewer = request.query.get("viewer")
     if viewer is not None and not _VIEWER_RE.match(viewer):
         viewer = None
@@ -442,7 +445,7 @@ async def web_events(request):
         or same_client >= MAX_STREAMS_PER_CLIENT
     ):
         # The page falls back to polling and retries later.
-        return _control_error(429, "Too many live connections.")
+        return _fail(request, 429, "web.too_many_streams")
 
     response = web.StreamResponse(
         headers={
@@ -562,13 +565,15 @@ async def web_lyrics(request):
         return web.json_response({"active": False}, status=404, headers=headers)
     track = _find_track(player, request.match_info["track_id"])
     if track is None:
-        return _control_error(404, "Unknown track.")
+        return _fail(request, 404, "web.unknown_track")
     result = await lyrics.get(track)
     if result == lyrics.PENDING:
         return web.json_response({"pending": True}, status=202, headers=headers)
     if not result:
         return web.json_response(
-            {"ok": False, "error": "No lyrics found."}, status=404, headers=headers
+            {"ok": False, "error": t("web.no_lyrics", request_lang(request))},
+            status=404,
+            headers=headers,
         )
     return web.json_response(
         {"synced": result["synced"], "plain": result["plain"]}, headers=headers
@@ -587,7 +592,7 @@ async def web_stats(request):
         return web.json_response({"active": False}, status=404, headers=headers)
     range_name = request.query.get("range", "week")
     if range_name not in stats.RANGES:
-        return _control_error(400, "Unknown period.")
+        return _fail(request, 400, "web.unknown_period")
     guild_id = state.sessions[sid]
     key = (guild_id, range_name)
     now = time.monotonic()
@@ -599,7 +604,7 @@ async def web_stats(request):
         result = await loop.run_in_executor(None, stats.summary, guild_id, range_name)
     except Exception as e:
         print(f"Stats read failed: {e}")
-        return _control_error(500, "Stats are unavailable right now.")
+        return _fail(request, 500, "web.stats_unavailable")
     for stale in [k for k, v in _stats_cache.items() if v[0] <= now]:
         del _stats_cache[stale]
     _stats_cache[key] = (now + STATS_CACHE_SECONDS, result)
@@ -614,12 +619,24 @@ async def web_playlists(request):
     try:
         found = await control_playlist_list(state.sessions[sid])
     except ControlError as e:
-        return _control_error(e.status, e.message)
+        return _control_error(e.status, e.text(request_lang(request)))
     return web.json_response({"playlists": found}, headers=headers)
 
 
 def _control_error(status, message):
     return web.json_response({"ok": False, "error": message}, status=status)
+
+
+def request_lang(request):
+    """The language of the session's guild (BOT_LANGUAGE for an unknown
+    session): human error messages follow it."""
+    sid, _ = resolve_link(request.match_info.get("sid"))
+    return lang_for(state.sessions.get(sid) if sid is not None else None)
+
+
+def _fail(request, status, key, **params):
+    """An error response with the `key` message in the session's language."""
+    return _control_error(status, t(key, request_lang(request), **params))
 
 
 async def _read_body(request, limit):
@@ -640,13 +657,13 @@ async def _read_json(request):
     """(dict, None) or (None, error response) for a small JSON body."""
     body = await _read_body(request, MAX_CONTROL_BODY)
     if body is None:
-        return None, _control_error(400, "Request too large.")
+        return None, _fail(request, 400, "web.too_large")
     try:
         data = json.loads(body)
     except (ValueError, RecursionError):
-        return None, _control_error(400, "Invalid request.")
+        return None, _fail(request, 400, "web.bad_request")
     if not isinstance(data, dict):
-        return None, _control_error(400, "Invalid request.")
+        return None, _fail(request, 400, "web.bad_request")
     return data, None
 
 
@@ -676,20 +693,15 @@ CONTROL_ACTIONS = frozenset(
     }
 )
 
-VIEW_ONLY_ERROR = (
-    "This is a view-only link. Ask a DJ for the control link "
-    f"({COMMAND_PREFIX}weblink in Discord)."
-)
-
 
 async def web_control(request):
     _, sid, player, can_control = _session(request)
     if player is None:
-        return _control_error(404, "Unknown or expired session.")
+        return _fail(request, 404, "web.unknown_session")
     # The one permission gate of the web API, before the body is even read:
     # a view-only id can run none of CONTROL_ACTIONS (fail closed).
     if not can_control:
-        return _control_error(403, VIEW_ONLY_ERROR)
+        return _fail(request, 403, "web.view_only")
     guild_id = state.sessions[sid]
 
     data, error = await _read_json(request)
@@ -697,16 +709,16 @@ async def web_control(request):
         return error
     action = data.get("action")
     if action not in CONTROL_ACTIONS:
-        return _control_error(400, "Unknown action.")
+        return _fail(request, 400, "web.unknown_action")
 
     track_id = data.get("id")
     index = data.get("index")
     if action in ("remove", "move", "jump") and not (
         isinstance(track_id, str) and 0 < len(track_id) <= 64
     ):
-        return _control_error(400, "Invalid track.")
+        return _fail(request, 400, "web.bad_track")
     if action == "move" and (type(index) is not int):
-        return _control_error(400, "Invalid position.")
+        return _fail(request, 400, "web.bad_position")
     position = data.get("position")
     if action == "seek" and not (
         isinstance(position, (int, float))
@@ -714,38 +726,39 @@ async def web_control(request):
         and math.isfinite(position)
         and position >= 0
     ):
-        return _control_error(400, "Invalid position.")
+        return _fail(request, 400, "web.bad_position")
     if action == "add" and not isinstance(data.get("url"), str):
-        return _control_error(400, "Missing link.")
+        return _fail(request, 400, "web.missing_link")
     if action in ("crossfade", "autoplay") and not isinstance(
         data.get("enabled"), bool
     ):
-        return _control_error(400, "Invalid request.")
+        return _fail(request, 400, "web.bad_request")
     name = data.get("name")
     if action in ("save_playlist", "load_playlist") and not (
         isinstance(name, str) and 0 < len(name) <= 200
     ):
-        return _control_error(400, "Invalid playlist name.")
+        return _fail(request, 400, "web.bad_playlist_name")
 
     mode = data.get("mode")
     if action == "loop" and mode is not None and mode not in LOOP_MODES:
-        return _control_error(400, ControlError.MESSAGES["bad_loop"][1])
+        return _fail(request, 400, "control.bad_loop")
     if action == "volume" and not valid_volume(data.get("value")):
-        return _control_error(400, ControlError("bad_volume").message)
+        return _fail(request, 400, "control.bad_volume")
 
     touch(player)
     if player.sid != sid:  # Expired just now
-        return _control_error(404, "Unknown or expired session.")
+        return _fail(request, 404, "web.unknown_session")
+    lang = lang_for(guild_id)
 
     try:
         if action == "next":
             await control_next(player)
-            set_action(player, "⏭️ Skipped via the web page")
+            set_action(player, t("action.web_skipped", lang))
         elif action == "previous":
             if await control_previous(player) == "restart":
-                set_action(player, "⏮️ Restarted via the web page")
+                set_action(player, t("action.web_restarted", lang))
             else:
-                set_action(player, "⏮️ Previous track via the web page")
+                set_action(player, t("action.web_previous", lang))
         elif action == "pause":
             await control_pause(player)
             refresh_panel(player)
@@ -754,10 +767,11 @@ async def web_control(request):
             refresh_panel(player)
         elif action == "remove":
             track = await control_remove(player, track_id)
-            set_action(player, f"🗑️ Removed: {short(track['title'])}")
+            title = short(track["title"])
+            set_action(player, t("action.web_removed", lang, title=title))
         elif action == "move":
             await control_move(player, track_id, index)
-            set_action(player, "🔀 Queue reordered")
+            set_action(player, t("action.web_reordered", lang))
         elif action == "seek":
             applied = await control_seek(player, position)
             set_action(player, seek_label(player, applied))
@@ -765,29 +779,33 @@ async def web_control(request):
             control_crossfade(player, data["enabled"])
         elif action == "loop":
             mode = control_loop(player, mode)
-            set_action(player, f"🔁 Loop: {mode} via the web page")
+            label = t(f"loop.mode.{mode}", lang)
+            set_action(player, t("action.web_loop", lang, mode=label))
         elif action == "shuffle":
             await control_shuffle(player)
-            set_action(player, "🔀 Queue shuffled via the web page")
+            set_action(player, t("action.web_shuffled", lang))
         elif action == "volume":
             _announce_volume(player, guild_id, data["value"])
         elif action == "autoplay":
             control_autoplay(player, data["enabled"])
         elif action == "jump":
             track = await control_jump(player, guild_id, track_id)
-            set_action(player, f"▶️ Jumped to: {short(track['title'])}")
+            title = short(track["title"])
+            set_action(player, t("action.web_jumped", lang, title=title))
         elif action == "save_playlist":
             saved = await control_playlist_save(player, guild_id, name)
-            set_action(player, f"💾 Saved playlist {saved['name']} via the web page")
+            set_action(player, t("action.web_playlist_saved", lang, name=saved["name"]))
         elif action == "load_playlist":
             loaded = await control_playlist_load(player, guild_id, name)
-            set_action(player, f"📥 Loading playlist {loaded['name']} via the web page")
+            set_action(
+                player, t("action.web_playlist_loading", lang, name=loaded["name"])
+            )
             return web.json_response({"ok": True}, status=202)
         elif action == "add":
             await control_add(player, guild_id, data["url"])
             return web.json_response({"ok": True}, status=202)
     except ControlError as e:
-        return _control_error(e.status, e.message)
+        return _control_error(e.status, e.text(lang))
     return web.json_response({"ok": True})
 
 
@@ -797,7 +815,8 @@ def _announce_volume(player, guild_id, percent):
     try:
         control_volume(player, guild_id, percent)
     finally:
-        set_action(player, f"🔊 Volume set to {percent}% via the web page")
+        lang = lang_for(guild_id)
+        set_action(player, t("action.web_volume", lang, volume=percent))
 
 
 def _theme_auth(request):
@@ -805,30 +824,25 @@ def _theme_auth(request):
     else (None, None, error response)."""
     _, sid, player, can_control = _session(request)
     if player is None:
-        return None, None, _control_error(404, "Unknown or expired session.")
+        return None, None, _fail(request, 404, "web.unknown_session")
     if not can_control:  # The editor link is always a control link
-        return None, None, _control_error(403, VIEW_ONLY_ERROR)
+        return None, None, _fail(request, 403, "web.view_only")
     guild_id = state.sessions[sid]
     if not check_edit_token(request.headers.get("X-Edit-Token"), guild_id):
         return (
             None,
             None,
-            _control_error(
-                403,
-                "Invalid or expired edit link. " "Run !theme edit in Discord again.",
-            ),
+            _fail(request, 403, "web.bad_edit_token"),
         )
     return player, guild_id, None
 
 
 def _theme_saved(request, player, guild_id):
     touch(player)
-    set_action(player, "🎨 Clip page theme updated via the web page")
+    lang = lang_for(guild_id)
+    set_action(player, t("action.web_theme", lang))
     theme = theme_state(request.match_info["sid"], guild_id)
     return web.json_response({"ok": True, "theme": theme})
-
-
-_SAVE_FAILED = "Could not save on the server."
 
 
 async def web_theme(request):
@@ -839,14 +853,14 @@ async def web_theme(request):
     if error is not None:
         return error
     if data.get("skin") not in THEME_SKINS:
-        return _control_error(400, "Unknown theme.")
+        return _fail(request, 400, "web.unknown_theme")
     if data.get("base") not in THEME_PRESETS:
-        return _control_error(400, "Unknown base style.")
+        return _fail(request, 400, "web.unknown_base")
     if not all(valid_color(data.get(k)) for k in ("bg", "text", "accent")):
-        return _control_error(400, "Invalid color (use #rrggbb).")
+        return _fail(request, 400, "web.bad_color")
     name = clean_theme_name(data.get("name", ""))
     if name is None:
-        return _control_error(400, f"Invalid name ({THEME_NAME_MAX} characters max).")
+        return _fail(request, 400, "web.bad_name", max=THEME_NAME_MAX)
     previous = state.guild_themes.get(guild_id)
     state.guild_themes[guild_id] = {
         **(previous or {}),
@@ -867,7 +881,7 @@ async def web_theme(request):
         else:
             state.guild_themes[guild_id] = previous
         print(f"Could not save theme: {e}")
-        return _control_error(500, _SAVE_FAILED)
+        return _fail(request, 500, "web.save_failed")
     return _theme_saved(request, player, guild_id)
 
 
@@ -880,19 +894,19 @@ async def web_theme_logo(request):
             remove_logo(guild_id)
         except OSError as e:
             print(f"Could not remove logo: {e}")
-            return _control_error(500, _SAVE_FAILED)
+            return _fail(request, 500, "web.save_failed")
         return _theme_saved(request, player, guild_id)
     body = await _read_body(request, MAX_LOGO_BYTES)
     if body is None:
-        return _control_error(400, "Image too large (512 KB max).")
+        return _fail(request, 400, "web.logo_too_large")
     ext = sniff_image(body)
     if ext is None:
-        return _control_error(400, "Unsupported format (PNG, JPEG, WebP or GIF).")
+        return _fail(request, 400, "web.logo_format")
     try:
         set_logo(guild_id, body, ext)
     except OSError as e:
         print(f"Could not save logo: {e}")
-        return _control_error(500, _SAVE_FAILED)
+        return _fail(request, 500, "web.save_failed")
     return _theme_saved(request, player, guild_id)
 
 

@@ -20,6 +20,8 @@ Every command works two ways: as a text message with the prefix, `!` by default 
 | `!theme [preset\|reset\|edit]` | Show or set the clip page's default theme for the server. `edit` DMs you a private editor link. Needs the Manage Server permission. |
 | `!weblink` | DM you the clip page's control link and its view-only link. DJs only when control is limited. |
 | `!djrole [role\|off]` | Show, set or remove the DJ role. Needs the Manage Server permission. |
+| `!language [code\|reset]` | Show or set the language of the bot and the clip page for the server (`en`, `fr`). Needs the Manage Server permission. |
+| `!help [command]` | List the commands, or show one, in the server's language. |
 
 ## Playing music
 
@@ -133,3 +135,18 @@ Sends you, by direct message, the clip page's control link and its view-only lin
 ## Errors
 
 If you leave out a required argument the bot says so. Commands that need music playing answer "No music is currently playing." when there is none, and `!theme` without the permission is refused. A command reserved for DJs answers, for example, "Only DJs can use `!stop`: you need the **DJ** role or the **Manage Server** permission."
+### `!language [code|reset]`
+
+Needs the **Manage Server** permission. Aliases: `!lang`, `!langue`.
+
+| Form | Effect |
+| --- | --- |
+| `!language` | Shows the current language, whether it is the server's choice or the fallback, and the available languages. |
+| `!language <code>` | Sets the server's language: `en` (English) or `fr` (French). |
+| `!language reset` | Goes back to the `BOT_LANGUAGE` default. |
+
+The language applies to command replies, errors, `!help`, the status message and the clip page's default language (each viewer can still pick another one in the page's settings menu). Command names and their arguments stay the same in every language.
+
+## Errors
+
+If you leave out a required argument the bot says so. Commands that need music playing answer "No music is currently playing." when there is none, and `!theme` or `!language` without the permission is refused. Error messages follow the server's language.

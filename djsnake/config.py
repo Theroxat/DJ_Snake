@@ -83,6 +83,7 @@ WEB_CONTROL = (os.getenv("WEB_CONTROL") or "everyone").strip().lower()
 if WEB_CONTROL not in ("everyone", "dj"):
     print(f"⚠️  WEB_CONTROL={WEB_CONTROL!r} is not everyone|dj; using 'everyone'.")
     WEB_CONTROL = "everyone"
+LANGUAGES_FILE = os.path.join(DATA_DIR, "languages.json")
 # Listening statistics (stats.py): SQLite, written by one background thread.
 STATS_DB = os.path.join(DATA_DIR, "stats.db")
 # Saved playlists (playlists.py): SQLite, per guild. Only links and titles.
@@ -131,6 +132,9 @@ CUSTOM_DEFAULTS = {
     "text": "#f2f2f2",
     "accent": "#ffb703",
 }
+# Language of the bot's messages and the clip page for guilds that never ran
+# `!language` (djsnake/locales/{code}.json; i18n.py checks the value).
+BOT_LANGUAGE = (os.getenv("BOT_LANGUAGE") or "en").strip().lower()
 THEME_NAME_MAX = 32
 THEME_EDIT_SECONDS = 30 * 60  # Lifetime of a `!theme edit` link
 MAX_LOGO_BYTES = 512 * 1024

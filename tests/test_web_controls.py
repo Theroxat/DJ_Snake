@@ -35,6 +35,7 @@ STATE_KEYS = {
     "theme",
     "lyrics",
     "can_control",
+    "lang",
 }
 NOW_PLAYING_KEYS = {
     "id",

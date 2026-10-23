@@ -26,7 +26,8 @@ from .playback import (
     queue_spotify,
 )
 from .player import discard_tracks, guild_of
-from .sessions import refresh_panel
+from .i18n import ctx_lang, t
+from .sessions import player_lang, refresh_panel
 from .volume import percent_to_gain, save_volumes, valid_volume, volume_for
 
 
@@ -78,91 +79,57 @@ class ChannelContext:
 
 
 class ControlError(Exception):
-    """A control that cannot be applied. `code` picks the message."""
+    """A control that cannot be applied. `code` picks the HTTP status and the
+    message (`control.<code>` in the locales); the code never changes with
+    the language."""
 
-    # code -> (HTTP status, message), shown on Discord and on the web page
-    MESSAGES = {
-        "not_in_voice": (409, "I'm not in a voice channel."),
-        "nothing_playing": (409, "No music is currently playing."),
-        "track_not_found": (404, "That track is not in the queue."),
-        "bad_index": (400, "Invalid position."),
-        "bad_loop": (400, "Loop mode must be off, track or queue."),
-        "nothing_to_shuffle": (409, "Not enough queued tracks to shuffle."),
-        "bad_volume": (400, "Volume must be a whole number from 0 to 150."),
-        "volume_not_saved": (
-            500,
-            "Volume changed, but it could not be saved on the server.",
-        ),
-        "bad_url": (
-            400,
-            "Only YouTube, SoundCloud and Bandcamp links (track or playlist) and "
-            "Spotify, Deezer and Apple Music (track, album or playlist) links "
-            "are accepted.",
-        ),
-        "short_link": (
-            400,
-            "Short share links are not supported: open it and copy the full "
-            "address.",
-        ),
-        "link_not_found": (
-            404,
-            "That playlist, album or track was not found (private or deleted?).",
-        ),
-        "link_empty": (400, "That link has no tracks."),
-        "link_unreadable": (
-            502,
-            "Could not read that link right now (the service may be unreachable "
-            "or have changed its page).",
-        ),
-        "spotify_short_link": (
-            400,
-            "Short spotify.link links are not supported: open it and copy the "
-            "open.spotify.com link.",
-        ),
-        "spotify_not_found": (
-            404,
-            "That Spotify playlist, album or track was not found (private or "
-            "deleted?).",
-        ),
-        "spotify_empty": (400, "That Spotify link has no tracks."),
-        "spotify_unreadable": (
-            502,
-            "Could not read that Spotify link right now (Spotify may have "
-            "changed its page).",
-        ),
-        "bad_playlist_name": (
-            400,
-            f"Invalid playlist name: use up to {SAVED_PLAYLIST_NAME_MAX} letters, "
-            "digits, spaces or . ' & ! + ( ) -",
-        ),
-        "playlist_not_found": (404, "No saved playlist has that name."),
-        "playlist_exists": (
-            409,
-            "A playlist with that name already exists. Only its creator or a "
-            "member with Manage Server can replace it.",
-        ),
-        "playlist_forbidden": (
-            403,
-            "Only the creator of a playlist or a member with Manage Server "
-            "can delete it.",
-        ),
-        "playlist_limit": (
-            409,
-            f"This server already has {MAX_SAVED_PLAYLISTS} saved playlists. "
-            "Delete one first.",
-        ),
-        "playlist_full": (
-            409,
-            f"A playlist holds at most {MAX_SAVED_TRACKS} tracks.",
-        ),
-        "playlist_empty": (400, "There is nothing to save: no track is queued."),
-        "playlist_unavailable": (500, "Could not reach the playlist storage."),
+    # code -> HTTP status
+    STATUS = {
+        "not_in_voice": 409,
+        "nothing_playing": 409,
+        "track_not_found": 404,
+        "bad_index": 400,
+        "bad_loop": 400,
+        "nothing_to_shuffle": 409,
+        "bad_volume": 400,
+        "volume_not_saved": 500,
+        "bad_url": 400,
+        "short_link": 400,
+        "link_not_found": 404,
+        "link_empty": 400,
+        "link_unreadable": 502,
+        "spotify_short_link": 400,
+        "spotify_not_found": 404,
+        "spotify_empty": 400,
+        "spotify_unreadable": 502,
+        "bad_playlist_name": 400,
+        "playlist_not_found": 404,
+        "playlist_exists": 409,
+        "playlist_forbidden": 403,
+        "playlist_limit": 409,
+        "playlist_full": 409,
+        "playlist_empty": 400,
+        "playlist_unavailable": 500,
     }
 
     def __init__(self, code):
         super().__init__(code)
         self.code = code
-        self.status, self.message = self.MESSAGES[code]
+        self.status = self.STATUS[code]
+
+    def text(self, lang=None):
+        """The message in `lang` (default: BOT_LANGUAGE)."""
+        return t(
+            f"control.{self.code}",
+            lang,
+            name_max=SAVED_PLAYLIST_NAME_MAX,
+            playlists_max=MAX_SAVED_PLAYLISTS,
+            tracks_max=MAX_SAVED_TRACKS,
+        )
+
+    @property
+    def message(self):
+        return self.text()
 
 
 def _require_playing(player):
@@ -339,7 +306,7 @@ def seek_label(player, applied):
     start, as the web page shows it."""
     start = (player.now_playing or {}).get("start") or 0.0
     rel = int(max(0.0, applied - start))
-    return f"⏩ Seeked to {rel // 60}:{rel % 60:02d}"
+    return t("action.seeked", player_lang(player), time=f"{rel // 60}:{rel % 60:02d}")
 
 
 def _find_queued(player, track_id):
@@ -471,9 +438,7 @@ async def _add_from_web(player, guild_id, kind, url):
             if cancelled(player, epoch):
                 pass
             elif not entries:
-                await ctx.send(
-                    "❌ Could not read the playlist added from the web page."
-                )
+                await ctx.send(t("play.web_playlist_failed", ctx_lang(ctx)))
             else:
                 entries = entries[:MAX_PLAYLIST_SIZE]
                 await queue_playlist(ctx, player, entries, from_web=True)

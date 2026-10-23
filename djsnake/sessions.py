@@ -8,14 +8,14 @@ import discord
 
 from . import state
 from .config import (
-    COMMAND_PREFIX,
     PUBLIC_BASE_URL,
     SESSION_CLEANUP_SECONDS,
     SESSION_IDLE_HOURS,
     VOLUME_DEFAULT,
 )
+from .i18n import lang_for, t
 from .permissions import web_control_restricted
-from .player import discard_tracks, notify_state
+from .player import discard_tracks, guild_of, notify_state
 from .volume import volume_for
 
 # --- Sessions ---------------------------------------------------------------
@@ -164,14 +164,23 @@ def short(title, limit=100):
     return title if len(title) <= limit else title[: limit - 1] + "…"
 
 
-def _duration(seconds):
+def player_lang(player):
+    """The language of a player's guild (its session's, or BOT_LANGUAGE once
+    the player is replaced by !reset)."""
+    guild_id = state.sessions.get(player.sid) if player.sid else None
+    if guild_id is None:
+        guild_id = guild_of(player)
+    return lang_for(guild_id)
+
+
+def _duration(seconds, lang):
     seconds = max(0, round(seconds or 0))
     if seconds >= 60:
-        return f"{round(seconds / 60)} min"
-    return f"{seconds} s"
+        return t("panel.minutes", lang, count=round(seconds / 60))
+    return t("panel.seconds", lang, count=seconds)
 
 
-def _link_lines(player):
+def _link_lines(player, lang=None):
     """The panel's links. The view-only link is always public; the control
     link only when the guild leaves control to everyone (WEB_CONTROL, no DJ
     role), else DJs get it by DM with `!weblink`."""
@@ -180,57 +189,58 @@ def _link_lines(player):
         return []
     watch = f"{PUBLIC_BASE_URL}/{player.watch_id}" if player.watch_id else None
     if web_control_restricted(guild_id):
-        lines = [f"📺 Watch the clip live: {watch}"] if watch else []
-        lines.append(f"🎛️ DJs: `{COMMAND_PREFIX}weblink` DMs you the control link")
+        lines = [t("panel.watch", lang, url=watch)] if watch else []
+        lines.append(t("panel.weblink_hint", lang))
         return lines
-    lines = [f"📺 Watch and control the clip live: {PUBLIC_BASE_URL}/{player.sid}"]
+    lines = [t("panel.watch_control", lang, url=f"{PUBLIC_BASE_URL}/{player.sid}")]
     if watch:
         # In <>: Discord shows no second preview for it.
-        lines.append(f"👀 View-only link: <{watch}>")
+        lines.append(t("panel.view_only_link", lang, url=watch))
     return lines
 
 
 def render_panel(player):
+    lang = player_lang(player)
     if player.expired:
-        return "⌛ Session expired"
+        return t("panel.expired", lang)
     lines = []
-    lines.extend(_link_lines(player))
+    lines.extend(_link_lines(player, lang))
     if not player.in_voice():
-        lines.append(f"💤 Idle — {COMMAND_PREFIX}play to resume")
+        lines.append(t("panel.idle", lang))
     elif player.lingering() and not player.now_playing and not player.queue:
-        lines.append(
-            f"💤 Queue empty — leaving in {_duration(player.idle_delay)} "
-            "unless something is added"
-        )
+        delay = _duration(player.idle_delay, lang)
+        lines.append(t("panel.lingering", lang, delay=delay))
     elif player.now_playing:
-        line = f"🎵 Now playing: **{short(player.now_playing['title'])}**"
+        title = short(player.now_playing["title"])
+        line = t("panel.now_playing", lang, title=title)
         if player.paused_at is not None:
-            line += " ⏸️ paused"
+            line += t("panel.paused", lang)
         if player.now_playing.get("autoplay"):
-            line += " 📻 Autoplay"
+            line += t("panel.autoplay_track", lang)
         lines.append(line)
     else:
-        lines.append("🎵 Nothing playing yet")
+        lines.append(t("panel.nothing_playing", lang))
     if player.queue:
-        line = f"⏭️ Up next: {short(player.queue[0]['title'])}"
+        line = t("panel.up_next", lang, title=short(player.queue[0]["title"]))
         if len(player.queue) > 1:
-            line += f" and {len(player.queue) - 1} more"
+            line += t("panel.up_next_more", lang, count=len(player.queue) - 1)
         lines.append(line)
     if player.crossfade:
-        lines.append("🔀 Crossfade on")
+        lines.append(t("panel.crossfade_on", lang))
     if player.loop != "off":
-        lines.append(f"🔁 Loop: {player.loop}")
+        lines.append(t("panel.loop", lang, mode=t(f"loop.mode.{player.loop}", lang)))
     volume = volume_for(state.sessions.get(player.sid))
     if volume != VOLUME_DEFAULT:
-        lines.append(f"🔊 Volume {volume}%")
+        lines.append(t("panel.volume", lang, volume=volume))
     if player.autoplay:
-        lines.append("📻 Autoplay on")
+        lines.append(t("panel.autoplay_on", lang))
     if player.load_line:
         lines.append(player.load_line)
     elif len(player.pending_downloads) > 1:
-        lines.append(f"📥 Downloading {len(player.pending_downloads)} tracks…")
+        count = len(player.pending_downloads)
+        lines.append(t("panel.downloading_many", lang, count=count))
     elif player.single_downloads or player.pending_downloads:
-        lines.append("📥 Downloading…")
+        lines.append(t("panel.downloading", lang))
     if player.last_action:
         lines.append(player.last_action)
     return "\n".join(lines)
