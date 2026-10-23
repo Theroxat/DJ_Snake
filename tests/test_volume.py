@@ -247,6 +247,17 @@ async def test_web_volume_rejects_bad_values(client, player, bad):
     assert 1 not in state.guild_volumes
 
 
+async def test_web_volume_save_failure_is_not_announced(client, player, monkeypatch):
+    def broken():
+        raise OSError("read-only")
+
+    monkeypatch.setattr("djsnake.controls.save_volumes", broken)
+    status, body = await web_volume(client, player, 40)
+    assert status == 500 and not body["ok"]
+    assert volume.volume_for(1) == 40  # Applied anyway
+    assert "Volume set" not in (player.last_action or "")
+
+
 async def test_web_volume_needs_a_value(client, player):
     r = await client.post(f"/api/{player.sid}/control", json={"action": "volume"})
     assert r.status == 400

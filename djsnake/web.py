@@ -819,11 +819,8 @@ async def web_control(request):
 def _announce_volume(player, guild_id, percent):
     """Apply a web volume change. The panel line is the usual coalesced edit
     (one per PANEL_MIN_INTERVAL), so dragging the slider does not spam."""
-    try:
-        control_volume(player, guild_id, percent)
-    finally:
-        lang = lang_for(guild_id)
-        set_action(player, t("action.web_volume", lang, volume=percent))
+    control_volume(player, guild_id, percent)  # Raises before the line below
+    set_action(player, t("action.web_volume", lang_for(guild_id), volume=percent))
 
 
 def _theme_auth(request):
