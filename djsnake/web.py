@@ -30,6 +30,7 @@ from .config import (
 from .controls import (
     ControlError,
     control_add,
+    control_autoplay,
     control_crossfade,
     control_jump,
     control_loop,
@@ -72,9 +73,9 @@ from .volume import valid_volume, volume_for
 #   POST /api/{sid}/control    {"action", "id"?, "index"?, "url"?, "position"?,
 #                              "enabled"?} -> {"ok": ...}; actions: next,
 #                              previous, pause, resume, remove, move, add,
-#                              seek, jump, crossfade ({"enabled": bool}),
+#                              seek, jump, crossfade and autoplay ({"enabled": bool}),
 #                              loop ({"mode": off|track|queue}, none cycles),
-#                              shuffle
+#                              shuffle,
 #                              volume ({"value": int 0-150, percent})
 #   GET /media/{sid}/{id}      the mp4 of a playing, queued or history track
 #   POST /api/{sid}/theme      {skin, base, bg, text, accent, name}, with the
@@ -198,6 +199,7 @@ def _track_summary(track):
         "duration": track.get("duration"),
         "thumbnail": track.get("thumbnail"),
         "url": track.get("url"),
+        "autoplay": bool(track.get("autoplay")),
     }
 
 
@@ -279,6 +281,7 @@ async def web_state(request):
             "crossfade": player.crossfade,
             "loop": player.loop,
             "volume": volume_for(state.sessions[sid]),
+            "autoplay": player.autoplay,
             # True while the previous track still drains under this one.
             "crossfading": now_playing is not None
             and player.mixer is not None
@@ -405,6 +408,7 @@ async def web_control(request):
         "loop",
         "shuffle",
         "volume",
+        "autoplay",
     ):
         return _control_error(400, "Unknown action.")
 
@@ -426,7 +430,9 @@ async def web_control(request):
         return _control_error(400, "Invalid position.")
     if action == "add" and not isinstance(data.get("url"), str):
         return _control_error(400, "Missing link.")
-    if action == "crossfade" and not isinstance(data.get("enabled"), bool):
+    if action in ("crossfade", "autoplay") and not isinstance(
+        data.get("enabled"), bool
+    ):
         return _control_error(400, "Invalid request.")
 
     mode = data.get("mode")
@@ -473,6 +479,8 @@ async def web_control(request):
             set_action(player, "🔀 Queue shuffled via the web page")
         elif action == "volume":
             _announce_volume(player, guild_id, data["value"])
+        elif action == "autoplay":
+            control_autoplay(player, data["enabled"])
         elif action == "jump":
             track = await control_jump(player, guild_id, track_id)
             set_action(player, f"▶️ Jumped to: {short(track['title'])}")

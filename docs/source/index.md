@@ -15,6 +15,7 @@
 - **Automix, always on**: SponsorBlock `music_offtopic` segments are cut, loudness is normalised to -14 LUFS, leading and trailing silence is trimmed, and tracks fade in and out.
 - **Optional crossfade** between tracks.
 - **Loop and shuffle**: repeat a track or the whole queue, or shuffle what is coming up.
+- **Optional autoplay**: a related track plays on when the queue runs out.
 - **Listening stats** per server on the clip page: top tracks and artists, the most skipped track, hours played, sessions, peak listeners and a day-by-hour heatmap.
 - **Themable clip page**: eight presets plus a custom look with your colors, name and logo.
 - **One live status message per session**, edited in place instead of spamming the channel.

@@ -17,11 +17,12 @@ from .playback import (
     cancelled,
     download_and_queue_song,
     play_next,
+    prefetch_autoplay,
     queue_playlist,
     queue_search,
     queue_spotify,
 )
-from .player import discard_tracks
+from .player import discard_tracks, guild_of
 from .sessions import refresh_panel
 from .volume import percent_to_gain, save_volumes, valid_volume, volume_for
 
@@ -254,6 +255,20 @@ def control_volume(player, guild_id, percent):
         print(f"Could not save volumes: {e}")
         raise ControlError("volume_not_saved")
     return volume_for(guild_id)
+
+
+def control_autoplay(player, enabled):
+    """Turn the session's autoplay on or off. On, a related track is
+    prepared at once if the queue is empty; off, the prepared one is dropped."""
+    player.autoplay = bool(enabled)
+    player.last_active = state.clock()
+    if not player.autoplay:
+        player.drop_autoplay_next()
+    elif player.is_playing:
+        guild_id = guild_of(player)
+        if guild_id is not None:
+            prefetch_autoplay(WebContext(guild_id, player), player)
+    refresh_panel(player)
 
 
 def seek_label(player, applied):

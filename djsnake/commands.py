@@ -19,6 +19,7 @@ from .config import (
 )
 from .controls import (
     ControlError,
+    control_autoplay,
     control_crossfade,
     control_loop,
     control_next,
@@ -265,6 +266,8 @@ async def reset_voice(ctx):
         fresh.expired = player.expired
         fresh.crossfade = player.crossfade
         fresh.loop = player.loop
+        fresh.autoplay = player.autoplay
+        fresh.recent_ids = player.recent_ids
         if player.panel_task is not None:
             player.panel_task.cancel()
         state.music_players[ctx.guild.id] = fresh
@@ -274,6 +277,7 @@ async def reset_voice(ctx):
         player.queue = []
         player.history = []
         player.now_playing = None
+        player.drop_autoplay_next()
         discard_tracks(leftovers)
 
     # Wait a bit (the voice state update arrives in the meantime)
@@ -409,6 +413,22 @@ async def volume(ctx, level: str = None):
     except ControlError as e:
         await ctx.send(f"⚠️ {e.message}")
         return
+    await ack(ctx)
+
+
+@bot.command(name="autoplay")
+async def autoplay(ctx, mode: str = None):
+    """Keep playing related tracks when the queue runs out."""
+    player = state.music_players.setdefault(ctx.guild.id, MusicPlayer())
+    touch(player)
+    mode = (mode or "").lower()
+    if mode not in ("on", "off"):
+        status = "on" if player.autoplay else "off"
+        await ctx.send(
+            f"📻 Autoplay is {status}. Usage: `{COMMAND_PREFIX}autoplay on|off`"
+        )
+        return
+    control_autoplay(player, mode == "on")
     await ack(ctx)
 
 
