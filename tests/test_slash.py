@@ -356,6 +356,7 @@ def test_not_dj_message_names_the_slash_command():
 
 
 def test_new_playback_commands_need_a_dj():
-    from djsnake.permissions import DJ_COMMANDS
+    from djsnake.permissions import DJ_COMMANDS, DJ_WHEN_SETTING
 
-    assert {"loop", "shuffle", "volume", "autoplay"} <= DJ_COMMANDS
+    assert {"loop", "shuffle"} <= DJ_COMMANDS
+    assert {"volume", "autoplay"} == DJ_WHEN_SETTING

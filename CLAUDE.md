@@ -437,7 +437,7 @@ Module map, lowest layer first (each imports only the ones above it):
     request used, so a view-only page never sees the control id.
   - Discord: the global `bot.check` `dj_gate()` calls
     `can_run_dj_command()`: a command named in `DJ_COMMANDS` (next, pause,
-    resume, seek, stop, reset, crossfade, loop, shuffle, volume, autoplay) needs `is_dj()` (Manage Server, or
+    resume, seek, stop, reset, crossfade, loop, shuffle) needs `is_dj()`; `volume` and `autoplay` need it only to set a value (bare, they show the setting; `DJ_WHEN_SETTING`, `require_dj()`) (Manage Server, or
     the guild's DJ role; no role set = everyone), except that
     `REQUESTER_COMMANDS` (next) is allowed to `track["requester_id"]` (set by
     `download_and_queue_song()`) on the playing track. A new mutating command

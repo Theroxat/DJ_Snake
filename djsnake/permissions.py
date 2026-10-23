@@ -29,10 +29,12 @@ DJ_COMMANDS = frozenset(
         "crossfade",
         "loop",
         "shuffle",
-        "volume",
-        "autoplay",
     }
 )
+# Commands that only need a DJ to change a value: with no argument they just
+# show the setting. The check cannot see the argument (it runs before parsing),
+# so the command itself calls `commands.require_dj()` when it is about to set.
+DJ_WHEN_SETTING = frozenset({"volume", "autoplay"})
 # Commands the member who queued the current track may always use on it.
 REQUESTER_COMMANDS = frozenset({"next"})
 
@@ -110,7 +112,9 @@ def is_dj(member, guild_id, strict=False):
 
 
 def can_run_dj_command(member, guild_id, command, player):
-    """The Discord gate: may `member` run `command` (a name)?"""
+    """The Discord gate: may `member` run `command` (a name)? With
+    `DJ_WHEN_SETTING` commands, True means "may show"; setting needs
+    `is_dj()` (see `commands.require_dj()`)."""
     if command not in DJ_COMMANDS or is_dj(member, guild_id):
         return True
     if command in REQUESTER_COMMANDS and player is not None:

@@ -201,6 +201,13 @@ async def dj_gate(ctx):
     raise NotDJ()
 
 
+def require_dj(ctx):
+    """For DJ_WHEN_SETTING commands: raise NotDJ unless the author may change
+    the value (showing it stays open to everyone)."""
+    if ctx.guild is not None and not is_dj(ctx.author, ctx.guild.id):
+        raise NotDJ()
+
+
 @bot.before_invoke
 async def record_command_activity(ctx):
     if ctx.guild and ctx.guild.id in state.music_players:
@@ -555,6 +562,7 @@ async def volume(ctx, level: str = None):
     if percent is None:
         await fail_t(ctx, "cmd.volume_usage")
         return
+    require_dj(ctx)
     player = state.music_players.setdefault(ctx.guild.id, MusicPlayer())
     touch(player)
     try:
@@ -583,6 +591,7 @@ async def autoplay(ctx, mode: str = None):
         key = "cmd.autoplay_info_on" if player.autoplay else "cmd.autoplay_info_off"
         await ctx.send(t(key, lang), ephemeral=True)
         return
+    require_dj(ctx)
     control_autoplay(player, mode == "on")
     await ack(ctx)
 
