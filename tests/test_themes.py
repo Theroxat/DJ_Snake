@@ -404,7 +404,8 @@ async def test_missing_permission_message(theme_ctx, channel):
 
 
 def test_theme_command_needs_manage_guild():
-    assert len(commands.theme.checks) == 1
+    names = [check.__qualname__ for check in commands.theme.checks]
+    assert any(n.startswith("has_guild_permissions") for n in names)
 
 
 async def test_page_is_served_without_leaking_the_token(client, player):

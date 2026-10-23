@@ -98,7 +98,7 @@ async def join_voice_channel(ctx):
     """Simplified voice connection function"""
     author = getattr(ctx, "author", None)
     if not author or not author.voice:
-        await ctx.send("❌ You must be in a voice channel!")
+        await ctx.send("❌ You must be in a voice channel!", ephemeral=True)
         return False
 
     voice_channel = author.voice.channel
@@ -126,7 +126,7 @@ async def join_voice_channel(ctx):
         await open_session(ctx, player, announce=not already_here)
         return True
     else:
-        await ctx.send("❌ Unable to connect to voice channel.")
+        await ctx.send("❌ Unable to connect to voice channel.", ephemeral=True)
         return False
 
 

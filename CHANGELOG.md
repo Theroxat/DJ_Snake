@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Slash commands: every command also works as `/play`, `/next`, `/list`, `/seek`, `/pause`, `/resume`, `/stop`, `/reset`, `/crossfade` and `/theme` (with suggestions for the preset). The `!` versions are unchanged. Re-invite the bot with the `applications.commands` scope if the commands do not show up.
+- `SLASH_SYNC_GUILD` publishes the slash commands to one server at once, for development. The number of synced commands is logged at startup.
+
 ## [1.3.0] - 2026-10-22
 
 ### Added

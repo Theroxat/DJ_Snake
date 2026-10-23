@@ -25,6 +25,16 @@ MEDIA_FORMAT = os.getenv("MEDIA_FORMAT") or DEFAULT_MEDIA_FORMAT
 if os.getenv("AUDIO_FORMAT") and not os.getenv("MEDIA_FORMAT"):
     print("⚠️  AUDIO_FORMAT is no longer read; set MEDIA_FORMAT instead.")
 
+# Slash commands sync globally at startup (up to an hour to show everywhere).
+# SLASH_SYNC_GUILD, a server ID, syncs to that server only, at once: for dev.
+_slash_guild = (os.getenv("SLASH_SYNC_GUILD") or "").strip()
+if _slash_guild.isdigit():
+    SLASH_SYNC_GUILD = int(_slash_guild)
+else:
+    SLASH_SYNC_GUILD = None
+    if _slash_guild:
+        print(f"⚠️  SLASH_SYNC_GUILD={_slash_guild!r} is not a server ID; ignoring.")
+
 # Web server for the synced clip page. The public URL is what gets posted in
 # Discord; the tunnel in front of it forwards to WEB_PORT.
 WEB_PORT = int(os.getenv("WEB_PORT", "47823"))
