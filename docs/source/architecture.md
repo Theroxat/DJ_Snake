@@ -9,7 +9,8 @@ Lowest layer first; each module imports only the ones above it.
 | Module | Role |
 | --- | --- |
 | `config.py` | Environment variables and constants, read once at import. |
-| `state.py` | Shared mutable state: the `bot`, `music_players`, `sessions`, `guild_themes`, `edit_tokens`, `viewers`, `background_tasks` and `clock()`. Always used as `state.music_players`, never imported by name, so every module and test sees the same objects. |
+| `state.py` | Shared mutable state: the `bot`, `music_players`, `sessions`, `guild_themes`, `guild_languages`, `edit_tokens`, `viewers`, `background_tasks` and `clock()`. Always used as `state.music_players`, never imported by name, so every module and test sees the same objects. |
+| `i18n.py` | Translations: `t(key, lang, **params)` over the catalogs in `djsnake/locales/` (`en.json`, `fr.json`), and each server's language (`!language`, `languages.json`). |
 | `stats.py` | Listening stats in SQLite, written by one background thread. |
 | `player.py` | `MusicPlayer` (per-server state), cleanup of files and history helpers. |
 | `sessions.py` | Session expiry and the status panel. |
@@ -68,7 +69,7 @@ discord.py drops and resumes the gateway roughly every couple of hours. Do no cl
 
 ### Persistent data
 
-Everything persistent lives in `DATA_DIR`: `themes.json` (per-server themes, written atomically), `logos/` and `stats.db` (SQLite, WAL).
+Everything persistent lives in `DATA_DIR`: `themes.json` (per-server themes, written atomically), `languages.json` (per-server languages), `logos/` and `stats.db` (SQLite, WAL).
 
 ## Demo site
 

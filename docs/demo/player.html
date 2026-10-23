@@ -566,6 +566,8 @@ a.ghub:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 .dots { margin-left: auto; display: flex; gap: 4px; flex: none; }
 .dots i { width: 12px; height: 12px; border-radius: 50%; display: block; border: 1px solid color-mix(in srgb, var(--text) 35%, transparent); }
 .menu hr { border: 0; border-top: 1px solid var(--hair); margin: 6px 4px; }
+.menu .mlbl { padding: 2px 10px 4px; color: var(--muted); font: 600 12px/1.3 var(--font-body); }
+.menu .mhint { margin-left: auto; color: var(--muted); font-size: 13px; font-weight: 400; }
 
 /* Sidebar */
 aside { min-width: 0; display: flex; flex-direction: column; gap: 28px; }
@@ -785,7 +787,7 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
 .skipcard { border: var(--bw) dashed var(--hair); border-radius: var(--radius-sm); padding: 10px 14px; }
 .skipcard .t { font-size: 15px; overflow-wrap: anywhere; }
 .skipcard .s { color: var(--muted); font-size: 13px; }
-.heat { display: grid; grid-template-columns: 3.2ch repeat(24, minmax(0, 1fr)); gap: 2px; font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+.heat { display: grid; grid-template-columns: minmax(3.2ch, max-content) repeat(24, minmax(0, 1fr)); gap: 2px; font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
 .heat .cell { aspect-ratio: 5 / 3; min-height: 8px; border-radius: calc(var(--radius-sm) / 2); background: var(--hair); }
 .heat .cell.on { background: color-mix(in srgb, var(--accent) var(--p), var(--hair)); }
 .heat .dl { align-self: center; line-height: 1; }
@@ -893,21 +895,21 @@ html.demo-embedded .demo-ribbon { display: none; }
   </div>
   <div class="spacer"></div>
   <div class="hdrtools">
-    <span id="net" class="badge net hud" hidden>Reconnecting…</span>
+    <span id="net" class="badge net hud" data-i18n="net" hidden>Reconnecting…</span>
     <span id="live" class="badge live off hud"><i>●</i> <span id="livetxt">NOT SYNCED</span></span>
-    <span class="hud credits">CREDITS: ∞</span>
-    <span id="viewers" class="badge hud viewers" title="people on the page" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C6.5 5 2.7 9.3 1.5 12c1.2 2.7 5 7 10.5 7s9.3-4.3 10.5-7C21.3 9.3 17.5 5 12 5zm0 11.5a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9zm0-2.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg> <b id="viewcount">1</b></span>
-    <button id="statsbtn" class="ghost palette" type="button" aria-haspopup="dialog" aria-controls="stats" aria-label="Stats" title="Stats">
+    <span class="hud credits" data-i18n="credits">CREDITS: ∞</span>
+    <span id="viewers" class="badge hud viewers" title="people on the page" data-i18n-title="viewers_title" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C6.5 5 2.7 9.3 1.5 12c1.2 2.7 5 7 10.5 7s9.3-4.3 10.5-7C21.3 9.3 17.5 5 12 5zm0 11.5a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9zm0-2.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg> <b id="viewcount">1</b></span>
+    <button id="statsbtn" class="ghost palette" type="button" aria-haspopup="dialog" aria-controls="stats" aria-label="Stats" title="Stats" data-i18n-aria="stats" data-i18n-title="stats">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16v2H4zM5 11h3v7H5zM10.5 4h3v14h-3zM16 8h3v10h-3z"/></svg>
     </button>
-    <button id="palbtn" class="ghost palette" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="thememenu" aria-label="Change theme" title="Change theme">
+    <button id="palbtn" class="ghost palette" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="thememenu" aria-label="Change theme" title="Change theme" data-i18n-aria="change_theme" data-i18n-title="change_theme">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0 0 18c1.4 0 2-.9 2-1.8 0-.5-.2-.9-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.4 17 3 12 3zM7.5 12a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>
     </button>
-    <a class="ghub" href="https://github.com/Theroxat/DJ_Snake" target="_blank" rel="noopener noreferrer" aria-label="Source code on GitHub" title="Source code on GitHub">
+    <a class="ghub" href="https://github.com/Theroxat/DJ_Snake" target="_blank" rel="noopener noreferrer" aria-label="Source code on GitHub" title="Source code on GitHub" data-i18n-aria="source_code" data-i18n-title="source_code">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
     </a>
   </div>
-  <div class="menu" id="thememenu" role="menu" aria-label="Theme" hidden></div>
+  <div class="menu" id="thememenu" role="menu" aria-label="Theme" data-i18n-aria="theme_menu" hidden></div>
 </header>
 
 <main>
@@ -917,9 +919,9 @@ html.demo-embedded .demo-ribbon { display: none; }
       <div class="frame" id="frame">
         <video id="video" class="front" muted playsinline preload="auto"></video>
         <video id="video2" muted playsinline preload="auto" aria-hidden="true"></video>
-        <div class="pausebadge hud" id="pausebadge" hidden><i>❚❚</i> PAUSED</div>
+        <div class="pausebadge hud" id="pausebadge" hidden><i>❚❚</i> <span data-i18n="paused_badge">PAUSED</span></div>
         <div class="overlay" id="overlay">
-          <div class="hud blink" id="overlayhud" style="color:var(--accent-3)">PLAYER 1 — READY</div>
+          <div class="hud blink" id="overlayhud" style="color:var(--accent-3)" data-i18n="player_ready">PLAYER 1 — READY</div>
           <div class="big display" id="overlaytxt">Connecting…</div>
           <p class="sub" id="overlaysub" hidden></p>
         </div>
@@ -928,7 +930,7 @@ html.demo-embedded .demo-ribbon { display: none; }
         <div class="trackinfo">
           <h2 class="title display" id="title">&nbsp;</h2>
           <div class="progline" id="progline" hidden>
-            <div class="seek disabled" id="seek" role="slider" tabindex="-1" aria-label="Position in the track" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="00:00" aria-disabled="true">
+            <div class="seek disabled" id="seek" role="slider" tabindex="-1" aria-label="Position in the track" data-i18n-aria="seek" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="00:00" aria-disabled="true">
               <div class="prog"><i id="progfill"></i></div>
               <span class="ghost" id="seekghost" hidden></span>
               <span class="tip hud" id="seektip" hidden>00:00</span>
@@ -936,26 +938,26 @@ html.demo-embedded .demo-ribbon { display: none; }
             <span class="times"><span id="tcur">00:00</span> / <span id="tdur">--:--</span></span>
           </div>
         </div>
-        <div class="transport" role="group" aria-label="Playback controls">
+        <div class="transport" role="group" aria-label="Playback controls" data-i18n-aria="transport">
           <div class="tside">
-            <button id="xfade" class="synctoggle xfade" type="button" role="switch" aria-checked="false" title="Fade between tracks (for everyone in the channel)" disabled><span class="box" aria-hidden="true"></span>Crossfade</button>
+            <button id="xfade" class="synctoggle xfade" type="button" role="switch" aria-checked="false" title="Fade between tracks (for everyone in the channel)" data-i18n-title="xfade_title" disabled><span class="box" aria-hidden="true"></span><span class="xl" data-i18n="xfade">Crossfade</span></button>
           </div>
           <div class="tcenter">
-            <button id="prev" type="button" aria-label="Previous track" title="Previous" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h3v14H5zM20 5v14L9 12z"/></svg></button>
+            <button id="prev" type="button" aria-label="Previous track" title="Previous" data-i18n-aria="prev_aria" data-i18n-title="prev" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h3v14H5zM20 5v14L9 12z"/></svg></button>
             <button id="pp" type="button" aria-label="Pause" title="Pause" disabled><svg id="ppicon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg></button>
-            <button id="next" type="button" aria-label="Next track" title="Next" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h3v14h-3zM4 5v14l11-7z"/></svg></button>
+            <button id="next" type="button" aria-label="Next track" title="Next" data-i18n-aria="next_aria" data-i18n-title="next" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h3v14h-3zM4 5v14l11-7z"/></svg></button>
           </div>
           <div class="tside end">
-            <button id="synctoggle" class="synctoggle" type="button" aria-expanded="false" aria-controls="syncpanel" title="Video / audio offset"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h9.2a3 3 0 0 1 5.6 0H20v2h-1.2a3 3 0 0 1-5.6 0H4zm12 2a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM4 16h1.2a3 3 0 0 1 5.6 0H20v2h-9.2a3 3 0 0 1-5.6 0H4zm4 2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg><span class="lbl">Sync</span><b id="syncbadge" hidden></b></button>
-            <button id="fs" class="synctoggle" type="button" aria-label="Fullscreen" title="Fullscreen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v2H6v4H4zm10 0h6v6h-2V6h-4zM4 14h2v4h4v2H4zm14 0h2v6h-6v-2h4z"/></svg></button>
+            <button id="synctoggle" class="synctoggle" type="button" aria-expanded="false" aria-controls="syncpanel" title="Video / audio offset" data-i18n-title="sync_title"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h9.2a3 3 0 0 1 5.6 0H20v2h-1.2a3 3 0 0 1-5.6 0H4zm12 2a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM4 16h1.2a3 3 0 0 1 5.6 0H20v2h-9.2a3 3 0 0 1-5.6 0H4zm4 2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg><span class="lbl" data-i18n="sync">Sync</span><b id="syncbadge" hidden></b></button>
+            <button id="fs" class="synctoggle" type="button" aria-label="Fullscreen" title="Fullscreen" data-i18n-aria="fullscreen" data-i18n-title="fullscreen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v2H6v4H4zm10 0h6v6h-2V6h-4zM4 14h2v4h4v2H4zm14 0h2v6h-6v-2h4z"/></svg></button>
           </div>
         </div>
-        <div class="offset" id="syncpanel" role="group" aria-label="Sync offset" hidden>
-          <span class="hud" style="color:var(--accent-3)">Offset</span>
-          <input id="offset" type="range" min="-2" max="2" step="0.05" value="0" aria-label="Offset in seconds">
+        <div class="offset" id="syncpanel" role="group" aria-label="Sync offset" data-i18n-aria="sync_panel" hidden>
+          <span class="hud" style="color:var(--accent-3)" data-i18n="offset">Offset</span>
+          <input id="offset" type="range" min="-2" max="2" step="0.05" value="0" aria-label="Offset in seconds" data-i18n-aria="offset_aria">
           <output id="offsetval">0.00 s</output>
-          <button id="offsetreset" type="button" aria-label="Reset offset to zero">0</button>
-          <p class="hint">The audio comes from Discord and the video is muted. If the picture runs ahead of or behind the sound, adjust the offset.</p>
+          <button id="offsetreset" type="button" aria-label="Reset offset to zero" data-i18n-aria="offset_reset">0</button>
+          <p class="hint" data-i18n="offset_hint">The audio comes from Discord and the video is muted. If the picture runs ahead of or behind the sound, adjust the offset.</p>
         </div>
       </div>
     </div>
@@ -963,25 +965,25 @@ html.demo-embedded .demo-ribbon { display: none; }
 
   <aside>
     <section class="editor" id="editor" aria-labelledby="edh" hidden>
-      <h2 class="display" id="edh">Server theme</h2>
-      <p class="note">The page's default theme for the whole server. Each viewer can still pick their own with the palette button.</p>
+      <h2 class="display" id="edh" data-i18n="ed_title">Server theme</h2>
+      <p class="note" data-i18n="ed_note">The page's default theme for the whole server. Each viewer can still pick their own with the palette button.</p>
       <div>
-        <label for="e-skin">Theme</label>
+        <label for="e-skin" data-i18n="ed_theme">Theme</label>
         <select id="e-skin">
           <option value="arcade">Arcade</option><option value="minimal">Minimal</option><option value="night">Night</option>
           <option value="vinyl">Vinyl</option><option value="club">Club</option><option value="terminal">Terminal</option><option value="space">Space</option><option value="cobalt">Cobalt</option>
-          <option value="custom">Custom colors</option>
+          <option value="custom" data-i18n="ed_custom">Custom colors</option>
         </select>
       </div>
       <div id="e-custom" hidden>
         <div class="row3">
-          <div><label for="e-bg">Background</label><input type="color" id="e-bg" value="#101820"></div>
-          <div><label for="e-text">Text</label><input type="color" id="e-text" value="#f2f2f2"></div>
-          <div><label for="e-accent">Accent</label><input type="color" id="e-accent" value="#ffb703"></div>
+          <div><label for="e-bg" data-i18n="ed_bg">Background</label><input type="color" id="e-bg" value="#101820"></div>
+          <div><label for="e-text" data-i18n="ed_text">Text</label><input type="color" id="e-text" value="#f2f2f2"></div>
+          <div><label for="e-accent" data-i18n="ed_accent">Accent</label><input type="color" id="e-accent" value="#ffb703"></div>
         </div>
-        <p class="note" style="margin-top:8px">Surface, borders and secondary text are derived automatically.</p>
+        <p class="note" style="margin-top:8px" data-i18n="ed_derived">Surface, borders and secondary text are derived automatically.</p>
         <div style="margin-top:14px">
-          <label for="e-base">Base style (fonts, shapes, effects)</label>
+          <label for="e-base" data-i18n="ed_base">Base style (fonts, shapes, effects)</label>
           <select id="e-base">
             <option value="arcade">Arcade</option><option value="minimal">Minimal</option><option value="night">Night</option>
             <option value="vinyl">Vinyl</option><option value="club">Club</option><option value="terminal">Terminal</option><option value="space">Space</option><option value="cobalt">Cobalt</option>
@@ -989,39 +991,39 @@ html.demo-embedded .demo-ribbon { display: none; }
         </div>
       </div>
       <div>
-        <label for="e-name">Community name</label>
+        <label for="e-name" data-i18n="ed_name">Community name</label>
         <input type="text" id="e-name" maxlength="32" placeholder="DJ Snake" autocomplete="off">
       </div>
       <div>
-        <span class="lbl" id="logolbl">Logo (PNG, JPEG, WebP or GIF, 512 KB max), saved as soon as you upload it</span>
+        <span class="lbl" id="logolbl" data-i18n="ed_logo">Logo (PNG, JPEG, WebP or GIF, 512 KB max), saved as soon as you upload it</span>
         <div class="drop" id="drop">
-          Drop an image here or on the header
+          <span data-i18n="ed_drop">Drop an image here or on the header</span>
           <input type="file" id="e-logo" accept="image/png,image/jpeg,image/webp,image/gif" aria-labelledby="logolbl">
         </div>
       </div>
       <div class="btns">
-        <button id="e-save" type="button">Save</button>
-        <button id="e-revert" class="ghost" type="button">Discard changes</button>
-        <button id="e-logoclear" class="ghost" type="button" hidden>Remove logo</button>
+        <button id="e-save" type="button" data-i18n="ed_save">Save</button>
+        <button id="e-revert" class="ghost" type="button" data-i18n="ed_revert">Discard changes</button>
+        <button id="e-logoclear" class="ghost" type="button" data-i18n="ed_logoclear" hidden>Remove logo</button>
       </div>
       <p class="msg" id="e-msg" role="status" aria-live="polite"></p>
     </section>
     <div id="nowwrap" hidden>
-      <h2 class="display">Now playing</h2>
-      <ol id="nowrow" class="now" aria-label="Now playing"></ol>
+      <h2 class="display" data-i18n="now">Now playing</h2>
+      <ol id="nowrow" class="now" aria-label="Now playing" data-i18n-aria="now"></ol>
     </div>
     <div>
-      <h2 class="display">Up next <span class="count" id="qcount">00</span></h2>
+      <h2 class="display"><span data-i18n="upnext">Up next</span> <span class="count" id="qcount">00</span></h2>
       <form id="addform" class="addform" autocomplete="off">
-        <input id="addurl" type="text" inputmode="url" placeholder="Paste a YouTube or Spotify link…" aria-label="YouTube or Spotify link to add" disabled>
-        <button id="addbtn" type="submit" aria-label="Add to queue" disabled>Add</button>
+        <input id="addurl" type="text" inputmode="url" placeholder="Paste a YouTube or Spotify link…" aria-label="YouTube or Spotify link to add" data-i18n-ph="add_ph" data-i18n-aria="add_aria" disabled>
+        <button id="addbtn" type="submit" aria-label="Add to queue" data-i18n-aria="add_btn_aria" data-i18n="add_btn" disabled>Add</button>
       </form>
-      <ol id="queue" aria-label="Queue"></ol>
-      <div id="queueempty" class="empty">The queue is empty. Paste a link above to add a track.</div>
+      <ol id="queue" aria-label="Queue" data-i18n-aria="queue"></ol>
+      <div id="queueempty" class="empty" data-i18n="queue_empty">The queue is empty. Paste a link above to add a track.</div>
     </div>
     <div id="dlwrap" hidden>
-      <h2 class="display">Downloading <span class="count" id="dlcount">00</span></h2>
-      <ol id="dl" class="dl" aria-label="Tracks being downloaded"></ol>
+      <h2 class="display"><span data-i18n="dl">Downloading</span> <span class="count" id="dlcount">00</span></h2>
+      <ol id="dl" class="dl" aria-label="Tracks being downloaded" data-i18n-aria="dl_aria"></ol>
     </div>
   </aside>
 </main>
@@ -1031,13 +1033,13 @@ html.demo-embedded .demo-ribbon { display: none; }
 <div id="stats" class="statsdlg" role="dialog" aria-modal="true" aria-labelledby="stath" hidden>
   <div class="statscard" id="statscard">
     <div class="stathead">
-      <h2 class="display" id="stath">Stats</h2>
-      <div class="rangetabs" role="tablist" aria-label="Period">
-        <button type="button" role="tab" data-range="week" aria-selected="true">Week</button>
-        <button type="button" role="tab" data-range="month" aria-selected="false">Month</button>
-        <button type="button" role="tab" data-range="all" aria-selected="false">All time</button>
+      <h2 class="display" id="stath" data-i18n="stats">Stats</h2>
+      <div class="rangetabs" role="tablist" aria-label="Period" data-i18n-aria="st_period">
+        <button type="button" role="tab" data-range="week" aria-selected="true" data-i18n="st_week">Week</button>
+        <button type="button" role="tab" data-range="month" aria-selected="false" data-i18n="st_month">Month</button>
+        <button type="button" role="tab" data-range="all" aria-selected="false" data-i18n="st_all">All time</button>
       </div>
-      <button type="button" class="ghost statclose" id="statsclose" aria-label="Close stats" title="Close (Esc)">×</button>
+      <button type="button" class="ghost statclose" id="statsclose" aria-label="Close stats" title="Close (Esc)" data-i18n-aria="st_close_aria" data-i18n-title="st_close">×</button>
     </div>
     <div id="statsbody" aria-live="polite"></div>
   </div>
@@ -1045,10 +1047,10 @@ html.demo-embedded .demo-ribbon { display: none; }
 
 <div id="ended" hidden>
   <div class="card">
-    <div class="hud" style="color:var(--accent)">GAME OVER</div>
-    <h1 class="display">Session ended</h1>
-    <p>The bot has left the voice channel.</p>
-    <p>When DJ Snake comes back, use the new link posted in Discord.</p>
+    <div class="hud" style="color:var(--accent)" data-i18n="end_hud">GAME OVER</div>
+    <h1 class="display" data-i18n="end_title">Session ended</h1>
+    <p data-i18n="end_p1">The bot has left the voice channel.</p>
+    <p data-i18n="end_p2">When DJ Snake comes back, use the new link posted in Discord.</p>
   </div>
 </div>
 
@@ -1057,6 +1059,333 @@ html.demo-embedded .demo-ribbon { display: none; }
   "use strict";
   const sid = location.pathname.split("/").filter(Boolean)[0] || "";
   const $ = (id) => document.getElementById(id);
+
+  // ---- i18n. English is the reference; both languages have the same keys and
+  // the same {placeholders}. Plurals: `key_one` / `key_other`, picked by
+  // Intl.PluralRules (French: 0 and 1 are singular). Server error messages
+  // arrive already localised and are shown as-is.
+  const I18N = {
+    en: {
+      doc_title: "DJ Snake — Clip Party",
+      net: "Reconnecting…",
+      credits: "CREDITS: ∞",
+      viewers_title: "people on the page",
+      viewers_one: "{n} person on the page",
+      viewers_other: "{n} people on the page",
+      stats: "Stats",
+      change_theme: "Change theme",
+      source_code: "Source code on GitHub",
+      theme_menu: "Theme",
+      live: "LIVE",
+      not_synced: "NOT SYNCED",
+      live_pause: "PAUSE",
+      live_idle: "IDLE",
+      paused_badge: "PAUSED",
+      player_ready: "PLAYER 1 — READY",
+      connecting: "Connecting…",
+      loading_video: "Loading video…",
+      video_unavailable: "Video unavailable…",
+      idle: "Idle",
+      idle_sub: "DJ Snake isn't in a voice channel. Run !play in Discord to resume; this link stays valid.",
+      preparing: "The bot is preparing the track…",
+      waiting: "Waiting for a track…",
+      seek: "Position in the track",
+      transport: "Playback controls",
+      xfade: "Crossfade",
+      xfade_title: "Fade between tracks (for everyone in the channel)",
+      prev_aria: "Previous track",
+      prev: "Previous",
+      next_aria: "Next track",
+      next: "Next",
+      pause: "Pause",
+      resume: "Resume",
+      sync_title: "Video / audio offset",
+      sync: "Sync",
+      fullscreen: "Fullscreen",
+      sync_panel: "Sync offset",
+      offset: "Offset",
+      offset_aria: "Offset in seconds",
+      offset_reset: "Reset offset to zero",
+      offset_val: "{v} s",
+      offset_hint: "The audio comes from Discord and the video is muted. If the picture runs ahead of or behind the sound, adjust the offset.",
+      ed_title: "Server theme",
+      ed_note: "The page's default theme for the whole server. Each viewer can still pick their own with the palette button.",
+      ed_theme: "Theme",
+      ed_custom: "Custom colors",
+      ed_bg: "Background",
+      ed_text: "Text",
+      ed_accent: "Accent",
+      ed_derived: "Surface, borders and secondary text are derived automatically.",
+      ed_base: "Base style (fonts, shapes, effects)",
+      ed_name: "Community name",
+      ed_logo: "Logo (PNG, JPEG, WebP or GIF, 512 KB max), saved as soon as you upload it",
+      ed_drop: "Drop an image here or on the header",
+      ed_save: "Save",
+      ed_revert: "Discard changes",
+      ed_logoclear: "Remove logo",
+      ed_err_status: "Could not save (error {status}).",
+      ed_name_long: "Name too long (32 characters max).",
+      ed_saved: "Theme saved.",
+      ed_bad_format: "Unsupported format (PNG, JPEG, WebP or GIF).",
+      ed_too_large: "Image too large (512 KB max).",
+      ed_uploading: "Uploading logo…",
+      ed_logo_saved: "Logo saved.",
+      ed_logo_removed: "Logo removed.",
+      logo_alt: "Logo {name}",
+      network: "Network unavailable, try again.",
+      menu_server: "Server theme (default) · {skin}",
+      skin_custom: "Custom",
+      menu_lang: "Language",
+      lang_auto: "Automatic",
+      now: "Now playing",
+      upnext: "Up next",
+      add_ph: "Paste a YouTube or Spotify link…",
+      add_aria: "YouTube or Spotify link to add",
+      add_btn_aria: "Add to queue",
+      add_btn: "Add",
+      queue: "Queue",
+      queue_empty: "The queue is empty. Paste a link above to add a track.",
+      q_move: "Move “{title}” (drag, or use the up and down arrow keys)",
+      q_play_now: "Play now",
+      q_play: "Play “{title}” now",
+      q_remove: "Remove “{title}” from the queue",
+      open_yt: "Open on YouTube",
+      dl: "Downloading",
+      dl_aria: "Tracks being downloaded",
+      dl_reading: "Reading link…",
+      dl_more_one: "+ {n} more",
+      dl_more_other: "+ {n} more",
+      added: "Added — downloading…",
+      action_failed: "Action failed (error {status}).",
+      st_period: "Period",
+      st_week: "Week",
+      st_month: "Month",
+      st_all: "All time",
+      st_close_aria: "Close stats",
+      st_close: "Close (Esc)",
+      st_range_week: "last 7 days",
+      st_range_month: "last 30 days",
+      st_range_all: "all time",
+      st_web: "web page",
+      st_rank_aria: "{rank}. {title}, plays {n}",
+      st_cell_one: "{day} {hour} — {n} play",
+      st_cell_other: "{day} {hour} — {n} plays",
+      st_heat_aria: "Plays by day and hour. Busiest slot: {day} {hour} ({n}).",
+      st_heat_none: "Plays by day and hour: none.",
+      st_nodata: "NO DATA",
+      st_empty: "No stats yet",
+      st_empty_all: "Play a few tracks with !play: every listen is counted here, along with artists and peak hours.",
+      st_empty_range: "No plays in the {range}. Try the “All time” period.",
+      st_hours: "Hours listened",
+      st_hours_val: "{n} h",
+      st_tracks: "Tracks played",
+      st_sessions: "Sessions",
+      st_sessions_sub: "voice connections",
+      st_peak: "Peak listeners",
+      st_peak_on: "on {date}",
+      st_top_tracks: "Top tracks",
+      st_no_tracks: "No track played to the end.",
+      st_top_artists: "Top artists",
+      st_no_artists: "No artists recognized.",
+      st_skipped_one: "skipped {n} time before 30 s",
+      st_skipped_other: "skipped {n} times before 30 s",
+      st_no_skips: "Nothing was skipped. Nice picks.",
+      st_most_skipped: "Most skipped",
+      st_peak_hours: "Peak hours",
+      st_heat_note: "Plays by day and hour, in your browser's time zone.",
+      st_loading: "Loading…",
+      st_unavailable: "Stats are unavailable right now.",
+      end_hud: "GAME OVER",
+      end_title: "Session ended",
+      end_p1: "The bot has left the voice channel.",
+      end_p2: "When DJ Snake comes back, use the new link posted in Discord.",
+    },
+    fr: {
+      doc_title: "DJ Snake — Soirée clips",
+      net: "Reconnexion…",
+      credits: "CRÉDITS : ∞",
+      viewers_title: "spectateurs sur la page",
+      viewers_one: "{n} spectateur sur la page",
+      viewers_other: "{n} spectateurs sur la page",
+      stats: "Statistiques",
+      change_theme: "Changer de thème",
+      source_code: "Code source sur GitHub",
+      theme_menu: "Thème",
+      live: "EN DIRECT",
+      not_synced: "NON SYNCHRO",
+      live_pause: "PAUSE",
+      live_idle: "EN VEILLE",
+      paused_badge: "EN PAUSE",
+      player_ready: "JOUEUR 1 — PRÊT",
+      connecting: "Connexion…",
+      loading_video: "Chargement de la vidéo…",
+      video_unavailable: "Vidéo indisponible…",
+      idle: "En veille",
+      idle_sub: "DJ Snake n’est dans aucun salon vocal. Lancer !play sur Discord pour reprendre ; ce lien reste valide.",
+      preparing: "Le bot prépare le titre…",
+      waiting: "En attente d’un titre…",
+      seek: "Position dans le titre",
+      transport: "Commandes de lecture",
+      xfade: "Fondu enchaîné",
+      xfade_title: "Fondu entre les titres (pour tout le salon)",
+      prev_aria: "Titre précédent",
+      prev: "Précédent",
+      next_aria: "Titre suivant",
+      next: "Suivant",
+      pause: "Pause",
+      resume: "Lecture",
+      sync_title: "Décalage vidéo / audio",
+      sync: "Synchro",
+      fullscreen: "Plein écran",
+      sync_panel: "Décalage de synchro",
+      offset: "Décalage",
+      offset_aria: "Décalage en secondes",
+      offset_reset: "Remettre le décalage à zéro",
+      offset_val: "{v} s",
+      offset_hint: "Le son vient de Discord et la vidéo est muette. Si l’image est en avance ou en retard sur le son, ajuster le décalage.",
+      ed_title: "Thème du serveur",
+      ed_note: "Thème par défaut de la page pour tout le serveur. Chaque spectateur peut toujours choisir le sien avec le bouton palette.",
+      ed_theme: "Thème",
+      ed_custom: "Couleurs personnalisées",
+      ed_bg: "Fond",
+      ed_text: "Texte",
+      ed_accent: "Accent",
+      ed_derived: "La surface, les bordures et le texte secondaire sont calculés automatiquement.",
+      ed_base: "Style de base (polices, formes, effets)",
+      ed_name: "Nom de la communauté",
+      ed_logo: "Logo (PNG, JPEG, WebP ou GIF, 512 Ko max), enregistré dès l’envoi",
+      ed_drop: "Déposer une image ici ou sur l’en-tête",
+      ed_save: "Enregistrer",
+      ed_revert: "Annuler les modifications",
+      ed_logoclear: "Supprimer le logo",
+      ed_err_status: "Enregistrement impossible (erreur {status}).",
+      ed_name_long: "Nom trop long (32 caractères max).",
+      ed_saved: "Thème enregistré.",
+      ed_bad_format: "Format non pris en charge (PNG, JPEG, WebP ou GIF).",
+      ed_too_large: "Image trop lourde (512 Ko max).",
+      ed_uploading: "Envoi du logo…",
+      ed_logo_saved: "Logo enregistré.",
+      ed_logo_removed: "Logo supprimé.",
+      logo_alt: "Logo {name}",
+      network: "Réseau indisponible, réessayer plus tard.",
+      menu_server: "Thème du serveur (par défaut) · {skin}",
+      skin_custom: "Personnalisé",
+      menu_lang: "Langue",
+      lang_auto: "Automatique",
+      now: "En cours de lecture",
+      upnext: "À suivre",
+      add_ph: "Coller un lien YouTube ou Spotify…",
+      add_aria: "Lien YouTube ou Spotify à ajouter",
+      add_btn_aria: "Ajouter à la file d’attente",
+      add_btn: "Ajouter",
+      queue: "File d’attente",
+      queue_empty: "La file d’attente est vide. Coller un lien ci-dessus pour ajouter un titre.",
+      q_move: "Déplacer « {title} » (glisser, ou utiliser les flèches haut et bas)",
+      q_play_now: "Lire maintenant",
+      q_play: "Lire « {title} » maintenant",
+      q_remove: "Retirer « {title} » de la file d’attente",
+      open_yt: "Ouvrir sur YouTube",
+      dl: "Téléchargement",
+      dl_aria: "Titres en cours de téléchargement",
+      dl_reading: "Analyse du lien…",
+      dl_more_one: "+ {n} autre",
+      dl_more_other: "+ {n} autres",
+      added: "Ajouté — téléchargement…",
+      action_failed: "Échec de l’action (erreur {status}).",
+      st_period: "Période",
+      st_week: "Semaine",
+      st_month: "Mois",
+      st_all: "Tout",
+      st_close_aria: "Fermer les statistiques",
+      st_close: "Fermer (Échap)",
+      st_range_week: "7 derniers jours",
+      st_range_month: "30 derniers jours",
+      st_range_all: "depuis le début",
+      st_web: "page web",
+      st_rank_aria: "{rank}. {title}, {n} écoutes",
+      st_cell_one: "{day} {hour} — {n} écoute",
+      st_cell_other: "{day} {hour} — {n} écoutes",
+      st_heat_aria: "Écoutes par jour et par heure. Créneau le plus chargé : {day} {hour} ({n}).",
+      st_heat_none: "Écoutes par jour et par heure : aucune.",
+      st_nodata: "AUCUNE DONNÉE",
+      st_empty: "Pas encore de statistiques",
+      st_empty_all: "Lancer quelques titres avec !play : chaque écoute est comptée ici, avec les artistes et les heures de pointe.",
+      st_empty_range: "Aucune écoute sur les {range}. Choisir plutôt la période « Tout ».",
+      st_hours: "Heures d’écoute",
+      st_hours_val: "{n} h",
+      st_tracks: "Titres joués",
+      st_sessions: "Sessions",
+      st_sessions_sub: "connexions vocales",
+      st_peak: "Pic d’auditeurs",
+      st_peak_on: "le {date}",
+      st_top_tracks: "Top titres",
+      st_no_tracks: "Aucun titre écouté jusqu’au bout.",
+      st_top_artists: "Top artistes",
+      st_no_artists: "Aucun artiste reconnu.",
+      st_skipped_one: "passé {n} fois avant 30 s",
+      st_skipped_other: "passé {n} fois avant 30 s",
+      st_no_skips: "Rien n’a été passé. Belle sélection !",
+      st_most_skipped: "Le plus passé",
+      st_peak_hours: "Heures de pointe",
+      st_heat_note: "Écoutes par jour et par heure, dans le fuseau horaire du navigateur.",
+      st_loading: "Chargement…",
+      st_unavailable: "Statistiques indisponibles pour le moment.",
+      end_hud: "FIN DE PARTIE",
+      end_title: "Session terminée",
+      end_p1: "Le bot a quitté le salon vocal.",
+      end_p2: "Au retour de DJ Snake, utiliser le nouveau lien publié sur Discord.",
+    },
+  };
+  const LANGS = Object.keys(I18N);
+  const LANG_KEY = "djsnake.lang";
+  let langPref = "auto";    // "auto" or a language the viewer picked in the menu
+  let serverLang = null;    // the guild's bot language, from the state
+  let lang = "en";
+  try { const v = localStorage.getItem(LANG_KEY); if (LANGS.includes(v)) langPref = v; } catch (e) {}
+  function t(key, params) {
+    let s = I18N[lang][key];
+    if (s == null) s = I18N.en[key];
+    if (s == null) return key;
+    return params ? s.replace(/\{(\w+)\}/g, (m, k) => (params[k] != null ? String(params[k]) : m)) : s;
+  }
+  // Plural: `key_one` or `key_other` for n, with {n} formatted for the language.
+  function tn(key, n, params) {
+    let cat = "other";
+    try { cat = new Intl.PluralRules(lang).select(n); } catch (e) { cat = (lang === "fr" ? n < 2 : n === 1) ? "one" : "other"; }
+    return t(key + (cat === "one" ? "_one" : "_other"), Object.assign({ n: nf(n) }, params || {}));
+  }
+  const nf = (n, opts) => Number(n || 0).toLocaleString(lang, opts);
+  const i18n = t; // for code where `t` names something else (a theme, a track)
+  function pickLang() {
+    if (langPref !== "auto") return langPref;
+    if (serverLang) return serverLang;
+    let nav = "";
+    try { nav = (navigator.languages && navigator.languages[0]) || navigator.language || ""; } catch (e) {}
+    return /^fr\b/i.test(nav) ? "fr" : "en";
+  }
+  // Static markup: data-i18n (text), data-i18n-title, data-i18n-aria, data-i18n-ph.
+  // An attribute is only replaced while it still holds one of our own strings,
+  // so text set by someone else (e.g. the demo's example link) stays.
+  const ATTRS = [["data-i18n-title", "title"], ["data-i18n-aria", "aria-label"], ["data-i18n-ph", "placeholder"]];
+  const ours = (key, v) => LANGS.some((l) => I18N[l][key] === v);
+  function translateStatic() {
+    document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
+    for (const [sel, attr] of ATTRS) {
+      document.querySelectorAll("[" + sel + "]").forEach((el) => {
+        const key = el.getAttribute(sel);
+        if (!el.hasAttribute(attr) || ours(key, el.getAttribute(attr))) el.setAttribute(attr, t(key));
+      });
+    }
+  }
+  const langListeners = [];
+  function setLang(force) {
+    const l = pickLang();
+    if (l === lang && !force) return;
+    lang = l;
+    document.documentElement.lang = l;
+    translateStatic();
+    langListeners.forEach((f) => f());
+  }
   // Two stacked <video>s: `video` is the synced one; `back` holds the previous
   // clip while a crossfade dissolves into the new one.
   let video = $("video"), back = $("video2");
@@ -1108,7 +1437,7 @@ html.demo-embedded .demo-ribbon { display: none; }
   function setOffset(v, save) {
     offset = Math.round(v * 100) / 100;
     $("offset").value = offset;
-    const txt = (offset > 0 ? "+" : "") + offset.toFixed(2) + " s";
+    const txt = t("offset_val", { v: nf(offset, { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: "exceptZero" }) });
     $("offsetval").textContent = txt;
     $("syncbadge").textContent = " " + txt;
     $("syncbadge").hidden = offset === 0;
@@ -1139,18 +1468,30 @@ html.demo-embedded .demo-ribbon { display: none; }
   });
 
   // ---- UI helpers
+  // setLive and overlay take i18n keys and remember them for a language change.
+  let liveArgs = [false, null], overlayArgs = ["connecting", null, false];
   function setLive(on, label) {
+    liveArgs = [on, label];
     $("live").classList.toggle("off", !on);
-    $("livetxt").textContent = on ? "LIVE" : (label || "NOT SYNCED");
+    $("livetxt").textContent = t(on ? "live" : (label || "not_synced"));
   }
   function overlay(text, sub, idle) {
+    overlayArgs = [text || overlayArgs[0], sub, idle];
     $("overlay").hidden = !text;
     $("overlay").classList.toggle("idle-overlay", !!idle);
     $("overlayhud").hidden = !!idle;
     $("overlaysub").hidden = !sub;
-    $("overlaysub").textContent = sub || "";
-    if (text) $("overlaytxt").textContent = text;
+    $("overlaysub").textContent = sub ? t(sub) : "";
+    if (text) $("overlaytxt").textContent = t(text);
   }
+  langListeners.push(() => {
+    setLive(liveArgs[0], liveArgs[1]);
+    const [text, sub, idle] = overlayArgs, shown = !$("overlay").hidden;
+    overlay(shown ? text : null, sub, idle);
+    overlayArgs[0] = text;
+    if (!shown) $("overlaytxt").textContent = t(text);
+    setOffset(offset, false);
+  });
   let toastTimer = null;
   function toast(msg, kind) {
     const t = $("toast");
@@ -1168,8 +1509,8 @@ html.demo-embedded .demo-ribbon { display: none; }
     a.href = url;
     a.target = "_blank";
     a.rel = "noopener noreferrer";
-    a.title = "Open on YouTube";
-    a.setAttribute("aria-label", "Open on YouTube");
+    a.title = t("open_yt");
+    a.setAttribute("aria-label", t("open_yt"));
     a.innerHTML = YT; // static markup, no server data
     return a;
   }
@@ -1198,33 +1539,33 @@ html.demo-embedded .demo-ribbon { display: none; }
     lastQueueSig = sig;
     const ol = $("queue");
     ol.textContent = "";
-    q.forEach((t, i) => {
+    q.forEach((tr, i) => {
       const li = mk("li");
-      li.dataset.id = t.id;
+      li.dataset.id = tr.id;
       const grip = mk("button", "grip");
       grip.type = "button";
       grip.innerHTML = GRIP; // static markup, no server data
-      grip.setAttribute("aria-label", "Move \u201c" + t.title + "\u201d (drag, or use the up and down arrow keys)");
-      grip.dataset.id = t.id;
+      grip.setAttribute("aria-label", t("q_move", { title: tr.title }));
+      grip.dataset.id = tr.id;
       li.appendChild(grip);
       const idx = mk("span", "idx");
       idx.appendChild(mk("span", "num", String(i + 1).padStart(2, "0")));
       idx.appendChild(mk("span", "pl", "▶"));
       li.appendChild(idx);
-      li.title = "Play now";
-      if (t.thumbnail) li.appendChild(safeImg(t.thumbnail));
+      li.title = t("q_play_now");
+      if (tr.thumbnail) li.appendChild(safeImg(tr.thumbnail));
       const n = mk("span", "n");
-      n.textContent = t.title;
+      n.textContent = tr.title;
       n.tabIndex = 0;
       n.setAttribute("role", "button");
-      n.setAttribute("aria-label", "Play \u201c" + t.title + "\u201d now");
+      n.setAttribute("aria-label", t("q_play", { title: tr.title }));
       li.appendChild(n);
-      const yt = ytLink(t.url);
+      const yt = ytLink(tr.url);
       if (yt) li.appendChild(yt);
-      li.appendChild(mk("span", "d", fmt(t.duration)));
+      li.appendChild(mk("span", "d", fmt(tr.duration)));
       const rm = mk("button", "rm", "×");
       rm.type = "button";
-      rm.setAttribute("aria-label", "Remove \u201c" + t.title + "\u201d from the queue");
+      rm.setAttribute("aria-label", t("q_remove", { title: tr.title }));
       li.appendChild(rm);
       ol.appendChild(li);
     });
@@ -1293,21 +1634,26 @@ html.demo-embedded .demo-ribbon { display: none; }
     lastDlSig = sig;
     const ol = $("dl");
     ol.textContent = "";
-    items.forEach((t) => {
+    items.forEach((tr) => {
       const li = mk("li");
       li.appendChild(mk("span", "spin"));
-      const known = typeof t.title === "string" && t.title !== "";
-      li.appendChild(mk("span", known ? "n" : "n unknown", known ? t.title : "Reading link…"));
-      li.appendChild(mk("span", "src", t.source === "spotify" ? "Spotify" : "YouTube"));
+      const known = typeof tr.title === "string" && tr.title !== "";
+      li.appendChild(mk("span", known ? "n" : "n unknown", known ? tr.title : t("dl_reading")));
+      li.appendChild(mk("span", "src", tr.source === "spotify" ? "Spotify" : "YouTube"));
       ol.appendChild(li);
     });
     if (total > items.length) {
       const rest = total - items.length;
-      ol.appendChild(mk("li", "more", "+ " + rest + " more"));
+      ol.appendChild(mk("li", "more", tn("dl_more", rest)));
     }
     $("dlcount").textContent = String(total).padStart(2, "0");
     $("dlwrap").hidden = total === 0;
   }
+  langListeners.push(() => {
+    lastQueueSig = ""; renderQueue(queue);
+    const dl = lastDlSig ? JSON.parse(lastDlSig) : null;
+    if (dl) { lastDlSig = ""; renderDownloading(dl[1].map(([key, title, source]) => ({ key, title, source })), dl[0]); }
+  });
 
   // ---- queue actions (optimistic)
   function moveLocal(from, to) {
@@ -1477,7 +1823,7 @@ html.demo-embedded .demo-ribbon { display: none; }
     } else {
       video.pause();
       delete video.dataset.dissolve;
-      overlay("Loading video…");
+      overlay("loading_video");
     }
     // A retry gets a fresh URL, so nothing reuses the stalled request.
     video.src = np.video_url + (loadTries ? (np.video_url.includes("?") ? "&" : "?") + "r=" + loadTries : "");
@@ -1503,7 +1849,7 @@ html.demo-embedded .demo-ribbon { display: none; }
   }
   function onErr(e) {
     if (e.target !== video) return;
-    if (curId) overlay("Video unavailable…");
+    if (curId) overlay("video_unavailable");
     if (!errAt) errAt = performance.now();
     setLive(false);
   }
@@ -1529,7 +1875,7 @@ html.demo-embedded .demo-ribbon { display: none; }
       if (!video.paused) video.pause();
       video.playbackRate = 1;
       if (Math.abs(video.currentTime - targetPos()) > 0.3) { try { video.currentTime = targetPos(); } catch (e) {} }
-      setLive(false, "PAUSE");
+      setLive(false, "live_pause");
       return;
     }
     if (video.paused && !video.ended) { const p = video.play(); if (p && p.catch) p.catch(() => {}); }
@@ -1716,7 +2062,7 @@ html.demo-embedded .demo-ribbon { display: none; }
     wm.appendChild(mk("span", null, last));
     const img = $("logoimg");
     img.hidden = !t.logo_url;
-    img.alt = t.logo_url ? "Logo " + brandName() : "";
+    img.alt = t.logo_url ? i18n("logo_alt", { name: brandName() }) : "";
     if (t.logo_url) { if (img.getAttribute("src") !== t.logo_url) img.src = t.logo_url; }
     else img.removeAttribute("src");
     $("e-logoclear").hidden = !t.logo_url;
@@ -1761,9 +2107,32 @@ html.demo-embedded .demo-ribbon { display: none; }
       b.appendChild(dots(t));
       menu.appendChild(b);
     };
-    item("server", "Server theme (default) \u00b7 " + SKIN_NAMES[st.skin], st);
+    item("server", t("menu_server", { skin: st.skin === "custom" ? t("skin_custom") : SKIN_NAMES[st.skin] }), st);
     menu.appendChild(mk("hr"));
     PRESETS.forEach(([id, name]) => item(id, name, Object.assign({}, st, { skin: id })));
+    // The page's language: automatic (the bot's language for this server, else
+    // the browser's) or the viewer's choice, kept in localStorage.
+    menu.appendChild(mk("hr"));
+    const grp = mk("div");
+    grp.setAttribute("role", "group");
+    grp.setAttribute("aria-labelledby", "mlang");
+    const lbl = mk("div", "mlbl", t("menu_lang"));
+    lbl.id = "mlang";
+    grp.appendChild(lbl);
+    [["auto", t("lang_auto")], ["en", "English"], ["fr", "Fran\u00e7ais"]].forEach(([l, label]) => {
+      const b = mk("button");
+      b.type = "button";
+      b.dataset.choice = "lang:" + l;
+      b.setAttribute("role", "menuitemradio");
+      b.setAttribute("aria-checked", String(langPref === l));
+      b.appendChild(mk("span", "tick", langPref === l ? "\u2713" : ""));
+      const sp = mk("span", null, label);
+      if (l !== "auto") sp.lang = l;
+      b.appendChild(sp);
+      if (l === "auto") b.appendChild(mk("span", "mhint", lang === "fr" ? "Fran\u00e7ais" : "English"));
+      grp.appendChild(b);
+    });
+    menu.appendChild(grp);
     if (focused) { const f = menu.querySelector('[data-choice="' + focused + '"]'); if (f) f.focus(); }
   }
   function openMenu() {
@@ -1777,6 +2146,14 @@ html.demo-embedded .demo-ribbon { display: none; }
   menu.addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b) return;
+    if (b.dataset.choice.startsWith("lang:")) {
+      langPref = b.dataset.choice.slice(5);
+      try { if (langPref === "auto") localStorage.removeItem(LANG_KEY); else localStorage.setItem(LANG_KEY, langPref); } catch (x) {}
+      closeMenu();
+      setLang();
+      palbtn.focus();
+      return;
+    }
     viewerSkin = b.dataset.choice;
     try { localStorage.setItem(SKIN_KEY, viewerSkin); } catch (x) {}
     closeMenu();
@@ -1795,10 +2172,14 @@ html.demo-embedded .demo-ribbon { display: none; }
   });
 
   // editor (edit link only)
+  // text: a server message (shown as-is) or [i18n key, params], kept for a language change.
+  let editMsgArgs = [""];
   function editMsg(text, ok) {
-    $("e-msg").textContent = text || "";
+    editMsgArgs = [text, ok];
+    $("e-msg").textContent = Array.isArray(text) ? t(text[0], text[1]) : (text || "");
     $("e-msg").classList.toggle("ok", !!ok);
   }
+  langListeners.push(() => { editMsg(editMsgArgs[0], editMsgArgs[1]); buildMenu(); });
   function openEditor() {
     $("editor").hidden = false;
     palbtn.hidden = true; // the preview shows the draft, not the viewer's pick
@@ -1839,9 +2220,9 @@ html.demo-embedded .demo-ribbon { display: none; }
       let j = null;
       try { j = await r.json(); } catch (e) {}
       if (r.ok && j && j.ok) return j.theme;
-      editMsg((j && j.error) || "Could not save (error " + r.status + ").");
+      editMsg((j && j.error) || ["ed_err_status", { status: r.status }]);
     } catch (e) {
-      editMsg("Network unavailable, try again.");
+      editMsg(["network"]);
     }
     return null;
   }
@@ -1855,29 +2236,29 @@ html.demo-embedded .demo-ribbon { display: none; }
   $("e-save").addEventListener("click", async () => {
     if (!draft || !editToken) return;
     const name = draft.name.trim();
-    if (name.length > 32) { editMsg("Name too long (32 characters max)."); return; }
+    if (name.length > 32) { editMsg(["ed_name_long"]); return; }
     const btn = $("e-save");
     btn.disabled = true;
     const body = JSON.stringify({ skin: draft.skin, base: draft.base, bg: draft.bg, text: draft.text, accent: draft.accent, name });
     const t = await themeRequest("/theme", "POST", body, "application/json");
     btn.disabled = false;
-    if (t) { adoptSaved(t, false); editMsg("Theme saved.", true); }
+    if (t) { adoptSaved(t, false); editMsg(["ed_saved"], true); }
   });
   async function uploadLogo(file) {
     editMsg("");
     if (!file || !editToken || !draft) return;
-    if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) { editMsg("Unsupported format (PNG, JPEG, WebP or GIF)."); return; }
-    if (file.size > LOGO_MAX) { editMsg("Image too large (512 KB max)."); return; }
-    editMsg("Uploading logo…", true);
+    if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) { editMsg(["ed_bad_format"]); return; }
+    if (file.size > LOGO_MAX) { editMsg(["ed_too_large"]); return; }
+    editMsg(["ed_uploading"], true);
     const t = await themeRequest("/theme/logo", "POST", file, file.type);
     $("e-logo").value = "";
-    if (t) { adoptSaved(t, true); editMsg("Logo saved.", true); }
+    if (t) { adoptSaved(t, true); editMsg(["ed_logo_saved"], true); }
   }
   $("e-logo").addEventListener("change", (e) => uploadLogo(e.target.files[0]));
   $("e-logoclear").addEventListener("click", async () => {
     if (!editToken || !draft) return;
     const t = await themeRequest("/theme/logo", "DELETE", null, null);
-    if (t) { adoptSaved(t, true); editMsg("Logo removed.", true); }
+    if (t) { adoptSaved(t, true); editMsg(["ed_logo_removed"], true); }
   });
   for (const el of [$("drop"), $("header")]) {
     el.addEventListener("dragover", (e) => { if (!draft) return; e.preventDefault(); el.classList.add("dragover"); });
@@ -1897,8 +2278,16 @@ html.demo-embedded .demo-ribbon { display: none; }
   applyTheme();
 
   // ---- polling
+  let viewersN = 0;
+  langListeners.push(() => {
+    if (viewersN) $("viewers").title = tn("viewers", viewersN);
+    if (!curNp) document.title = t("doc_title");
+    updateControls();
+  });
   function apply(d, latency) {
     $("ended").hidden = true;
+    serverLang = LANGS.includes(d.lang) ? d.lang : null;
+    setLang();
     if (d.theme) setServerTheme(d.theme);
     inVoice = d.in_voice !== false;
     paused = !!d.paused && inVoice;
@@ -1910,7 +2299,8 @@ html.demo-embedded .demo-ribbon { display: none; }
     const nv = Number.isInteger(d.viewers) && d.viewers > 0 ? d.viewers : 0;
     $("viewers").hidden = !nv;
     $("viewcount").textContent = String(nv);
-    $("viewers").title = nv > 1 ? nv + " people on the page" : "1 person on the page";
+    viewersN = nv;
+    if (nv) $("viewers").title = tn("viewers", nv);
     renderQueue(d.queue || []);
     renderDownloading(d.downloading, d.downloading_total);
     const np = d.now_playing;
@@ -1921,8 +2311,8 @@ html.demo-embedded .demo-ribbon { display: none; }
       clearVideo(video);
       $("title").textContent = ""; $("title").dataset.sig = "";
       $("progline").hidden = true;
-      overlay("Idle", "DJ Snake isn't in a voice channel. Run !play in Discord to resume; this link stays valid.", true);
-      setLive(false, "IDLE");
+      overlay("idle", "idle_sub", true);
+      setLive(false, "live_idle");
       updateControls();
       return;
     }
@@ -1932,7 +2322,7 @@ html.demo-embedded .demo-ribbon { display: none; }
       clearVideo(video);
       $("title").textContent = "";
       $("progline").hidden = true;
-      overlay(d.loading ? "The bot is preparing the track…" : "Waiting for a track…");
+      overlay(d.loading ? "preparing" : "waiting");
       setLive(false);
       updateControls();
       return;
@@ -1971,8 +2361,8 @@ html.demo-embedded .demo-ribbon { display: none; }
     dis("xfade", !inVoice || pending.has("crossfade"));
     $("xfade").setAttribute("aria-checked", String(xfade));
     const pp = $("pp");
-    pp.setAttribute("aria-label", paused ? "Resume" : "Pause");
-    pp.title = paused ? "Resume" : "Pause";
+    pp.setAttribute("aria-label", t(paused ? "resume" : "pause"));
+    pp.title = t(paused ? "resume" : "pause");
     $("ppicon").innerHTML = paused ? '<path d="M7 4.5v15l12-7.5z"/>' : '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>';
   }
 
@@ -1995,12 +2385,12 @@ html.demo-embedded .demo-ribbon { display: none; }
       try { j = await r.json(); } catch (e) {}
       if (r.ok && j && j.ok) {
         ok = true;
-        if (action === "add") toast("Added \u2014 downloading\u2026", "ok");
+        if (action === "add") toast(t("added"), "ok");
       } else {
-        toast((j && j.error) || "Action failed (error " + r.status + ").", "err");
+        toast((j && j.error) || t("action_failed", { status: r.status }), "err");
       }
     } catch (e) {
-      toast("Network unavailable, try again.", "err");
+      toast(t("network"), "err");
     } finally {
       clearTimeout(kill);
       pending.delete(action);
@@ -2040,28 +2430,27 @@ html.demo-embedded .demo-ribbon { display: none; }
 
   // ---- stats panel. Titles and names come from users: textContent only.
   const statsDlg = $("stats"), statsBtn = $("statsbtn"), statsBody = $("statsbody");
-  const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const RANGE_LABEL = { week: "last 7 days", month: "last 30 days", all: "all time" };
-  let statsRange = "week", statsSeq = 0;
-  const nf = (n) => Number(n || 0).toLocaleString("en");
-  function rankList(items, label) {
+  // Short day names, Monday first, in the page's language (Jan 1 2024 is a Monday).
+  const days = () => Array.from({ length: 7 }, (_, d) => new Date(2024, 0, 1 + d).toLocaleDateString(lang, { weekday: "short" }));
+  let statsRange = "week", statsSeq = 0, statsData = null;
+  function rankList(items) {
     const ol = mk("ol", "rank");
     const max = Math.max(1, ...items.map((i) => i.plays || 0));
     items.forEach((it, i) => {
       const li = mk("li");
       li.appendChild(mk("span", "r", String(i + 1)));
       const t = mk("span", "t");
-      if (it.name === null) t.appendChild(mk("span", "web", "web page"));
+      if (it.name === null) t.appendChild(mk("span", "web", i18n("st_web")));
       else t.appendChild(document.createTextNode(it.title != null ? it.title : it.name));
       if (it.artist) { t.appendChild(document.createTextNode(" ")); t.appendChild(mk("small", null, "· " + it.artist)); }
-      t.title = (it.title != null ? it.title : it.name || "web page") + (it.artist ? " · " + it.artist : "");
+      t.title = (it.title != null ? it.title : it.name || i18n("st_web")) + (it.artist ? " · " + it.artist : "");
       li.appendChild(t);
       li.appendChild(mk("span", "c", "×" + nf(it.plays)));
       const bar = mk("span", "meter"), fill = mk("i");
       fill.style.width = Math.round((100 * (it.plays || 0)) / max) + "%";
       bar.appendChild(fill);
       li.appendChild(bar);
-      li.setAttribute("aria-label", (i + 1) + ". " + t.title + ", " + label + " " + (it.plays || 0));
+      li.setAttribute("aria-label", i18n("st_rank_aria", { rank: i + 1, title: t.title, n: nf(it.plays) }));
       ol.appendChild(li);
     });
     return ol;
@@ -2088,6 +2477,7 @@ html.demo-embedded .demo-ribbon { display: none; }
     const local = new Array(168).fill(0);
     (Array.isArray(utc) ? utc : []).forEach((n, u) => { if (u < 168) local[(((u + shift) % 168) + 168) % 168] += Number(n) || 0; });
     const max = Math.max(...local);
+    const DAYS = days(), hour = (h) => String(h).padStart(2, "0") + ":00";
     const g = mk("div", "heat");
     g.setAttribute("role", "img");
     g.appendChild(mk("span"));
@@ -2106,25 +2496,26 @@ html.demo-embedded .demo-ribbon { display: none; }
           c.style.setProperty("--p", Math.round(25 + (75 * n) / max) + "%");
           if (!busiest || n > busiest[2]) busiest = [d, h, n];
         }
-        c.title = DAYS[d] + " " + String(h).padStart(2, "0") + ":00 \u2014 " + n + (n === 1 ? " play" : " plays");
+        c.title = tn("st_cell", n, { day: DAYS[d], hour: hour(h) });
         g.appendChild(c);
       }
     }
     g.setAttribute("aria-label", busiest
-      ? "Plays by day and hour. Busiest slot: " + DAYS[busiest[0]] + " " + String(busiest[1]).padStart(2, "0") + ":00 (" + busiest[2] + ")."
-      : "Plays by day and hour: none.");
+      ? t("st_heat_aria", { day: DAYS[busiest[0]], hour: hour(busiest[1]), n: nf(busiest[2]) })
+      : t("st_heat_none"));
     return g;
   }
   function renderStats(d) {
+    statsData = d;
     statsBody.textContent = "";
     const totals = d.totals || {};
     if (!totals.tracks) {
       const e = mk("div", "statempty");
-      e.appendChild(mk("div", "hud", "NO DATA"));
-      e.appendChild(mk("div", "big display", "No stats yet"));
+      e.appendChild(mk("div", "hud", t("st_nodata")));
+      e.appendChild(mk("div", "big display", t("st_empty")));
       e.appendChild(mk("p", null, statsRange === "all"
-        ? "Play a few tracks with !play: every listen is counted here, along with artists and peak hours."
-        : "No plays in the " + (statsRange === "week" ? "last 7 days" : "last 30 days") + ". Try the \u201cAll time\u201d period."));
+        ? t("st_empty_all")
+        : t("st_empty_range", { range: t("st_range_" + statsRange) })));
       statsBody.appendChild(e);
       return;
     }
@@ -2132,43 +2523,51 @@ html.demo-embedded .demo-ribbon { display: none; }
     wrap.style.cssText = "display:flex;flex-direction:column;gap:18px";
     const tiles = mk("div", "tiles");
     const hours = Number(totals.hours) || 0;
-    tiles.appendChild(tile("Hours listened", hours.toLocaleString("en", { maximumFractionDigits: 1 }) + " h", RANGE_LABEL[statsRange]));
-    tiles.appendChild(tile("Tracks played", nf(totals.tracks)));
-    tiles.appendChild(tile("Sessions", nf(totals.sessions), "voice connections"));
+    tiles.appendChild(tile(t("st_hours"), t("st_hours_val", { n: nf(hours, { maximumFractionDigits: 1 }) }), t("st_range_" + statsRange)));
+    tiles.appendChild(tile(t("st_tracks"), nf(totals.tracks)));
+    tiles.appendChild(tile(t("st_sessions"), nf(totals.sessions), t("st_sessions_sub")));
     const pk = d.peak_listeners;
-    tiles.appendChild(tile("Peak listeners", pk ? nf(pk.count) : "—",
-      pk && pk.at ? "on " + new Date(pk.at * 1000).toLocaleDateString("en", { day: "numeric", month: "short", year: "numeric" }) : null));
+    tiles.appendChild(tile(t("st_peak"), pk ? nf(pk.count) : "—",
+      pk && pk.at ? t("st_peak_on", { date: new Date(pk.at * 1000).toLocaleDateString(lang, { day: "numeric", month: "short", year: "numeric" }) }) : null));
     wrap.appendChild(tiles);
     const grid = mk("div", "statgrid");
     const none = (txt) => mk("p", "statnone", txt);
     const tt = d.top_tracks || [], ta = d.top_artists || [];
-    const topSec = section("Top tracks", "10", tt.length ? rankList(tt, "plays") : none("No track played to the end."));
+    const topSec = section(t("st_top_tracks"), "10", tt.length ? rankList(tt) : none(t("st_no_tracks")));
     topSec.classList.add("tall");
     grid.appendChild(topSec);
-    grid.appendChild(section("Top artists", "10", ta.length ? rankList(ta, "plays") : none("No artists recognized.")));
+    grid.appendChild(section(t("st_top_artists"), "10", ta.length ? rankList(ta) : none(t("st_no_artists"))));
     const ms = d.most_skipped;
     let skip;
     if (ms) {
       skip = mk("div", "skipcard");
-      const t = mk("div", "t", ms.title);
-      if (ms.artist) { t.appendChild(document.createTextNode(" ")); t.appendChild(mk("small", null, "· " + ms.artist)); }
-      skip.appendChild(t);
-      skip.appendChild(mk("div", "s", "skipped " + nf(ms.skips) + (ms.skips === 1 ? " time" : " times") + " before 30 s"));
-    } else skip = none("Nothing was skipped. Nice picks.");
-    grid.appendChild(section("Most skipped", "⏭", skip));
+      const st = mk("div", "t", ms.title);
+      if (ms.artist) { st.appendChild(document.createTextNode(" ")); st.appendChild(mk("small", null, "· " + ms.artist)); }
+      skip.appendChild(st);
+      skip.appendChild(mk("div", "s", tn("st_skipped", Number(ms.skips) || 0)));
+    } else skip = none(t("st_no_skips"));
+    grid.appendChild(section(t("st_most_skipped"), "⏭", skip));
     wrap.appendChild(grid);
-    const hm = section("Peak hours", null, heatmap(d.heatmap));
-    hm.appendChild(mk("p", "heatnote", "Plays by day and hour, in your browser's time zone."));
+    const hm = section(t("st_peak_hours"), null, heatmap(d.heatmap));
+    hm.appendChild(mk("p", "heatnote", t("st_heat_note")));
     wrap.appendChild(hm);
     statsBody.appendChild(wrap);
   }
+  let statsMsg = null; // i18n key of the loading / error line, if shown
+  function statsLine(key) {
+    statsMsg = key;
+    statsData = null;
+    statsBody.textContent = "";
+    statsBody.appendChild(mk("p", key === "st_loading" ? "statmsg hud" : "statmsg", t(key)));
+  }
+  langListeners.push(() => {
+    if (statsData) renderStats(statsData);
+    else if (statsMsg && statsBody.querySelector(".statmsg")) statsLine(statsMsg);
+  });
   async function loadStats() {
     const seq = ++statsSeq;
     statsDlg.querySelectorAll("[data-range]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.range === statsRange)));
-    if (!statsBody.firstChild || statsBody.querySelector(".statmsg")) {
-      statsBody.textContent = "";
-      statsBody.appendChild(mk("p", "statmsg hud", "Loading…"));
-    }
+    if (!statsBody.firstChild || statsBody.querySelector(".statmsg")) statsLine("st_loading");
     try {
       const r = await fetch("/api/" + encodeURIComponent(sid) + "/stats?range=" + statsRange, { cache: "no-store" });
       const d = await r.json();
@@ -2177,8 +2576,7 @@ html.demo-embedded .demo-ribbon { display: none; }
       renderStats(d);
     } catch (e) {
       if (seq !== statsSeq) return;
-      statsBody.textContent = "";
-      statsBody.appendChild(mk("p", "statmsg", "Stats are unavailable right now."));
+      statsLine("st_unavailable");
     }
   }
   function openStats() {
@@ -2257,6 +2655,7 @@ html.demo-embedded .demo-ribbon { display: none; }
     }
   });
 
+  setLang(true);
   poll();
 })();
 </script>

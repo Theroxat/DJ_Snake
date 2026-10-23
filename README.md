@@ -35,6 +35,7 @@
 - Optional crossfade between tracks.
 - Listening stats per server on the clip page: top tracks and artists, the most skipped track, hours played, sessions, peak listeners and a day-by-hour heatmap, for the last week, month or all time.
 - Live viewer count in the clip page header.
+- English and French: `!language fr` switches the bot's replies, the status message and the clip page for the whole server (see [Language](#language)).
 - Themable clip page: eight looks, including a custom one with your colors, name and logo (see [Themes](#themes) below).
 - One live status message per session, edited in place instead of spamming the channel.
 - Radio/mix links ask whether to play the single track or the whole playlist.
@@ -80,6 +81,11 @@ The prefix is `!` by default (`COMMAND_PREFIX`).
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
 | `!theme [preset\|reset\|edit]` | Show or set the clip page's default theme for the server. `edit` DMs you a private editor link. Needs the Manage Server permission. |
+| `!language [code\|reset]` | Show or set the language of the bot and the clip page for the server (`en`, `fr`). Needs the Manage Server permission. |
+
+## Language
+
+DJ Snake speaks English and French. `!language fr` (Manage Server) switches the server to French: command replies, errors, the status message and `!help`, plus the clip page, which follows the server's language unless a viewer picks another one in its settings menu. `!language` shows the current setting and `!language reset` goes back to `BOT_LANGUAGE` (`en` by default). The choice is saved in `DATA_DIR/languages.json`.
 
 ## Spotify links
 
@@ -160,8 +166,9 @@ Set these in `.env` (see `.env.example`).
 | `WEB_BIND` | `127.0.0.1` | Host IP the port is published on (Compose only). |
 | `PUBLIC_BASE_URL` | empty (`http://localhost:WEB_PORT`) | Public address used in the posted clip link. |
 | `SESSION_IDLE_HOURS` | `6` | Idle hours before a clip link expires. |
-| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), logos and listening stats (`stats.db`). Compose mounts `./data` there. |
+| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`) and languages (`languages.json`), logos and listening stats (`stats.db`). Compose mounts `./data` there. |
 | `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`. |
+| `BOT_LANGUAGE` | `en` | Language of the bot's messages and the clip page for servers that never ran `!language`: `en` or `fr`. |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | empty | Optional Spotify Web API credentials, for playlists over 100 tracks. Without them, Spotify links are read from the public embed page. |
 | `YTDLP_AUTO_UPDATE` | `1` | Upgrade yt-dlp on container start (`0` to skip). |
 

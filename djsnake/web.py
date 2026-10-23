@@ -38,6 +38,7 @@ from .controls import (
     control_seek,
     seek_label,
 )
+from .i18n import lang_for, t
 from .sessions import refresh_panel, session_player, set_action, short, touch
 from .themes import (
     check_edit_token,
@@ -173,6 +174,8 @@ async def web_state(request):
             "downloading": [dict(item) for item in downloading[:MAX_DOWNLOADING]],
             "downloading_total": len(downloading),
             "theme": theme_state(sid, state.sessions[sid]),
+            # The guild's language (`!language`): the page's default.
+            "lang": lang_for(state.sessions[sid]),
         },
         headers=headers,
     )
@@ -211,7 +214,7 @@ async def web_stats(request):
         return web.json_response({"active": False}, status=404, headers=headers)
     range_name = request.query.get("range", "week")
     if range_name not in stats.RANGES:
-        return _control_error(400, "Unknown period.")
+        return _fail(request, 400, "web.unknown_period")
     guild_id = state.sessions[sid]
     key = (guild_id, range_name)
     now = time.monotonic()
@@ -223,7 +226,7 @@ async def web_stats(request):
         result = await loop.run_in_executor(None, stats.summary, guild_id, range_name)
     except Exception as e:
         print(f"Stats read failed: {e}")
-        return _control_error(500, "Stats are unavailable right now.")
+        return _fail(request, 500, "web.stats_unavailable")
     for stale in [k for k, v in _stats_cache.items() if v[0] <= now]:
         del _stats_cache[stale]
     _stats_cache[key] = (now + STATS_CACHE_SECONDS, result)
@@ -232,6 +235,17 @@ async def web_stats(request):
 
 def _control_error(status, message):
     return web.json_response({"ok": False, "error": message}, status=status)
+
+
+def request_lang(request):
+    """The language of the session's guild (BOT_LANGUAGE for an unknown
+    session): human error messages follow it."""
+    return lang_for(state.sessions.get(request.match_info.get("sid")))
+
+
+def _fail(request, status, key, **params):
+    """An error response with the `key` message in the session's language."""
+    return _control_error(status, t(key, request_lang(request), **params))
 
 
 async def _read_body(request, limit):
@@ -252,13 +266,13 @@ async def _read_json(request):
     """(dict, None) or (None, error response) for a small JSON body."""
     body = await _read_body(request, MAX_CONTROL_BODY)
     if body is None:
-        return None, _control_error(400, "Request too large.")
+        return None, _fail(request, 400, "web.too_large")
     try:
         data = json.loads(body)
     except (ValueError, RecursionError):
-        return None, _control_error(400, "Invalid request.")
+        return None, _fail(request, 400, "web.bad_request")
     if not isinstance(data, dict):
-        return None, _control_error(400, "Invalid request.")
+        return None, _fail(request, 400, "web.bad_request")
     return data, None
 
 
@@ -266,7 +280,7 @@ async def web_control(request):
     sid = request.match_info["sid"]
     player = session_player(sid)
     if player is None:
-        return _control_error(404, "Unknown or expired session.")
+        return _fail(request, 404, "web.unknown_session")
     guild_id = state.sessions[sid]
 
     data, error = await _read_json(request)
@@ -285,16 +299,16 @@ async def web_control(request):
         "jump",
         "crossfade",
     ):
-        return _control_error(400, "Unknown action.")
+        return _fail(request, 400, "web.unknown_action")
 
     track_id = data.get("id")
     index = data.get("index")
     if action in ("remove", "move", "jump") and not (
         isinstance(track_id, str) and 0 < len(track_id) <= 64
     ):
-        return _control_error(400, "Invalid track.")
+        return _fail(request, 400, "web.bad_track")
     if action == "move" and (type(index) is not int):
-        return _control_error(400, "Invalid position.")
+        return _fail(request, 400, "web.bad_position")
     position = data.get("position")
     if action == "seek" and not (
         isinstance(position, (int, float))
@@ -302,25 +316,26 @@ async def web_control(request):
         and math.isfinite(position)
         and position >= 0
     ):
-        return _control_error(400, "Invalid position.")
+        return _fail(request, 400, "web.bad_position")
     if action == "add" and not isinstance(data.get("url"), str):
-        return _control_error(400, "Missing link.")
+        return _fail(request, 400, "web.missing_link")
     if action == "crossfade" and not isinstance(data.get("enabled"), bool):
-        return _control_error(400, "Invalid request.")
+        return _fail(request, 400, "web.bad_request")
 
     touch(player)
     if player.sid != sid:  # Expired just now
-        return _control_error(404, "Unknown or expired session.")
+        return _fail(request, 404, "web.unknown_session")
+    lang = lang_for(guild_id)
 
     try:
         if action == "next":
             await control_next(player)
-            set_action(player, "⏭️ Skipped via the web page")
+            set_action(player, t("action.web_skipped", lang))
         elif action == "previous":
             if await control_previous(player) == "restart":
-                set_action(player, "⏮️ Restarted via the web page")
+                set_action(player, t("action.web_restarted", lang))
             else:
-                set_action(player, "⏮️ Previous track via the web page")
+                set_action(player, t("action.web_previous", lang))
         elif action == "pause":
             await control_pause(player)
             refresh_panel(player)
@@ -329,10 +344,11 @@ async def web_control(request):
             refresh_panel(player)
         elif action == "remove":
             track = await control_remove(player, track_id)
-            set_action(player, f"🗑️ Removed: {short(track['title'])}")
+            title = short(track["title"])
+            set_action(player, t("action.web_removed", lang, title=title))
         elif action == "move":
             await control_move(player, track_id, index)
-            set_action(player, "🔀 Queue reordered")
+            set_action(player, t("action.web_reordered", lang))
         elif action == "seek":
             applied = await control_seek(player, position)
             set_action(player, seek_label(player, applied))
@@ -340,12 +356,13 @@ async def web_control(request):
             control_crossfade(player, data["enabled"])
         elif action == "jump":
             track = await control_jump(player, guild_id, track_id)
-            set_action(player, f"▶️ Jumped to: {short(track['title'])}")
+            title = short(track["title"])
+            set_action(player, t("action.web_jumped", lang, title=title))
         elif action == "add":
             await control_add(player, guild_id, data["url"])
             return web.json_response({"ok": True}, status=202)
     except ControlError as e:
-        return _control_error(e.status, e.message)
+        return _control_error(e.status, e.text(lang))
     return web.json_response({"ok": True})
 
 
@@ -355,28 +372,23 @@ def _theme_auth(request):
     sid = request.match_info["sid"]
     player = session_player(sid)
     if player is None:
-        return None, None, _control_error(404, "Unknown or expired session.")
+        return None, None, _fail(request, 404, "web.unknown_session")
     guild_id = state.sessions[sid]
     if not check_edit_token(request.headers.get("X-Edit-Token"), guild_id):
         return (
             None,
             None,
-            _control_error(
-                403,
-                "Invalid or expired edit link. " "Run !theme edit in Discord again.",
-            ),
+            _fail(request, 403, "web.bad_edit_token"),
         )
     return player, guild_id, None
 
 
 def _theme_saved(request, player, guild_id):
     touch(player)
-    set_action(player, "🎨 Clip page theme updated via the web page")
+    lang = lang_for(guild_id)
+    set_action(player, t("action.web_theme", lang))
     theme = theme_state(request.match_info["sid"], guild_id)
     return web.json_response({"ok": True, "theme": theme})
-
-
-_SAVE_FAILED = "Could not save on the server."
 
 
 async def web_theme(request):
@@ -387,14 +399,14 @@ async def web_theme(request):
     if error is not None:
         return error
     if data.get("skin") not in THEME_SKINS:
-        return _control_error(400, "Unknown theme.")
+        return _fail(request, 400, "web.unknown_theme")
     if data.get("base") not in THEME_PRESETS:
-        return _control_error(400, "Unknown base style.")
+        return _fail(request, 400, "web.unknown_base")
     if not all(valid_color(data.get(k)) for k in ("bg", "text", "accent")):
-        return _control_error(400, "Invalid color (use #rrggbb).")
+        return _fail(request, 400, "web.bad_color")
     name = clean_theme_name(data.get("name", ""))
     if name is None:
-        return _control_error(400, f"Invalid name ({THEME_NAME_MAX} characters max).")
+        return _fail(request, 400, "web.bad_name", max=THEME_NAME_MAX)
     previous = state.guild_themes.get(guild_id)
     state.guild_themes[guild_id] = {
         **(previous or {}),
@@ -415,7 +427,7 @@ async def web_theme(request):
         else:
             state.guild_themes[guild_id] = previous
         print(f"Could not save theme: {e}")
-        return _control_error(500, _SAVE_FAILED)
+        return _fail(request, 500, "web.save_failed")
     return _theme_saved(request, player, guild_id)
 
 
@@ -428,19 +440,19 @@ async def web_theme_logo(request):
             remove_logo(guild_id)
         except OSError as e:
             print(f"Could not remove logo: {e}")
-            return _control_error(500, _SAVE_FAILED)
+            return _fail(request, 500, "web.save_failed")
         return _theme_saved(request, player, guild_id)
     body = await _read_body(request, MAX_LOGO_BYTES)
     if body is None:
-        return _control_error(400, "Image too large (512 KB max).")
+        return _fail(request, 400, "web.logo_too_large")
     ext = sniff_image(body)
     if ext is None:
-        return _control_error(400, "Unsupported format (PNG, JPEG, WebP or GIF).")
+        return _fail(request, 400, "web.logo_format")
     try:
         set_logo(guild_id, body, ext)
     except OSError as e:
         print(f"Could not save logo: {e}")
-        return _control_error(500, _SAVE_FAILED)
+        return _fail(request, 500, "web.save_failed")
     return _theme_saved(request, player, guild_id)
 
 

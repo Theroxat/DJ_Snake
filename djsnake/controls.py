@@ -15,7 +15,8 @@ from .playback import (
     queue_spotify,
 )
 from .player import discard_tracks
-from .sessions import refresh_panel
+from .i18n import ctx_lang, t
+from .sessions import player_lang, refresh_panel
 
 
 class _NullMessage:
@@ -49,41 +50,35 @@ class WebContext:
 
 
 class ControlError(Exception):
-    """A control that cannot be applied. `code` picks the message."""
+    """A control that cannot be applied. `code` picks the HTTP status and the
+    message (`control.<code>` in the locales); the code never changes with
+    the language."""
 
-    # code -> (HTTP status, message), shown on Discord and on the web page
-    MESSAGES = {
-        "not_in_voice": (409, "I'm not in a voice channel."),
-        "nothing_playing": (409, "No music is currently playing."),
-        "track_not_found": (404, "That track is not in the queue."),
-        "bad_index": (400, "Invalid position."),
-        "bad_url": (
-            400,
-            "Only YouTube (video or playlist) and Spotify (track, album or "
-            "playlist) links are accepted.",
-        ),
-        "spotify_short_link": (
-            400,
-            "Short spotify.link links are not supported: open it and copy the "
-            "open.spotify.com link.",
-        ),
-        "spotify_not_found": (
-            404,
-            "That Spotify playlist, album or track was not found (private or "
-            "deleted?).",
-        ),
-        "spotify_empty": (400, "That Spotify link has no tracks."),
-        "spotify_unreadable": (
-            502,
-            "Could not read that Spotify link right now (Spotify may have "
-            "changed its page).",
-        ),
+    # code -> HTTP status
+    STATUS = {
+        "not_in_voice": 409,
+        "nothing_playing": 409,
+        "track_not_found": 404,
+        "bad_index": 400,
+        "bad_url": 400,
+        "spotify_short_link": 400,
+        "spotify_not_found": 404,
+        "spotify_empty": 400,
+        "spotify_unreadable": 502,
     }
 
     def __init__(self, code):
         super().__init__(code)
         self.code = code
-        self.status, self.message = self.MESSAGES[code]
+        self.status = self.STATUS[code]
+
+    def text(self, lang=None):
+        """The message in `lang` (default: BOT_LANGUAGE)."""
+        return t(f"control.{self.code}", lang)
+
+    @property
+    def message(self):
+        return self.text()
 
 
 def _require_playing(player):
@@ -202,7 +197,7 @@ def seek_label(player, applied):
     start, as the web page shows it."""
     start = (player.now_playing or {}).get("start") or 0.0
     rel = int(max(0.0, applied - start))
-    return f"⏩ Seeked to {rel // 60}:{rel % 60:02d}"
+    return t("action.seeked", player_lang(player), time=f"{rel // 60}:{rel % 60:02d}")
 
 
 def _find_queued(player, track_id):
@@ -314,9 +309,7 @@ async def _add_from_web(player, guild_id, kind, url):
             if cancelled(player, epoch):
                 pass
             elif not entries:
-                await ctx.send(
-                    "❌ Could not read the playlist added from the web page."
-                )
+                await ctx.send(t("play.web_playlist_failed", ctx_lang(ctx)))
             else:
                 entries = entries[:MAX_PLAYLIST_SIZE]
                 await queue_playlist(ctx, player, entries, from_web=True)

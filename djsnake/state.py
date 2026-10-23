@@ -33,6 +33,8 @@ sessions = {}
 
 # Guild id -> stored theme record (see themes.py).
 guild_themes = {}
+# Guild id -> language code chosen with `!language` (see i18n.py).
+guild_languages = {}
 # `!theme edit` links: token -> (guild id, expiry on clock()). In memory only.
 edit_tokens = {}
 

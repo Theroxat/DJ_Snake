@@ -46,6 +46,7 @@ EMPTY_CHANNEL_GRACE_SECONDS = 30.0
 DATA_DIR = os.getenv("DATA_DIR") or "/app/data"
 THEMES_FILE = os.path.join(DATA_DIR, "themes.json")
 LOGO_DIR = os.path.join(DATA_DIR, "logos")
+LANGUAGES_FILE = os.path.join(DATA_DIR, "languages.json")
 # Listening statistics (stats.py): SQLite, written by one background thread.
 STATS_DB = os.path.join(DATA_DIR, "stats.db")
 # A track left (next, jump, previous, !stop) before this much actual play
@@ -80,6 +81,9 @@ CUSTOM_DEFAULTS = {
     "text": "#f2f2f2",
     "accent": "#ffb703",
 }
+# Language of the bot's messages and the clip page for guilds that never ran
+# `!language` (djsnake/locales/{code}.json; i18n.py checks the value).
+BOT_LANGUAGE = (os.getenv("BOT_LANGUAGE") or "en").strip().lower()
 THEME_NAME_MAX = 32
 THEME_EDIT_SECONDS = 30 * 60  # Lifetime of a `!theme edit` link
 MAX_LOGO_BYTES = 512 * 1024

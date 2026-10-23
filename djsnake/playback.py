@@ -13,7 +13,15 @@ from .config import CROSSFADE_SECONDS, FADE_OUT_SECONDS, FRAMES_PER_SECOND
 from .media import crossfade_eligible, playback_options
 from .mixer import CrossfadeMixer
 from .player import MusicPlayer, discard_tracks, guild_of, push_history, retire_play
-from .sessions import open_session, refresh_panel, set_action, short, touch
+from .i18n import ctx_lang, t
+from .sessions import (
+    open_session,
+    player_lang,
+    refresh_panel,
+    set_action,
+    short,
+    touch,
+)
 
 
 # Simplified voice connection function to avoid error 4006
@@ -98,7 +106,7 @@ async def join_voice_channel(ctx):
     """Simplified voice connection function"""
     author = getattr(ctx, "author", None)
     if not author or not author.voice:
-        await ctx.send("❌ You must be in a voice channel!")
+        await ctx.send(t("play.not_in_voice", ctx_lang(ctx)))
         return False
 
     voice_channel = author.voice.channel
@@ -126,7 +134,7 @@ async def join_voice_channel(ctx):
         await open_session(ctx, player, announce=not already_here)
         return True
     else:
-        await ctx.send("❌ Unable to connect to voice channel.")
+        await ctx.send(t("play.connect_failed", ctx_lang(ctx)))
         return False
 
 
@@ -226,7 +234,7 @@ async def _download_and_queue(
         if not skip_voice_check:
             if not player.voice_client or not player.voice_client.is_connected():
                 if not await join_voice_channel(ctx):
-                    await ctx.send("❌ Unable to join voice channel!")
+                    await ctx.send(t("cmd.cannot_join", ctx_lang(ctx)))
                     return None
 
         loop = asyncio.get_running_loop()
@@ -261,7 +269,10 @@ async def _download_and_queue(
         if quiet:
             refresh_panel(player)
         else:
-            set_action(player, f"➕ Added: {short(track['title'])}")
+            set_action(
+                player,
+                t("action.added", player_lang(player), title=short(track["title"])),
+            )
 
         if not player.is_playing:
             await play_next(ctx)
@@ -272,7 +283,7 @@ async def _download_and_queue(
             print(f"Playlist item failed: {e}")
             return None
         refresh_panel(player)
-        await ctx.send(f"❌ Download error: {str(e)}")
+        await ctx.send(t("play.download_error", ctx_lang(ctx), error=e))
         return None
 
 
@@ -287,11 +298,12 @@ async def queue_playlist(ctx, player, entries, from_web=False):
     total = len(entries)
     loop = asyncio.get_running_loop()
 
-    def progress(text, final=False):
-        player.load_line, player.load_final = text, final
+    def progress(key, final=False, **params):
+        lang = player_lang(player)
+        player.load_line, player.load_final = t(key, lang, **params), final
         refresh_panel(player)
 
-    progress(f"📥 Loading 0/{total}…")
+    progress("load.progress", loaded=0, total=total)
     # Every entry is listed now and leaves as it is queued, fails or is
     # skipped; the finally drops what a stop or an error left behind.
     keys = [
@@ -346,7 +358,7 @@ async def queue_playlist(ctx, player, entries, from_web=False):
             )
             if track is not None and not cancelled(player, epoch):
                 loaded += 1
-                progress(f"📥 Loading {loaded}/{total}…")
+                progress("load.progress", loaded=loaded, total=total)
     finally:
         player.loading_jobs = max(0, player.loading_jobs - 1)
         for key in keys:
@@ -354,17 +366,20 @@ async def queue_playlist(ctx, player, entries, from_web=False):
                 player.drop_pending(key)
 
     if stopped or cancelled(player, epoch):
-        progress(f"⏹️ Loading stopped ({loaded}/{total})", final=True)
+        progress("load.stopped", final=True, loaded=loaded, total=total)
         return
-    text = f"✅ {loaded}/{total} tracks loaded"
+    lang = player_lang(player)
+    text = t("load.done", lang, loaded=loaded, count=total)
     missing = []
     if not_found:
-        missing.append(f"{not_found} not found on YouTube")
-    if total - loaded - not_found > 0:
-        missing.append(f"{total - loaded - not_found} unavailable")
+        missing.append(t("load.not_found", lang, count=not_found))
+    unavailable = total - loaded - not_found
+    if unavailable > 0:
+        missing.append(t("load.unavailable", lang, count=unavailable))
     if missing:
         text += f" ({', '.join(missing)})"
-    progress(text, final=True)
+    player.load_line, player.load_final = text, True
+    refresh_panel(player)
     # The last track may have finished while the queue was empty during
     # loading: start the queue again, or leave if there is nothing left.
     if not player.is_playing:
@@ -401,7 +416,7 @@ async def queue_spotify(ctx, player, kind, tracks, from_web=False):
         if video_url is None:
             player.drop_pending(key)
             await ctx.send(
-                f"❌ No YouTube match found for **{spotify.describe(track)}**.",
+                t("play.no_match", ctx_lang(ctx), track=spotify.describe(track)),
                 allowed_mentions=discord.AllowedMentions.none(),
             )
             return
@@ -436,7 +451,7 @@ async def play_next(ctx, gen=None, origin=None):
     except Exception as e:
         print(f"Error in play_next: {e}")
         player.is_playing = False
-        await ctx.send(f"❌ Playback error: {str(e)}")
+        await ctx.send(t("play.playback_error", ctx_lang(ctx), error=e))
 
 
 async def _advance(ctx, player):
@@ -470,7 +485,9 @@ async def _advance(ctx, player):
         next_track = player.next_in_queue()
 
     while next_track is not None and not os.path.exists(next_track["filepath"]):
-        await ctx.send(f"❌ File not found for {next_track['title']}")
+        await ctx.send(
+            t("play.file_not_found", ctx_lang(ctx), title=next_track["title"])
+        )
         next_track = player.next_in_queue()
         offset, keep_paused = 0.0, False  # The seek was for the lost track
 
@@ -495,7 +512,7 @@ async def _advance(ctx, player):
             player.queue.insert(0, next_track)
             player.is_playing = False
             refresh_panel(player)
-            await ctx.send("❌ Unable to join voice channel!")
+            await ctx.send(t("cmd.cannot_join", ctx_lang(ctx)))
             return
 
     player.play_gen += 1

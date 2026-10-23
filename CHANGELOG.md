@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- French translation, and a framework for more languages: `!language en|fr` (Manage Server) switches a server's command replies, errors, `!help`, status message and web API error messages; the clip page follows it (or the browser's language) and has a language picker in its settings menu. `BOT_LANGUAGE` sets the default (`en`). Messages live in `djsnake/locales/{en,fr}.json`.
+
 ## [1.3.0] - 2026-10-22
 
 ### Added

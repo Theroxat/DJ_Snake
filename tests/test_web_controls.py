@@ -30,6 +30,7 @@ STATE_KEYS = {
     "downloading",
     "downloading_total",
     "theme",
+    "lang",
 }
 NOW_PLAYING_KEYS = {
     "id",

@@ -13,6 +13,8 @@ Commands are text messages sent in a server channel. The prefix is `!` by defaul
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
 | `!theme [preset\|reset\|edit]` | Show or set the clip page's default theme for the server. `edit` DMs you a private editor link. Needs the Manage Server permission. |
+| `!language [code\|reset]` | Show or set the language of the bot and the clip page for the server (`en`, `fr`). Needs the Manage Server permission. |
+| `!help [command]` | List the commands, or show one, in the server's language. |
 
 ## Playing music
 
@@ -70,6 +72,18 @@ Needs the **Manage Server** permission.
 
 See [Themes](clip-page.md#themes) for details. `!theme edit` needs your DMs open to server members; otherwise the bot tells you so.
 
+### `!language [code|reset]`
+
+Needs the **Manage Server** permission. Aliases: `!lang`, `!langue`.
+
+| Form | Effect |
+| --- | --- |
+| `!language` | Shows the current language, whether it is the server's choice or the fallback, and the available languages. |
+| `!language <code>` | Sets the server's language: `en` (English) or `fr` (French). |
+| `!language reset` | Goes back to the `BOT_LANGUAGE` default. |
+
+The language applies to command replies, errors, `!help`, the status message and the clip page's default language (each viewer can still pick another one in the page's settings menu). Command names and their arguments stay the same in every language.
+
 ## Errors
 
-If you leave out a required argument the bot says so. Commands that need music playing answer "No music is currently playing." when there is none, and `!theme` without the permission is refused.
+If you leave out a required argument the bot says so. Commands that need music playing answer "No music is currently playing." when there is none, and `!theme` or `!language` without the permission is refused. Error messages follow the server's language.

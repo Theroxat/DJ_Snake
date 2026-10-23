@@ -57,7 +57,8 @@ pytest -q                                                            # test suit
 The tests (`tests/`, settings in `pytest.ini`) need no network, Discord or
 YouTube: `tests/fakes.py` fakes the voice client, channels and
 `discord.FFmpegPCMAudio`, and `tests/conftest.py` sets `TEMP_DIR`, `DATA_DIR`
-and `WEB_THEME` before `djsnake` is imported and empties the shared state
+`WEB_THEME` and `BOT_LANGUAGE=en` before `djsnake` is imported, points
+`i18n.LANGUAGES_FILE` at the test's directory and empties the shared state
 between tests. The web API runs through aiohttp's `TestClient`. Tests that need
 the real `ffmpeg` binary are marked `ffmpeg` and skipped without it. Patch
 `media.download_media`, `media.get_playlist_info`, `state.clock` or
@@ -98,7 +99,8 @@ which is no longer read), `TEMP_DIR`, `POT_BASE_URL`, `WEB_PORT` (47823),
 before leaving voice once the queue runs out), `DATA_DIR`
 (`/app/data`, mounted from `./data` by Compose; the container's UID 1000 must
 be able to write it), `WEB_THEME` (`arcade`, the theme of guilds that never
-chose one), `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` (optional, both
+chose one), `BOT_LANGUAGE` (`en`, the language of guilds that never ran
+`!language`; `en` or `fr`), `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` (optional, both
 needed to use the Spotify Web API), and `YTDLP_AUTO_UPDATE` (entrypoint only).
 
 ## Architecture (`djsnake/`)
@@ -108,10 +110,12 @@ Module map, lowest layer first (each imports only the ones above it):
 - `config.py`: environment variables and constants, read once at import
   (`WEB_INDEX` resolves `web/index.html` from the repository root).
 - `state.py`: shared mutable state: the `bot` instance, `music_players`,
-  `sessions`, `guild_themes`, `edit_tokens`, `viewers`, `background_tasks` and
-  `clock()`.
+  `sessions`, `guild_themes`, `guild_languages`, `edit_tokens`, `viewers`,
+  `background_tasks` and `clock()`.
   Always use it as `state.music_players` (never `from .state import ...`), so
   every module and test sees the same objects.
+- `i18n.py`: translations (see Translations): `t()`, `lang_for()`,
+  `ctx_lang()`, `set_language()`, the catalogs in `djsnake/locales/`.
 - `stats.py`: listening stats in SQLite (`record_play()`,
   `record_session()`, `record_listeners()`, `summary()`, `guess_artist()`),
   written by one background thread. Imports only `config`.
@@ -202,8 +206,10 @@ Module map, lowest layer first (each imports only the ones above it):
   `crossfading` is true while the old track drains; only then does the page
   cross-dissolve its two stacked `<video>`s (skips stay an instant swap).
 - **Controls** (`control_next/previous/pause/resume/remove/move/add/seek/jump/crossfade`) are shared
-  by Discord commands and the web page and raise `ControlError` (HTTP status and
-  one English message, shown on Discord and on the web page). Previous restarts the track
+  by Discord commands and the web page and raise `ControlError` (a stable
+  `code`, its HTTP status in `ControlError.STATUS` and the message
+  `control.<code>`, `e.text(lang)`, shown on Discord and on the web page in the
+  guild's language). Previous restarts the track
   after 5 s of play or with empty history. Add accepts only YouTube hosts and
   rebuilds a canonical URL (`parse_youtube_url()`, no SSRF via yt-dlp), or a
   Spotify link (see Spotify links; `control_add()` is async); `v=`
@@ -285,7 +291,7 @@ Module map, lowest layer first (each imports only the ones above it):
   paused, can_previous, crossfade, crossfading, server_time, viewers, now_playing: {id,
   title, duration, thumbnail, url, video_url, elapsed, start, end} | null, queue: [{id, title, duration,
   thumbnail, url}], downloading: [{key, title, source}], downloading_total,
-  theme: {skin, base, bg, text, accent, name, logo_url}}`
+  theme: {skin, base, bg, text, accent, name, logo_url}, lang}`
   (404 `{"active": false}` when the sid is unknown or
   expired; out of voice, `now_playing` is null and `queue` and `downloading`
   empty; `elapsed` freezes while paused; `downloading` is the first
@@ -303,7 +309,8 @@ Module map, lowest layer first (each imports only the ones above it):
   `enabled`; seek restarts the track at `position` seconds (file time),
   clamped, staying paused if it was, unannounced; jump plays a queued `id` now)
   and returns 200 `{"ok": true}` (202 for add, which downloads in the
-  background) or `{"ok": false, "error": "<message>"}` with 400 (bad input,
+  background) or `{"ok": false, "error": "<message>"}` (in the session's
+  language, `_fail(request, status, key)`) with 400 (bad input,
   non-YouTube URL), 404 (unknown sid or track id) or 409 (not in voice, nothing
   playing). `GET /media/{sid}/{id}` streams the playing, a queued or a history
   track's mp4 with Range support. Files are found by track id, never by a path
@@ -333,7 +340,7 @@ Module map, lowest layer first (each imports only the ones above it):
   bound to the session's guild: `POST /api/{sid}/theme` (`{skin, base, bg,
   text, accent, name}`, JSON <= 4 KB, colors `#rrggbb`, name <= 32 chars) and
   `POST|DELETE /api/{sid}/theme/logo` (raw body <= 512 KB, PNG/JPEG/WebP/GIF
-  by magic bytes, never SVG) answer `{"ok": true, "theme": ...}` or an English
+  by magic bytes, never SVG) answer `{"ok": true, "theme": ...}` or a localised
   error (400 bad input, 403 bad or expired token, 404 unknown session, 500
   write failed). `GET /theme-logo/{sid}` serves the logo with `nosniff`;
   `logo_url` carries `?v=` for cache busting. The page strips the token from
@@ -381,8 +388,25 @@ Module map, lowest layer first (each imports only the ones above it):
   session). `join_voice_channel()` wraps it. `!reset` forces a reconnect.
 - **Commands**: `!play` (YouTube or Spotify link), `!list`, `!next`, `!pause`, `!resume`, `!seek`
   (position relative to the track's automix `start`, as the page shows it),
-  `!crossfade on|off`, `!stop`, `!reset`, `!theme [preset|reset|edit]`
-  (Manage Server permission via `commands.has_guild_permissions`).
+  `!crossfade on|off`, `!stop`, `!reset`, `!theme [preset|reset|edit]` and
+  `!language [code|reset]` (both need Manage Server, via
+  `commands.has_guild_permissions`). `!help` is `HelpCommand`, one
+  `help.cmd.<name>` line per command in `HELP_ORDER`.
+- **Translations** (`i18n.py`): every user-facing text is a key in
+  `djsnake/locales/en.json` and `fr.json` (flat, same keys and same
+  `{placeholders}` in both; `tests/test_i18n.py` checks it). `t(key, lang,
+  **params)` formats it (`{prefix}` is always filled in; a `count` param picks
+  `key.one` / `key.other`, French singular for 0 and 1), falling back to
+  English, then to the key itself. A guild's language is
+  `state.guild_languages` (`!language`, persisted to
+  `{DATA_DIR}/languages.json` like themes), else `BOT_LANGUAGE`: use
+  `ctx_lang(ctx)` for replies, `player_lang(player)` (sessions.py) for the
+  panel, `set_action()` and `load_line`, and `request_lang(request)` /
+  `_fail()` in web.py. Panel lines are rendered when set, so a language change
+  shows on the next one. Log lines (`print`), command names, ControlError codes
+  and API field names are never translated. The page has its own `I18N`
+  dictionary (see Web server) and picks `state.lang` unless the viewer chose
+  a language.
 - Voice needs `PyNaCl`, `davey` (DAVE encryption, required by discord.py 2.7+)
   and, on Python 3.13+, `audioop-lts`. The Docker image uses Python 3.12. CI
   tests on 3.10 to 3.12.
@@ -438,8 +462,17 @@ docker exec dj-snake python -m yt_dlp --remote-components ejs:github \
 
 ## Conventions
 
-- User-facing messages, code comments, docs and the host-side refresh script
-  are all in English.
+- Code comments, docs, log lines and the host-side refresh script are in
+  English. User-facing messages are English by default and translated (see
+  Translations).
+- **Adding a user-facing string**: never write the text inline. Add a key to
+  `djsnake/locales/en.json` (English) and `fr.json` (French: neutral
+  imperative, no "vous"/"tu", typographic apostrophe ’, U+00A0 before `:`,
+  U+202F before `; ! ?`, `…`), then call `t("area.key", lang, **params)`. A
+  new `ControlError` code gets its status in `ControlError.STATUS` and a
+  `control.<code>` message; a new command gets a `help.cmd.<name>` line (and
+  a place in `HELP_ORDER`). Page strings go in both halves of the page's `I18N`
+  dictionary. Tests may assert English text: they run with `BOT_LANGUAGE=en`.
 - Black formatting with its default 88-column limit (there is no
   `pyproject.toml`), so CI's `black --check` reformats anything longer. The 127
   in CI's flake8 call is a non-blocking warning pass.
