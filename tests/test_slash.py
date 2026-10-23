@@ -30,6 +30,8 @@ NAMES = {
     "volume",
     "autoplay",
     "playlist",
+    "djrole",
+    "weblink",
 }
 
 
@@ -343,3 +345,16 @@ async def test_sync_failure_does_not_stop_startup(monkeypatch, capsys):
     monkeypatch.setattr(app, "SLASH_SYNC_GUILD", None)
     assert await app.sync_commands() is None
     assert "Could not sync" in capsys.readouterr().out
+
+
+def test_not_dj_message_names_the_slash_command():
+    message = commands.error_message(commands.NotDJ(), "loop", slash=True)
+    assert message.startswith("❌ Only DJs can use `/loop`")
+    message = commands.error_message(commands.NotDJ(), "volume")
+    assert "`!volume`" in message
+
+
+def test_new_playback_commands_need_a_dj():
+    from djsnake.permissions import DJ_COMMANDS
+
+    assert {"loop", "shuffle", "volume", "autoplay"} <= DJ_COMMANDS

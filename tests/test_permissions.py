@@ -1,5 +1,6 @@
 """Who may control the music: view-only links, the DJ role and !weblink."""
 
+import asyncio
 import json
 import types
 
@@ -117,6 +118,48 @@ async def test_watch_link_serves_page_and_state(client, player, playing):
     assert data["now_playing"]["video_url"].startswith(f"/media/{player.watch_id}/")
     r = await client.get(data["now_playing"]["video_url"])
     assert r.status == 200
+
+
+async def _first_event(response):
+    while True:
+        line = await asyncio.wait_for(response.content.readline(), 2.0)
+        assert line, "stream ended"
+        if line.startswith(b"data: "):
+            return line[len(b"data: ") :].decode()
+
+
+async def test_watch_link_events_never_carry_the_control_id(client, player, playing):
+    r = await client.get(f"/api/{player.watch_id}/events")
+    assert r.status == 200
+    raw = await _first_event(r)
+    data = json.loads(raw)
+    assert data["can_control"] is False and data["now_playing"]["title"] == "A"
+    assert player.sid not in raw
+    assert data["now_playing"]["video_url"].startswith(f"/media/{player.watch_id}/")
+    r.close()
+
+
+async def test_unknown_id_events_is_404(client, player):
+    r = await client.get("/api/" + "x" * 22 + "/events")
+    assert r.status == 404
+
+
+async def test_rotation_ends_control_streams_keeps_watch_streams(
+    client, player, playing, monkeypatch
+):
+    monkeypatch.setattr(web, "SSE_MIN_INTERVAL", 0.01)
+    control = await client.get(f"/api/{player.sid}/events")
+    watch = await client.get(f"/api/{player.watch_id}/events")
+    await _first_event(control)
+    await _first_event(watch)
+    old = player.sid
+    sessions.rotate_control_link(player)
+    assert player.sid != old
+    assert json.loads(await _first_event(control)) == {"active": False}
+    raw = await _first_event(watch)
+    assert json.loads(raw)["active"] is True and player.sid not in raw
+    control.close()
+    watch.close()
 
 
 async def test_control_link_state_can_control(client, player):
@@ -253,7 +296,8 @@ async def test_not_dj_error_message(channel):
 
 
 def test_djrole_needs_manage_guild():
-    assert len(commands.djrole.checks) == 1
+    names = [c.__qualname__ for c in commands.djrole.checks]
+    assert any(n.startswith("has_guild_permissions") for n in names)
 
 
 async def test_djrole_rotates_a_public_control_link(player, channel, monkeypatch):

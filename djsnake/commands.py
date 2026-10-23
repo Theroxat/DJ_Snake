@@ -961,7 +961,8 @@ async def on_app_command_error(interaction, error):
     """Errors raised before a hybrid command's context exists, and any pure
     slash command, get the same messages."""
     command = interaction.command.name if interaction.command else None
-    message = error_message(error, command, slash=True, guild=interaction.guild)
+    guild = getattr(interaction, "guild", None)
+    message = error_message(error, command, slash=True, guild=guild)
     if message is None:
         return
     if message.startswith("❌ Error:"):
