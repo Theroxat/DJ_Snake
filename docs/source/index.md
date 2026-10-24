@@ -1,6 +1,6 @@
 # DJ Snake
 
-**A self-hosted Discord music bot that plays YouTube or Spotify links in your voice channel, with a live clip page that shows the video in sync.**
+**A self-hosted Discord music bot that plays YouTube, Spotify, SoundCloud, Bandcamp, Deezer and Apple Music links, or plain text searches, in your voice channel, with a live clip page that shows the video in sync.**
 
 [![Live demo: DJ Snake joins a voice channel, posts the clip link, then the clip page plays a synced video](../screenshots/clip-page.png)](https://theroxat.github.io/DJ_Snake/demo/)
 
@@ -17,6 +17,15 @@
 - **Optional crossfade** between tracks.
 - **Loop and shuffle**: repeat a track or the whole queue, or shuffle what is coming up.
 - **Optional autoplay**: a related track plays on when the queue runs out.
+- **Volume** from 0 to 150%, remembered per server.
+- **Saved playlists**: save the queue under a name and load it again later.
+- **Plain text search**: `!play never gonna give you up` queues the best YouTube match.
+- **Slash commands**: every command works as `!name` and `/name`.
+- **Synced lyrics** over the clip, from LRCLIB (`LYRICS=0` turns them off).
+- **Live updates**: the clip page follows the queue in real time, with no refresh.
+- **View-only link and DJ role**: share a page that cannot control playback, and limit who can skip, stop or change settings.
+- **English and French**, chosen per server with `!language`.
+- **Health check and metrics**: `GET /healthz` for Docker, and optional Prometheus `GET /metrics`.
 - **Listening stats** per server on the clip page: top tracks and artists, the most skipped track, hours played, sessions, peak listeners and a day-by-hour heatmap.
 - **Themable clip page**: eight presets plus a custom look with your colors, name and logo.
 - **One live status message per session**, edited in place instead of spamming the channel.

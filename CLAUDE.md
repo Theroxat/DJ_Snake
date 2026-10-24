@@ -690,8 +690,8 @@ Module map, lowest layer first (each imports only the ones above it):
   dictionary (see Web server) and picks `state.lang` unless the viewer chose
   a language.
 - Voice needs `PyNaCl`, `davey` (DAVE encryption, required by discord.py 2.7+)
-  and, on Python 3.13+, `audioop-lts`. The Docker image uses Python 3.12. CI
-  tests on 3.10 to 3.12.
+  and, on Python 3.13+, `audioop-lts`. The Docker image uses Python 3.15. CI
+  tests on 3.10 to 3.15.
 
 ## Keeping YouTube Downloads Working
 

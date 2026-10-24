@@ -15,7 +15,7 @@ You need `ffmpeg` and `deno` on your `PATH`.
 
 ## Checks
 
-CI runs these on Python 3.10 to 3.12, and a change must pass them:
+CI runs these on Python 3.10 to 3.15, and a change must pass them:
 
 ```bash
 flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics

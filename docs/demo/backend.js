@@ -476,7 +476,7 @@
           theme: S.theme,
           lyrics: true,
           can_control: !view,
-          now_playing: c ? Object.assign(pub(c), { video_url: c.video_url, elapsed: elapsed(), start: START, end: END }) : null,
+          now_playing: c ? Object.assign(pub(c), { video_url: c.video_url, audio_only: false, elapsed: elapsed(), start: START, end: END }) : null,
           queue: S.inVoice ? S.queue.map(pub) : [],
           downloading: S.inVoice ? S.pending.slice(0, 50).map((p) => Object.assign({}, p)) : [],
           downloading_total: S.inVoice ? S.pending.length : 0,
@@ -655,6 +655,7 @@
       get jobs() { return S.jobs; },
       get theme() { return S.theme; },
       get volume() { return S.volume; },
+      get autoplay() { return S.autoplay; },
       setSkin(skin) { S.theme = Object.assign({}, S.theme, { skin }); changed(); },
       setAction,
     };

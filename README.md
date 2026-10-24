@@ -2,14 +2,14 @@
 
 # DJ Snake
 
-**A self-hosted Discord music bot that plays YouTube or Spotify links in your voice channel, with a live clip page that shows the video in sync.**
+**A self-hosted Discord music bot that plays YouTube, Spotify, SoundCloud, Bandcamp, Deezer and Apple Music links, or plain text searches, in your voice channel, with a live clip page that shows the video in sync.**
 
 [**Live demo**](https://theroxat.github.io/DJ_Snake/demo/) · [Project page](https://theroxat.github.io/DJ_Snake/) · [Documentation](https://dj-snake.readthedocs.io) · [Releases](https://github.com/Theroxat/DJ_Snake/releases) · [Changelog](CHANGELOG.md)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/Theroxat/DJ_Snake/ci.yml?branch=main&label=CI&logo=githubactions&logoColor=white)](https://github.com/Theroxat/DJ_Snake/actions/workflows/ci.yml)
-![Spotify](https://img.shields.io/badge/Spotify-playlists%20%C2%B7%20albums%20%C2%B7%20tracks-1DB954?logo=spotify&logoColor=white)
+![Sources](https://img.shields.io/badge/sources-YouTube%20%C2%B7%20Spotify%20%C2%B7%20SoundCloud%20%C2%B7%20Bandcamp%20%C2%B7%20Deezer%20%C2%B7%20Apple%20Music-1DB954?logo=spotify&logoColor=white)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776ab?logo=python&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-303%20passing-2ea44f)
+![Tests](https://img.shields.io/badge/tests-695%20passing-2ea44f)
 [![Docs](https://img.shields.io/readthedocs/dj-snake?logo=readthedocs&logoColor=white&label=docs)](https://dj-snake.readthedocs.io)
 [![Release](https://img.shields.io/github/v/release/Theroxat/DJ_Snake?color=ff2c41)](https://github.com/Theroxat/DJ_Snake/releases)
 [![Docker](https://img.shields.io/badge/ghcr.io-amd64%20%7C%20arm64-2496ed?logo=docker&logoColor=white)](https://github.com/Theroxat/DJ_Snake/pkgs/container/dj_snake)
@@ -205,6 +205,7 @@ Set these in `.env` (see `.env.example`).
 | `DISCORD_TOKEN` | none (required) | Bot token. A `token` file is a fallback. |
 | `COMMAND_PREFIX` | `!` | Prefix for text commands. |
 | `MAX_PLAYLIST_SIZE` | `30` | Maximum tracks loaded from a playlist. |
+| `IDLE_DISCONNECT_SECONDS` | `300` | Seconds the bot stays in voice once the queue runs out, before leaving (30 s when no human is left). |
 | `MEDIA_FORMAT` | max 720p H.264 + m4a | yt-dlp format selector. |
 | `TEMP_DIR` | fresh temp directory | Where downloaded tracks are stored. |
 | `POT_BASE_URL` | `http://pot-provider:4416` | PO token provider URL (matches Compose). |

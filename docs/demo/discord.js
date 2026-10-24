@@ -258,15 +258,32 @@
     react(msg);
     return { result };
   }
-  const HELP = "```\n​No Category:\n  crossfade\n  help      Shows this message\n  list\n  loop\n  next\n  pause\n  play\n" +
-    "  reset     Force reset the voice connection\n  resume\n  seek\n  shuffle\n  stop\n" +
-    "  theme     Show or set the clip page's default theme for this server.\n" +
-    "  volume    Show the server's volume, or set it (0-150 %, 100 = normal).\n\n" +
-    `Type ${P}help command for more info on a command.\nYou can also type ${P}help category for more info on a category.\n` + "```";
+  // !help as HelpCommand sends it (help.title, then help.cmd.<name> in HELP_ORDER).
+  const HELP = ["🎶 **DJ Snake commands**",
+    `\`${P}play <link or text>\`: play a YouTube, SoundCloud, Bandcamp, Spotify, Deezer or Apple Music link, or the best YouTube match for some text`,
+    `\`${P}list\`: show the queue`,
+    `\`${P}next\`: skip to the next track`,
+    `\`${P}pause\`: pause playback`,
+    `\`${P}resume\`: resume playback`,
+    `\`${P}seek <position>\`: jump to a position (seconds or mm:ss)`,
+    `\`${P}crossfade on|off\`: blend each track into the next`,
+    `\`${P}stop\`: stop, clear the queue and leave the voice channel`,
+    `\`${P}reset\`: reset the voice connection`,
+    `\`${P}loop [off|track|queue]\`: repeat the track or the queue (empty cycles)`,
+    `\`${P}shuffle\`: shuffle the upcoming queue once`,
+    `\`${P}volume [0-150]\`: show or set the server's volume`,
+    `\`${P}autoplay [on|off]\`: keep playing related tracks when the queue runs out`,
+    `\`${P}playlist save|add|load|show|delete <name>\`, \`${P}playlist list\`: saved playlists of the server`,
+    `\`${P}theme [preset|reset|edit]\`: clip page theme (Manage Server)`,
+    `\`${P}djrole [role|off]\`: the role that may control the music (Manage Server)`,
+    `\`${P}weblink\`: get the clip page links by direct message`,
+    `\`${P}language [code|reset]\`: language of the bot and the clip page (Manage Server)`,
+    `\`${P}help\`: show this list`,
+  ].join("\n");
 
   const COMMANDS = {
     async play(msg, arg) {
-      if (!arg) return botSay(`❌ Usage: \`${P}play <YouTube or Spotify link>\``);
+      if (!arg) return botSay(`❌ Usage: \`${P}play <link or search text>\``);
       let link;
       try { link = B.parseLink(arg); } catch (e) {
         if (e instanceof B.ControlError) return botSay("❌ " + e.message);
@@ -315,6 +332,16 @@
       await later(250);
       react(msg);
     },
+    async autoplay(msg, arg) {
+      const mode = (arg || "").toLowerCase();
+      if (!mode) {
+        return botSay(`📻 Autoplay is ${B.autoplay ? "on" : "off"}. Usage: \`${P}autoplay on|off\``);
+      }
+      if (mode !== "on" && mode !== "off") return botSay(`📻 Autoplay is ${B.autoplay ? "on" : "off"}. Usage: \`${P}autoplay on|off\``);
+      B.C.autoplay(mode === "on");
+      await later(250);
+      react(msg);
+    },
     async stop(msg) {
       if (!B.sid) return botSay("❌ No music is currently playing.");
       B.C.stop();
@@ -334,7 +361,10 @@
       if (q.length > 10) m += `\n... and ${q.length - 10} more tracks`;
       return botSay(m);
     },
-    async help() { return botSay(HELP); },
+    async help() {
+      await botSay(HELP);
+      tip(`Every command is also a slash command: \`/play\`, \`/next\`, \`/volume\`… This demo has no command picker, so type them in full.`);
+    },
     async theme(msg, arg) {
       const choice = (arg || "").trim().toLowerCase();
       if (!choice) {
@@ -361,16 +391,18 @@
   async function handle(text) {
     const msg = post("you", text);
     if (tour.step === "try") tourDone("cmd");
-    if (!text.startsWith(P)) {
+    // Every command is hybrid: \`/play\` works like \`!play\`.
+    const lead = text.startsWith(P) ? P : text.startsWith("/") ? "/" : null;
+    if (!lead) {
       await later(500);
-      tip(`DJ Snake only reads commands that start with \`${P}\`. Try \`${P}help\`, or \`${P}play <link>\`.`);
+      tip(`DJ Snake only reads commands that start with \`${P}\` (or slash commands like \`/play\`). Try \`${P}help\`, or \`${P}play <link>\`.`);
       return;
     }
-    const [name, ...rest] = text.slice(P.length).trim().split(/\s+/);
+    const [name, ...rest] = text.slice(lead.length).trim().split(/\s+/);
     const cmd = COMMANDS[(name || "").toLowerCase()];
     if (!cmd) {
       await later(500);
-      tip(`\`${P}${name || ""}\` is not a command, so the real bot stays silent. Try \`${P}help\`, \`${P}next\`, \`${P}pause\`, \`${P}list\` or \`${P}play <link>\`.`);
+      tip(`\`${lead}${name || ""}\` is not a command in this demo, so nothing happens. Try \`${P}help\`, \`${P}next\`, \`${P}pause\`, \`${P}list\` or \`${P}play <link>\`.`);
       return;
     }
     await cmd(msg, rest.join(" "));
