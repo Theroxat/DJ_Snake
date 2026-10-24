@@ -924,6 +924,13 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
 }
 
 @media (min-width: 901px) and (max-width: 1400px) { li a.yt { display: none; } }
+/* Side-by-side transport needs room for both toggle groups; below 1500px (the
+   page keeps a sidebar until 900px) the play controls get their own row. */
+@media (min-width: 641px) and (max-width: 1500px) {
+  .transport { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 8px; }
+  .tcenter { flex: 1 1 100%; order: -1; justify-content: center; }
+  .tside.end { margin-left: auto; }
+}
 @media (max-width: 900px) {
   main { grid-template-columns: minmax(0, 1fr); gap: 28px; padding: 18px 16px 32px; }
   header { padding: 10px 16px; }
