@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Clip page: keyboard shortcuts (play/pause, seek, next/previous, shuffle, loop, mute, volume, fullscreen, lyrics, theme) and a localised help dialog opened with `?` or the header keyboard button. View-only links keep only the non-control keys.
+
 ## [1.4.0] - 2026-10-23
 
 ### Added
