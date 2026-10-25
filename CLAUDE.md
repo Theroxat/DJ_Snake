@@ -140,6 +140,8 @@ Module map, lowest layer first (each imports only the ones above it):
 - `themes.py`: theme storage, logos and `!theme edit` tokens.
 - `volume.py`: per-server volume storage (`{DATA_DIR}/volume.json`) and
   `percent_to_gain()`.
+- `filters.py`: audio filter presets (`chain()`, `rate()`, `parse_filter()`,
+  `clean_eq()`). Imports only `config`.
 - `permissions.py`: the DJ role (`load_perms()`, `set_dj_role()`,
   `dj_role()`), `is_dj()`, `web_control_restricted()` and the Discord gate
   (`DJ_COMMANDS`, `REQUESTER_COMMANDS`, `can_run_dj_command()`).
@@ -273,7 +275,32 @@ Module map, lowest layer first (each imports only the ones above it):
   (`play_next()`). The web action panel line ("Volume set to N% via the web
   page") goes through `set_action()`, so dragging coalesces to one edit per
   `PANEL_MIN_INTERVAL`; the panel also shows "Volume N%" when not 100.
-- **Controls** (`control_next/previous/pause/resume/remove/move/add/seek/jump/crossfade/loop/shuffle/volume/autoplay`,
+- **Audio filters** (`filters.py`; `player.filter`, one of `FILTER_PRESETS`
+  in `config.py`: off, bassboost, nightcore, vaporwave, 8d, karaoke, soft, eq;
+  `player.eq` `{low, mid, high}` dB, -`EQ_MAX_DB`..`EQ_MAX_DB` (12); per
+  session, kept by `!reset`): `!filter [preset] [low mid high]` and the web
+  `filter` action (`{preset, eq?}`) call `control_filter()` (`bad_filter`,
+  400). `open_track_source()` appends `filters.chain()` after the automix
+  fades (`playback_options(extra_filters=)`), so the fades stay in file time;
+  every chain starts with `aresample=48000,aformat=channel_layouts=stereo`
+  (loudnorm outputs 192 kHz, asetrate needs a known rate, pan/apulsator need
+  stereo). A change with a different chain on a playing track takes the lock
+  and sets the `seek` pending action at `player.elapsed()` (paused stays
+  paused), so it restarts at the same file position and counts as the same
+  play. Speed presets (`filters.RATES`: nightcore 1.25, vaporwave 0.8,
+  asetrate) change the real rate: `player.rate` (set where `started_at` is,
+  in `_advance()` and `_start_crossfade()`) makes `elapsed()` =
+  `play_offset + (wall - play_offset) * rate`, so elapsed, seeks, `start`/`end`
+  and lyrics stay file time; `played_seconds()` (stats) is wall time.
+  `open_track_source()` divides the frame counts by the rate and multiplies a
+  crossfade `fade_in` (wall seconds) by it. The state has `filter`, `eq` and
+  `rate` (the playing segment's, else the preset's); the page multiplies its
+  clock (`targetPos()`, `curElapsed()`, the latency) and the video's
+  `playbackRate` (nudges included) by `rate`. The picker sits in the volume
+  popover; the panel shows "🎛️ Filter: …" when not off. Karaoke on a mono
+  track leaves only the bass. Tests: `tests/test_filters.py` (an `ffmpeg`
+  test runs every chain through the real binary).
+- **Controls** (`control_next/previous/pause/resume/remove/move/add/seek/jump/crossfade/loop/shuffle/volume/autoplay/filter`,
   plus the `control_playlist_*` family) are shared by Discord commands and the
   web page and raise `ControlError` (a stable `code`, its HTTP status in
   `ControlError.STATUS` and the message `control.<code>`, `e.text(lang)`, shown
@@ -437,7 +464,7 @@ Module map, lowest layer first (each imports only the ones above it):
     request used, so a view-only page never sees the control id.
   - Discord: the global `bot.check` `dj_gate()` calls
     `can_run_dj_command()`: a command named in `DJ_COMMANDS` (next, pause,
-    resume, seek, stop, reset, crossfade, loop, shuffle) needs `is_dj()`; `volume` and `autoplay` need it only to set a value (bare, they show the setting; `DJ_WHEN_SETTING`, `require_dj()`) (Manage Server, or
+    resume, seek, stop, reset, crossfade, loop, shuffle) needs `is_dj()`; `volume`, `autoplay` and `filter` need it only to set a value (bare, they show the setting; `DJ_WHEN_SETTING`, `require_dj()`) (Manage Server, or
     the guild's DJ role; no role set = everyone), except that
     `REQUESTER_COMMANDS` (next) is allowed to `track["requester_id"]` (set by
     `download_and_queue_song()`) on the playing track. A new mutating command
@@ -460,7 +487,7 @@ Module map, lowest layer first (each imports only the ones above it):
   `GET /` landing text; `GET /{sid}` serves `web/index.html`;
   `GET /api/{sid}/state` returns `{active, in_voice, guild, channel, loading,
   paused, can_previous, can_control, crossfade, loop, volume, autoplay,
-  crossfading, server_time, viewers, lang, lyrics, now_playing: {id, title,
+  filter, eq, rate, crossfading, server_time, viewers, lang, lyrics, now_playing: {id, title,
   duration, thumbnail, url, autoplay, video_url, audio_only, elapsed, start,
   end} | null, queue: [{id, title, duration, thumbnail, url, autoplay}],
   downloading: [{key, title, source}], downloading_total, theme: {skin, base,
@@ -489,13 +516,14 @@ Module map, lowest layer first (each imports only the ones above it):
   cached `STATS_CACHE_SECONDS` (15) per guild and range (see Stats).
   `GET /api/{sid}/playlists` lists the saved playlists (see Saved playlists).
   `POST /api/{sid}/control` takes `{action:
-  next|previous|pause|resume|remove|move|add|seek|jump|crossfade|loop|shuffle|volume|autoplay|save_playlist|load_playlist,
-  id?, index?, url?, position?, enabled?, mode?, value?, name?}` (body <= 4 KB;
+  next|previous|pause|resume|remove|move|add|seek|jump|crossfade|loop|shuffle|volume|autoplay|filter|save_playlist|load_playlist,
+  id?, index?, url?, position?, enabled?, mode?, value?, name?, preset?, eq?}` (body <= 4 KB;
   crossfade and autoplay take a boolean `enabled`; volume an integer `value`
   0-150, valid out of voice too; seek restarts the track at `position` seconds
   (file time), clamped, staying paused if it was, unannounced; jump plays a
   queued `id` now; loop takes `mode` off|track|queue, none cycles; shuffle
-  needs 2+ queued tracks; `save_playlist` and `load_playlist` take a `name`)
+  needs 2+ queued tracks; filter takes `preset` and an optional `eq`
+  object, valid out of voice too; `save_playlist` and `load_playlist` take a `name`)
   and returns 200 `{"ok": true}` (202 for add and load_playlist, which
   download in the background) or `{"ok": false, "error": "<message>"}` (in
   the session's language, `_fail(request, status, key)`) with 400 (bad input,
@@ -668,6 +696,7 @@ Module map, lowest layer first (each imports only the ones above it):
   `!pause`, `!resume`, `!seek` (position relative to the track's automix
   `start`, as the page shows it), `!crossfade on|off`, `!loop
   [off|track|queue]`, `!shuffle`, `!volume [0-150]`, `!autoplay [on|off]`,
+  `!filter [preset] [low mid high]`,
   `!playlist save|add|load|show|delete <name>` and `!playlist list` (a
   `hybrid_group`: `/playlist save`, ...), `!stop`, `!reset`, `!weblink` (see
   Permissions), and the Manage Server ones (`commands.has_guild_permissions`):

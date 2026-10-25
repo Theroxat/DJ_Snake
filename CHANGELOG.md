@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Audio filters per session: `!filter [off|bassboost|nightcore|vaporwave|8d|karaoke|soft]` and `!filter eq <low> <mid> <high>` (-12 to 12 dB), a picker in the clip page's volume popover and a `filter` control action. A change restarts the playing track where it is, crossfade keeps working, and setting a filter needs the DJ role when there is one. Nightcore and vaporwave change the real playback speed: `/api/{sid}/state` exposes `filter`, `eq` and `rate`, and the page runs the video, progress bar and lyrics at that rate. The status panel shows the filter when it is on.
+
 ## [1.4.0] - 2026-10-23
 
 ### Added

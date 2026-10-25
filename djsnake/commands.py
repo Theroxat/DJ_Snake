@@ -7,9 +7,10 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from . import catalog, i18n, media, spotify, state
+from . import catalog, filters, i18n, media, spotify, state
 from .config import (
     COMMAND_PREFIX,
+    FILTER_PRESETS,
     LOOP_MODES,
     MAX_PLAYLIST_SIZE,
     MAX_SEARCH_LENGTH,
@@ -24,6 +25,7 @@ from .controls import (
     ControlError,
     control_autoplay,
     control_crossfade,
+    control_filter,
     control_loop,
     control_next,
     control_pause,
@@ -52,6 +54,7 @@ from .playback import (
 from .player import MusicPlayer, discard_tracks, retire_play
 from .sessions import (
     ack,
+    filter_label,
     open_session,
     player_lang,
     refresh_panel,
@@ -407,6 +410,7 @@ async def reset_voice(ctx):
         fresh.crossfade = player.crossfade
         fresh.loop = player.loop
         fresh.autoplay = player.autoplay
+        fresh.filter, fresh.eq = player.filter, dict(player.eq)
         fresh.recent_ids = player.recent_ids
         if player.panel_task is not None:
             player.panel_task.cancel()
@@ -593,6 +597,44 @@ async def autoplay(ctx, mode: str = None):
         return
     require_dj(ctx)
     control_autoplay(player, mode == "on")
+    await ack(ctx)
+
+
+@hybrid("filter", "Show or set the audio filter (bass boost, nightcore, 8D...)")
+@app_commands.describe(
+    preset="The filter (leave empty to show the current one)",
+    low="eq only: low band, -12 to 12 dB",
+    mid="eq only: mid band, -12 to 12 dB",
+    high="eq only: high band, -12 to 12 dB",
+)
+@app_commands.choices(
+    preset=[app_commands.Choice(name=p, value=p) for p in FILTER_PRESETS]
+)
+async def filter_command(
+    ctx, preset: str = None, low: int = None, mid: int = None, high: int = None
+):
+    """Show the session's audio filter, or set it (DJ only)."""
+    lang = ctx_lang(ctx)
+    player = state.music_players.setdefault(ctx.guild.id, MusicPlayer())
+    touch(player)
+    presets = ", ".join(FILTER_PRESETS)
+    if preset is None:
+        label = filter_label(player, lang)
+        info = t("cmd.filter_info", lang, filter=label, presets=presets)
+        await ctx.send(info, ephemeral=True)
+        return
+    bands = {"low": low, "mid": mid, "high": high}
+    eq = {band: value for band, value in bands.items() if value is not None}
+    name = filters.parse_filter(preset)
+    if name is None or (eq and name != "eq"):
+        await fail_t(ctx, "cmd.filter_usage", presets="|".join(FILTER_PRESETS))
+        return
+    require_dj(ctx)
+    try:
+        await control_filter(player, name, eq or None)
+    except ControlError as e:
+        await ctx.send(f"⚠️ {e.text(lang)}", ephemeral=True)
+        return
     await ack(ctx)
 
 
@@ -1085,6 +1127,7 @@ HELP_ORDER = (
     "shuffle",
     "volume",
     "autoplay",
+    "filter",
     "playlist",
     "theme",
     "djrole",

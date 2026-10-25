@@ -34,7 +34,7 @@ DJ_COMMANDS = frozenset(
 # Commands that only need a DJ to change a value: with no argument they just
 # show the setting. The check cannot see the argument (it runs before parsing),
 # so the command itself calls `commands.require_dj()` when it is about to set.
-DJ_WHEN_SETTING = frozenset({"volume", "autoplay"})
+DJ_WHEN_SETTING = frozenset({"volume", "autoplay", "filter"})
 # Commands the member who queued the current track may always use on it.
 REQUESTER_COMMANDS = frozenset({"next"})
 

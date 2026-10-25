@@ -210,6 +210,19 @@ PCM_FRAME_SIZE = discord.opus.Encoder.FRAME_SIZE  # 3840 bytes, 48 kHz s16 stere
 VOLUME_DEFAULT = 100
 VOLUME_MAX = 150
 VOLUME_RAMP_FRAMES = 5  # A volume change glides over this many frames (100 ms)
+# Audio filters (per session, see filters.py): presets and the 3-band EQ.
+FILTER_PRESETS = (
+    "off",
+    "bassboost",
+    "nightcore",
+    "vaporwave",
+    "8d",
+    "karaoke",
+    "soft",
+    "eq",
+)
+EQ_BANDS = ("low", "mid", "high")
+EQ_MAX_DB = 12  # Each band from -EQ_MAX_DB to +EQ_MAX_DB dB
 
 # Spotify links: the track list is read from the public embed page (no
 # configuration, at most 100 tracks), or from the Web API when both

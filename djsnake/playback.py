@@ -7,7 +7,7 @@ import time
 
 import discord
 
-from . import lyrics, media, spotify, state, stats
+from . import filters, lyrics, media, spotify, state, stats
 from . import config
 from .config import CROSSFADE_SECONDS, FADE_OUT_SECONDS, FRAMES_PER_SECOND
 from .media import crossfade_eligible, playback_options
@@ -140,22 +140,30 @@ async def join_voice_channel(ctx):
 
 
 def open_track_source(player, track, offset, fade_in=None):
-    """Start FFmpeg for `track` from `offset`. Returns (offset, source, frames,
-    fade_frames): the clamped offset, the source, its length in frames (None
-    if unknown) and the length of its fade-out (0: cannot crossfade)."""
+    """Start FFmpeg for `track` from `offset` (file time) with the session's
+    audio filter. Returns (offset, source, frames, fade_frames): the clamped
+    offset, the source, its length in frames (None if unknown) and the
+    length of its fade-out (0: cannot crossfade). `fade_in` and the frame
+    counts are wall time: a speed filter plays the file faster or slower."""
+    name, eq = getattr(player, "filter", "off"), getattr(player, "eq", None)
+    rate = filters.rate(name)
     eligible = crossfade_eligible(track)
     fade_out = CROSSFADE_SECONDS if player.crossfade and eligible else FADE_OUT_SECONDS
-    offset, kwargs = playback_options(track, offset, fade_in, fade_out)
+    if fade_in is not None:
+        fade_in *= rate  # The fades are file time (before the speed change)
+    offset, kwargs = playback_options(
+        track, offset, fade_in, fade_out, filters.chain(name, eq)
+    )
     source = discord.FFmpegPCMAudio(track["filepath"], **kwargs)
     end = track.get("end")
     if end is None:
         return offset, source, None, 0
     remaining = max(0.0, end - offset)
-    frames = round(remaining * FRAMES_PER_SECOND)
+    frames = round(remaining / rate * FRAMES_PER_SECOND)
     fade_frames = 0
     if eligible:
         # Toggled on mid-track, the fade already running is 4 s: overlap that.
-        fade_frames = round(min(fade_out, remaining) * FRAMES_PER_SECOND)
+        fade_frames = round(min(fade_out, remaining) / rate * FRAMES_PER_SECOND)
     return offset, source, frames, fade_frames
 
 
@@ -611,6 +619,7 @@ async def _advance(ctx, player):
         discard_tracks([next_track])
         raise
     now = time.monotonic()
+    player.rate = filters.rate(player.filter)
     player.started_at = now - offset
     # A loop replay is a new play; only a restart or seek continues one
     player.mark_started(
@@ -878,6 +887,7 @@ async def _start_crossfade(player, mixer, gen, ctx=None):
                     player.queue.append(current)
             player.note_played(upcoming)
             player.now_playing = upcoming
+            player.rate = filters.rate(player.filter)
             player.started_at = time.monotonic() - offset
             player.paused_at = None
             player.paused_total = 0.0

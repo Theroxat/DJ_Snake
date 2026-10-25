@@ -36,6 +36,7 @@
 - Optional crossfade between tracks.
 - Loop (track or queue) and one-shot queue shuffle.
 - Optional autoplay ("radio"): when the queue runs out, a related YouTube track plays on.
+- Audio filters per session: bass boost, nightcore, vaporwave, 8D, karaoke, soft, or a 3-band equaliser, switched mid-track without starting over.
 - Listening stats per server on the clip page: top tracks and artists, the most skipped track, hours played, sessions, peak listeners and a day-by-hour heatmap, for the last week, month or all time.
 - Live viewer count in the clip page header.
 - Synced lyrics over the clip, from [LRCLIB](https://lrclib.net) (free, no key; `LYRICS=0` turns them off).
@@ -88,6 +89,7 @@ Every command is both a `!` command and a slash command (`/play`, `/playlist sav
 | `!shuffle` | Shuffle the upcoming queue once; the current track keeps playing. |
 | `!volume [0-150]` | Show the server's volume, or set it in percent (100 is the normal level). Saved across restarts. |
 | `!autoplay [on\|off]` | Keep playing related tracks when the queue runs out, or show the current setting (off by default, see `AUTOPLAY`). |
+| `!filter [preset]` | Show or set the session's audio filter: `off`, `bassboost`, `nightcore`, `vaporwave`, `8d`, `karaoke`, `soft`, or `eq <low> <mid> <high>` (-12 to 12 dB). The track goes on from where it is. |
 | `!playlist save\|add\|load\|show\|delete <name>`, `!playlist list` | Saved playlists for the server: links and titles kept across restarts, downloaded again when loaded. |
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
@@ -97,7 +99,7 @@ Every command is both a `!` command and a slash command (`/play`, `/playlist sav
 
 | `!language [code\|reset]` | Show or set the language of the bot and the clip page for the server (`en`, `fr`). Needs the Manage Server permission. |
 
-When a server has a DJ role, `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!volume`, `!autoplay`, `!stop` and `!reset` need that role or the Manage Server permission; whoever queued the playing track may still skip it with `!next`. `!play` and `!list` stay open to everyone. See [Who controls the music](#who-controls-the-music).
+When a server has a DJ role, `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!volume`, `!autoplay`, `!filter`, `!stop` and `!reset` need that role or the Manage Server permission; whoever queued the playing track may still skip it with `!next`. `!play` and `!list` stay open to everyone. See [Who controls the music](#who-controls-the-music).
 
 ## Language
 

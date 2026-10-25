@@ -56,6 +56,7 @@
     bad_loop: [400, "Loop mode must be off, track or queue."],
     nothing_to_shuffle: [409, "Not enough queued tracks to shuffle."],
     bad_volume: [400, "Volume must be a whole number from 0 to 150."],
+    bad_filter: [400, "Unknown filter, or an equaliser band outside -12 to 12 dB."],
     bad_url: [400,
       "Only YouTube, SoundCloud and Bandcamp links (track or playlist) and Spotify, Deezer and Apple Music (track, album or playlist) links are accepted."],
     spotify_short_link: [400,
@@ -138,6 +139,9 @@
       sid: null, wid: null, inVoice: false, current: null, queue: [], history: [],
       startedAt: 0, pausedAt: null, pausedTotal: 0,
       crossfade: false, loop: "off", volume: 100, autoplay: false, epoch: 0, jobs: 0, single: 0,
+      // Audio filter (filters.py); a speed preset runs the file clock at `rate`
+      // from `segBase` (the file position where the current segment started).
+      filter: "off", eq: { low: 0, mid: 0, high: 0 }, rate: 1, segBase: START,
       playlists: [], // saved playlists: {name, ids: YouTube video ids}
       pending: [], // pending_downloads: {key, title (null: link not read), source}
       loadLine: null, loadFinal: false, lastAction: null,
@@ -155,8 +159,18 @@
     const on = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
 
     const paused = () => S.pausedAt !== null;
-    const elapsed = () => START + Math.max(0, (paused() ? S.pausedAt : now()) - S.startedAt - S.pausedTotal);
-    function play(t) { clearIdle(); S.current = t; S.startedAt = now(); S.pausedAt = null; S.pausedTotal = 0; }
+    const FILTERS = ["off", "bassboost", "nightcore", "vaporwave", "8d", "karaoke", "soft", "eq"];
+    const FILTER_NAMES = { off: "off", bassboost: "Bass boost", nightcore: "Nightcore (1.25× speed)", vaporwave: "Vaporwave (0.8× speed)", "8d": "8D", karaoke: "Karaoke", soft: "Soft", eq: "Equaliser" };
+    const rateOf = (f) => ({ nightcore: 1.25, vaporwave: 0.8 })[f] || 1;
+    const sgn = (v) => (v >= 0 ? "+" : "") + v;
+    const filterLabel = () => S.filter === "eq"
+      ? `Equaliser (low ${sgn(S.eq.low)}, mid ${sgn(S.eq.mid)}, high ${sgn(S.eq.high)} dB)`
+      : FILTER_NAMES[S.filter];
+    const elapsed = () => {
+      const raw = START + Math.max(0, (paused() ? S.pausedAt : now()) - S.startedAt - S.pausedTotal);
+      return S.segBase + (raw - S.segBase) * S.rate;
+    };
+    function play(t) { clearIdle(); S.current = t; S.startedAt = now(); S.pausedAt = null; S.pausedTotal = 0; S.segBase = START; S.rate = rateOf(S.filter); }
 
     function setAction(text) {
       S.lastAction = text;
@@ -373,9 +387,25 @@
         const was = paused();
         play(S.current);
         S.startedAt = now() - (p - START);
+        S.segBase = p;
         if (was) S.pausedAt = now();
         changed();
         return p;
+      },
+      filter(name, eq) {
+        if (!FILTERS.includes(name)) throw new ControlError("bad_filter");
+        const gains = Object.assign({}, S.eq);
+        if (eq != null) {
+          if (typeof eq !== "object" || Array.isArray(eq)) throw new ControlError("bad_filter");
+          for (const [k, v] of Object.entries(eq)) {
+            if (!(k in gains) || !Number.isInteger(v) || v < -12 || v > 12) throw new ControlError("bad_filter");
+            gains[k] = v;
+          }
+        }
+        S.filter = name; S.eq = gains;
+        // The bot restarts the track where it is with the new chain (a seek).
+        if (S.inVoice && S.current) C.seek(elapsed());
+        else changed();
       },
       crossfade(on) { S.crossfade = !!on; changed(); },
       loop(mode) {
@@ -454,6 +484,7 @@
       if (S.loop !== "off") lines.push(`🔁 Loop: ${S.loop}`);
       if (S.volume !== 100) lines.push(`🔊 Volume ${S.volume}%`);
       if (S.autoplay) lines.push("📻 Autoplay on");
+      if (S.filter !== "off") lines.push(`🎛️ Filter: ${filterLabel()}`);
       if (S.loadLine) lines.push(S.loadLine);
       else if (S.pending.length > 1) lines.push(`📥 Downloading ${S.pending.length} tracks…`);
       else if (S.single || S.pending.length) lines.push("📥 Downloading…");
@@ -471,7 +502,8 @@
         body: {
           active: true, in_voice: S.inVoice, guild: "Friday Night", channel: "Lounge",
           loading: S.jobs > 0, paused: !!c && paused(), can_previous: !!c,
-          crossfade: S.crossfade, loop: S.loop, volume: S.volume, autoplay: S.autoplay, crossfading: false, server_time: Date.now() / 1000,
+          crossfade: S.crossfade, loop: S.loop, volume: S.volume, autoplay: S.autoplay, crossfading: false,
+          filter: S.filter, eq: Object.assign({}, S.eq), rate: c ? S.rate : rateOf(S.filter), server_time: Date.now() / 1000,
           viewers: viewers(), lang,
           theme: S.theme,
           lyrics: true,
@@ -558,6 +590,10 @@
         } else if (a === "autoplay") {
           if (typeof d.enabled !== "boolean") return fail(400, "Invalid request.");
           C.autoplay(d.enabled);
+        } else if (a === "filter") {
+          if (typeof d.preset !== "string") return fail(400, ERRORS.bad_filter[1]);
+          C.filter(d.preset, d.eq);
+          setAction(`🎛️ Filter set to ${filterLabel()} via the web page`);
         } else if (a === "save_playlist" || a === "load_playlist") {
           if (typeof d.name !== "string" || !d.name || d.name.length > 200) return fail(400, "Invalid playlist name.");
           if (a === "save_playlist") setAction(`💾 Saved playlist ${C.savePlaylist(d.name)} via the web page`);
@@ -656,6 +692,8 @@
       get theme() { return S.theme; },
       get volume() { return S.volume; },
       get autoplay() { return S.autoplay; },
+      get filter() { return S.filter; },
+      filterLabel,
       setSkin(skin) { S.theme = Object.assign({}, S.theme, { skin }); changed(); },
       setAction,
     };

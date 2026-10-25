@@ -14,6 +14,7 @@ Every command works two ways: as a text message with the prefix, `!` by default 
 | `!shuffle` | Shuffle the upcoming queue once; the current track keeps playing. |
 | `!volume [0-150]` | Show the server's volume, or set it in percent (100 is the normal level). Saved across restarts. |
 | `!autoplay [on\|off]` | Keep playing related tracks when the queue runs out, or show the current setting (off by default, see `AUTOPLAY`). |
+| `!filter [preset]` | Show or set the session's audio filter: `off`, `bassboost`, `nightcore`, `vaporwave`, `8d`, `karaoke`, `soft`, or `eq <low> <mid> <high>` (-12 to 12 dB). The track goes on from where it is. |
 | `!playlist save\|add\|load\|show\|delete <name>`, `!playlist list` | Saved playlists for the server: links and titles kept across restarts, downloaded again when loaded. |
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
@@ -74,6 +75,25 @@ Without an argument, shows the server's volume. With a number from 0 to 150 (a t
 
 Keeps the music going when the queue runs out. With autoplay on, the bot picks a track related to the last one (from YouTube's mix for that video), downloads it while the current track is still playing so there is no gap, and plays it. Tracks played in the last 50, live streams, anything over 10 minutes and titles that look like podcasts, interviews or compilations are skipped. If nothing suitable is found or no pick is ready in time, the bot lingers in voice as usual, and it never autoplays into an empty channel. A loop mode, when active, takes precedence over autoplay, and a track you queue always plays before an autoplay pick. Without an argument, shows the current setting. Off by default; `AUTOPLAY=1` changes the default. The status message shows "📻 Autoplay on" and marks autoplay tracks.
 
+### `!filter [preset]`
+
+Without an argument, shows the session's audio filter. With a preset, sets it for everyone in the channel:
+
+| Preset | Effect |
+| --- | --- |
+| `off` | No filter (the default). |
+| `bassboost` | Stronger bass, with a limiter so it does not clip. |
+| `nightcore` | 1.25× faster, pitch up. |
+| `vaporwave` | 0.8× slower, pitch down, slightly darker. |
+| `8d` | The sound slowly circles from one ear to the other. |
+| `karaoke` | Removes what is mixed in the centre above 150 Hz, usually the lead vocal; the bass stays. It only works on stereo tracks and is never perfect. |
+| `soft` | A gentle low-pass filter, for background listening. |
+| `eq` | A 3-band equaliser: `!filter eq <low> <mid> <high>`, each from -12 to 12 dB (`/filter` has one option per band; a band left out keeps its value). |
+
+The playing track restarts at the same position with the new filter (a short fade softens the switch) and stays paused if it was; out of voice, the filter applies to the next track. The filter belongs to the session (it survives `!reset`, not a session expiry) and the status message shows it when it is not `off`. Setting it needs the DJ role when the server has one; showing it does not.
+
+With `nightcore` and `vaporwave` the track really plays faster or slower: the clip page runs the video, the progress bar and the lyrics at the same speed, and positions (`!seek`, the progress bar) stay in the track's own time. A 3-minute track takes 2:24 in nightcore. The listening stats count the time actually listened.
+
 ### `!playlist`
 
 Saved playlists belong to the server and survive restarts. Only the YouTube link, title and duration of each track are stored, never the media: loading a playlist downloads its tracks again. Names are case-insensitive, up to 32 characters (letters, digits, spaces and `. ' & ! + ( ) -`). A server holds up to 50 playlists of up to 200 tracks each.
@@ -121,7 +141,7 @@ Needs the **Manage Server** permission. The setting is saved per server in `DATA
 
 With a DJ role set:
 
-- `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!volume`, `!autoplay`, `!stop` and `!reset` need the DJ role or the Manage Server permission. The member who queued the playing track may still skip it with `!next`.
+- `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!volume`, `!autoplay`, `!filter`, `!stop` and `!reset` need the DJ role or the Manage Server permission. The member who queued the playing track may still skip it with `!next`.
 - `!play` and `!list` stay open to everyone: adding a track never interrupts what plays, and DJs can still skip or remove it.
 - The status message shows only the clip page's view-only link, and the control link posted before stops working (every change of the role gives a live session a new one and retires the server's `!theme edit` links). See [Who controls the music](clip-page.md#who-controls-the-music).
 

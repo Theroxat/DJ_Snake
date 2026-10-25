@@ -5,7 +5,7 @@ import random
 import time
 import types
 
-from . import catalog, media, playlists, spotify, state
+from . import catalog, filters, media, playlists, spotify, state
 from .config import (
     LOOP_MODES,
     MAX_PLAYLIST_SIZE,
@@ -93,6 +93,7 @@ class ControlError(Exception):
         "nothing_to_shuffle": 409,
         "bad_volume": 400,
         "volume_not_saved": 500,
+        "bad_filter": 400,
         "bad_url": 400,
         "short_link": 400,
         "link_not_found": 404,
@@ -285,6 +286,47 @@ def control_volume(player, guild_id, percent):
         print(f"Could not save volumes: {e}")
         raise ControlError("volume_not_saved")
     return volume_for(guild_id)
+
+
+async def control_filter(player, name, eq=None):
+    """Set the session's audio filter (a FILTER_PRESETS name; `eq` is the
+    {low, mid, high} dB gains of the `eq` preset, missing bands keep their
+    value). A playing track restarts at its current position with the new
+    chain, like a seek (paused stays paused); out of voice it applies to the
+    next track. Returns the preset name."""
+    preset = filters.parse_filter(name)
+    if preset is None:
+        raise ControlError("bad_filter")
+    if eq is not None:
+        merged = dict(player.eq)
+        if not isinstance(eq, dict):
+            raise ControlError("bad_filter")
+        merged.update(eq)
+        gains = filters.clean_eq(merged)
+        if gains is None:
+            raise ControlError("bad_filter")
+    else:
+        gains = dict(player.eq)
+    async with player.lock:
+        old = filters.chain(player.filter, player.eq)
+        player.filter, player.eq = preset, gains
+        player.last_active = state.clock()
+        if (
+            filters.chain(preset, gains) != old
+            and player.in_voice()
+            and player.is_playing
+            and player.now_playing
+            and player.started_at is not None
+            and player.pending_action is None
+        ):
+            # Restart at the current file position with the new chain; a
+            # pending transition (seek, skip...) picks the new chain anyway.
+            player.seek_position = player.elapsed()
+            player.seek_paused = player.paused_at is not None
+            player.pending_action = "seek"
+            player.voice_client.stop()
+    refresh_panel(player)
+    return preset
 
 
 def control_autoplay(player, enabled):

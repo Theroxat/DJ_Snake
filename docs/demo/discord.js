@@ -273,6 +273,7 @@
     `\`${P}shuffle\`: shuffle the upcoming queue once`,
     `\`${P}volume [0-150]\`: show or set the server's volume`,
     `\`${P}autoplay [on|off]\`: keep playing related tracks when the queue runs out`,
+    `\`${P}filter [preset]\`: show or set the audio filter (off, bassboost, nightcore, vaporwave, 8d, karaoke, soft, eq low mid high)`,
     `\`${P}playlist save|add|load|show|delete <name>\`, \`${P}playlist list\`: saved playlists of the server`,
     `\`${P}theme [preset|reset|edit]\`: clip page theme (Manage Server)`,
     `\`${P}djrole [role|off]\`: the role that may control the music (Manage Server)`,
@@ -331,6 +332,21 @@
       B.C.volume(n);
       await later(250);
       react(msg);
+    },
+    async filter(msg, arg) {
+      const presets = "off, bassboost, nightcore, vaporwave, 8d, karaoke, soft, eq";
+      const words = (arg || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+      if (!words.length) {
+        return botSay(`🎛️ Filter: **${B.filterLabel()}**\n\`${P}filter <preset>\` changes it: ${presets}. \`${P}filter eq <low> <mid> <high>\` sets the equaliser (-12 to 12 dB).`);
+      }
+      const [name, ...bands] = words;
+      const nums = bands.map((b) => (/^-?\d+$/.test(b) ? parseInt(b, 10) : NaN));
+      const eq = {};
+      ["low", "mid", "high"].forEach((k, i) => { if (i < nums.length) eq[k] = nums[i]; });
+      if ((bands.length && name !== "eq") || nums.some((n) => !Number.isInteger(n)) || bands.length > 3) {
+        return botSay(`❌ Usage: \`${P}filter [${presets.replace(/, /g, "|")}]\`, or \`${P}filter eq <low> <mid> <high>\` (-12 to 12 dB)`);
+      }
+      await runControl(msg, () => B.C.filter(name, bands.length ? eq : null));
     },
     async autoplay(msg, arg) {
       const mode = (arg || "").toLowerCase();
