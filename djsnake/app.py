@@ -6,6 +6,7 @@ import os
 import discord
 
 from . import commands  # noqa: F401  (registers the commands)
+from . import cookies
 from . import state, stats
 from .config import COMMAND_PREFIX, SLASH_SYNC_GUILD
 from .i18n import t
@@ -161,6 +162,7 @@ def main():
     print("Starting Discord Music Bot (fixed version)")
     print("-" * 50)
     TOKEN = get_discord_token()
+    cookies.setup()
     try:
         bot.run(TOKEN)
     finally:

@@ -111,7 +111,7 @@ link is never posted publicly, see Permissions; anything else falls back to
 (optional, both needed to use the Spotify Web API), `METRICS` (`0`; `1` enables
 `GET /metrics`), `APP_VERSION` (set by the Dockerfile build arg, `dev`
 otherwise; shown by `/healthz`), `LYRICS` (`1`; `0`, `false`, `no` or `off`
-turns the LRCLIB lyrics off), and `YTDLP_AUTO_UPDATE` (entrypoint only).
+turns the LRCLIB lyrics off), and `YTDLP_COOKIES` (optional Netscape cookies.txt path; `cookies.py` validates it and copies it to a 0600 temp file at startup, `cookies.options()` is merged into every yt-dlp options dict in `media.py`; `media.classify_error()` and `playback.download_error_text()` map access errors to `play.error_*` messages), and `YTDLP_AUTO_UPDATE` (entrypoint only).
 
 ## Architecture (`djsnake/`)
 

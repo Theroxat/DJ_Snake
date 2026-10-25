@@ -7,7 +7,7 @@ import time
 
 import discord
 
-from . import lyrics, media, spotify, state, stats
+from . import cookies, lyrics, media, spotify, state, stats
 from . import config
 from .config import CROSSFADE_SECONDS, FADE_OUT_SECONDS, FRAMES_PER_SECOND
 from .media import crossfade_eligible, playback_options
@@ -297,8 +297,21 @@ async def _download_and_queue(
             print(f"Playlist item failed: {e}")
             return None
         refresh_panel(player)
-        await ctx.send(t("play.download_error", ctx_lang(ctx), error=e))
+        await ctx.send(download_error_text(e, ctx_lang(ctx)))
         return None
+
+
+def download_error_text(error, lang):
+    """The message for a failed download: a specific one for age-restricted,
+    members-only, private or sign-in-required videos (with a cookies hint when
+    YTDLP_COOKIES is not set), else the generic one."""
+    kind = media.classify_error(error)
+    if kind is None:
+        return t("play.download_error", lang, error=error)
+    text = t(f"play.error_{kind}", lang)
+    if not cookies.enabled():
+        text += " " + t("play.cookies_hint", lang)
+    return text
 
 
 async def queue_playlist(ctx, player, entries, from_web=False):

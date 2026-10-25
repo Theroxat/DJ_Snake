@@ -167,6 +167,11 @@ REMOTE_COMPONENTS = ["ejs:github"]
 POT_BASE_URL = os.getenv("POT_BASE_URL", "http://pot-provider:4416")
 EXTRACTOR_ARGS = {"youtubepot-bgutilhttp": {"base_url": [POT_BASE_URL]}}
 
+# Optional Netscape cookies.txt for age-restricted / members-only videos
+# (see cookies.py). Use a throwaway Google account: YouTube may ban accounts
+# used by bots.
+YTDLP_COOKIES = (os.getenv("YTDLP_COOKIES") or "").strip()
+
 # A challenge that still slips through should cost a few seconds of retry, not
 # the whole track. One entry in the backoff tuple per retry.
 DOWNLOAD_ATTEMPTS = 3
