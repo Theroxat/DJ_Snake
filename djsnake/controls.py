@@ -5,7 +5,7 @@ import random
 import time
 import types
 
-from . import catalog, media, playlists, spotify, state
+from . import catalog, limits, media, playlists, spotify, state
 from .config import (
     LOOP_MODES,
     MAX_PLAYLIST_SIZE,
@@ -110,11 +110,14 @@ class ControlError(Exception):
         "playlist_full": 409,
         "playlist_empty": 400,
         "playlist_unavailable": 500,
+        "queue_full": 409,
+        "user_full": 409,
     }
 
-    def __init__(self, code):
+    def __init__(self, code, **params):
         super().__init__(code)
         self.code = code
+        self.params = params
         self.status = self.STATUS[code]
 
     def text(self, lang=None):
@@ -125,6 +128,7 @@ class ControlError(Exception):
             name_max=SAVED_PLAYLIST_NAME_MAX,
             playlists_max=MAX_SAVED_PLAYLISTS,
             tracks_max=MAX_SAVED_TRACKS,
+            **self.params,
         )
 
     @property
@@ -339,9 +343,20 @@ async def control_move(player, track_id, index):
     return track
 
 
+def _check_web_limits(player, guild_id):
+    """Refuse a page add up front when the queue is full or the page's
+    "web" bucket is at its per-user limit (the duration is checked once the
+    length is known, see playback.admission())."""
+    refusal = limits.check_enqueue(player, guild_id, limits.WEB_BUCKET)
+    if refusal and refusal[0] in (limits.QUEUE_FULL, limits.USER_FULL):
+        raise ControlError(refusal[0], **refusal[1])
+
+
 async def control_add(player, guild_id, url):
     """Validate a link and download it in the background. A Spotify link's
     track list is read first, so its errors reach the caller."""
+    if player.in_voice():
+        _check_web_limits(player, guild_id)
     try:
         link = catalog.check_link(url)
     except spotify.SpotifyError as e:

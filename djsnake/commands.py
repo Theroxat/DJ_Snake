@@ -7,7 +7,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from . import catalog, i18n, media, spotify, state
+from . import catalog, i18n, limits, media, spotify, state
 from .config import (
     COMMAND_PREFIX,
     LOOP_MODES,
@@ -65,6 +65,7 @@ from .permissions import (
     can_run_dj_command,
     dj_role,
     is_dj,
+    is_manager,
     set_dj_role,
     web_control_restricted,
 )
@@ -247,6 +248,16 @@ async def play(ctx, *, query: str = None):
         if url is None:
             await fail(ctx, ControlError("bad_url").text(lang))
             return
+
+    # The cooldown starts once the request is valid; DJs skip it.
+    skip_cooldown = limits.bypasses(ctx.author, ctx.guild.id)
+    wait = limits.cooldown_remaining(
+        ctx.guild.id, getattr(ctx.author, "id", None), skip_cooldown
+    )
+    if wait:
+        await fail_t(ctx, "limits.cooldown", seconds=wait)
+        return
+    limits.start_cooldown(ctx.guild.id, getattr(ctx.author, "id", None), skip_cooldown)
 
     if not await join_voice_channel(ctx):
         return
@@ -571,6 +582,76 @@ async def volume(ctx, level: str = None):
         await ctx.send(f"⚠️ {e.text(lang)}", ephemeral=True)
         return
     await ack(ctx)
+
+
+LIMIT_SETTINGS = {
+    "queue": "queue_size",
+    "user": "per_user",
+    "minutes": "track_minutes",
+    "cooldown": "cooldown",
+}
+
+
+def limits_embed(guild_id, lang):
+    """The guild's limits as a compact embed."""
+    current = limits.limits_for(guild_id)
+    zero = {
+        "per_user": t("limits.unlimited", lang),
+        "track_minutes": t("limits.unlimited", lang),
+        "cooldown": t("limits.off", lang),
+    }
+    shown = {
+        "queue_size": lambda n: t("limits.tracks", lang, count=n),
+        "per_user": lambda n: t("limits.tracks", lang, count=n),
+        "track_minutes": lambda n: t("limits.minutes", lang, count=n),
+        "cooldown": lambda n: t("limits.seconds", lang, count=n),
+    }
+    embed = discord.Embed(title=t("limits.title", lang))
+    for field in limits.FIELDS:
+        value = current[field]
+        text = shown[field](value) if value or field == "queue_size" else zero[field]
+        embed.add_field(name=t(f"limits.field.{field}", lang), value=text)
+    embed.set_footer(text=t("limits.footer", lang))
+    return embed
+
+
+@hybrid("limits", "Show the queue limits, or change one (Manage Server)")
+@app_commands.describe(
+    setting="queue, user, minutes or cooldown (leave empty to show them)",
+    value="A number, or default to go back to the default",
+)
+@app_commands.choices(
+    setting=[app_commands.Choice(name=name, value=name) for name in LIMIT_SETTINGS]
+)
+async def limits_command(ctx, setting: str = None, value: str = None):
+    """Show the queue limits, or change one (Manage Server)."""
+    lang = ctx_lang(ctx)
+    guild_id = ctx.guild.id
+    if setting is None:
+        await ctx.send(embed=limits_embed(guild_id, lang), ephemeral=True)
+        return
+    field = LIMIT_SETTINGS.get(setting.lower())
+    if field is None or value is None:
+        await fail_t(ctx, "cmd.limits_usage")
+        return
+    if value.lower() == "default":
+        number = None
+    else:
+        number = limits.parse_value(field, value)
+        if number is None:
+            await fail_t(ctx, "cmd.limits_usage")
+            return
+    if not is_manager(ctx.author):
+        await fail_t(ctx, "cmd.limits_need_manager")
+        return
+    try:
+        limits.set_limit(guild_id, field, number)
+    except OSError as e:
+        print(f"Could not save limits: {e}")
+        await fail_t(ctx, "cmd.limits_save_failed")
+        return
+    await ack(ctx)
+    await ctx.send(embed=limits_embed(guild_id, lang), ephemeral=True)
 
 
 @hybrid("autoplay", "Keep playing related tracks when the queue runs out")
@@ -1085,6 +1166,7 @@ HELP_ORDER = (
     "shuffle",
     "volume",
     "autoplay",
+    "limits",
     "playlist",
     "theme",
     "djrole",

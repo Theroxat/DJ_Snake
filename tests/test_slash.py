@@ -31,6 +31,7 @@ NAMES = {
     "autoplay",
     "playlist",
     "djrole",
+    "limits",
     "weblink",
     "language",
 }

@@ -68,11 +68,28 @@ AUTOPLAY_MAX_SECONDS = 600  # Longer tracks (mixes, albums, podcasts) are skippe
 AUTOPLAY_HISTORY = 50  # Recently played video ids that autoplay never repeats
 AUTOPLAY_CANDIDATES = 30  # Entries read from the related "RD<id>" mix
 AUTOPLAY_TRIES = 3  # Candidates downloaded before giving up
+
+
+# Anti-abuse limits on what may be queued (per-guild overrides: `/limits`, see
+# limits.py). These are the defaults of guilds that never changed them.
+def _int_env(name, default):
+    try:
+        return max(0, int(os.getenv(name, str(default)).strip()))
+    except ValueError:
+        print(f"⚠️  {name} is not a whole number; using {default}.")
+        return default
+
+
+MAX_QUEUE_SIZE = max(1, _int_env("MAX_QUEUE_SIZE", 200))  # Tracks waiting
+MAX_TRACKS_PER_USER = _int_env("MAX_TRACKS_PER_USER", 0)  # 0 = unlimited
+MAX_TRACK_MINUTES = _int_env("MAX_TRACK_MINUTES", 0)  # 0 = unlimited
+PLAY_COOLDOWN_SECONDS = _int_env("PLAY_COOLDOWN_SECONDS", 0)  # 0 = none
 # Persistent data (survives restarts): per-guild web page themes and logos.
 DATA_DIR = os.getenv("DATA_DIR") or "/app/data"
 THEMES_FILE = os.path.join(DATA_DIR, "themes.json")
 LOGO_DIR = os.path.join(DATA_DIR, "logos")
 VOLUME_FILE = os.path.join(DATA_DIR, "volume.json")
+LIMITS_FILE = os.path.join(DATA_DIR, "limits.json")
 # Per-guild DJ role (`!djrole`), see permissions.py.
 PERMISSIONS_FILE = os.path.join(DATA_DIR, "permissions.json")
 # Who gets the clip page's control link: "everyone" (posted in the status

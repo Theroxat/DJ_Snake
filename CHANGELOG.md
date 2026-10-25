@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Queue limits against abuse: `MAX_QUEUE_SIZE` (200), `MAX_TRACKS_PER_USER`, `MAX_TRACK_MINUTES` and `PLAY_COOLDOWN_SECONDS` (all off at 0) are the defaults of every server, and `/limits` (Manage Server to change, saved in `DATA_DIR/limits.json`) overrides them per server. They apply to `/play`, the clip page's add, saved playlist loads and autoplay (queue size only); the page counts as one "web" member. DJs and Manage Server members skip the per-member limit and the cooldown. Playlists queue up to the limit and report what was skipped and why.
+
 ## [1.4.0] - 2026-10-23
 
 ### Added

@@ -7,6 +7,10 @@ DJ Snake is configured through environment variables. With Docker Compose, put t
 | `DISCORD_TOKEN` | none (required) | Bot token. A `token` file is a fallback. |
 | `COMMAND_PREFIX` | `!` | Prefix for text commands. |
 | `MAX_PLAYLIST_SIZE` | `30` | Maximum tracks loaded from a playlist (YouTube, Spotify, SoundCloud, Bandcamp, Deezer or Apple Music). |
+| `MAX_QUEUE_SIZE` | `200` | Maximum tracks waiting in a server's queue. |
+| `MAX_TRACKS_PER_USER` | `0` | Maximum tracks one member may have waiting (`0` = unlimited). The clip page counts as one member. |
+| `MAX_TRACK_MINUTES` | `0` | Longest single track accepted, in minutes (`0` = unlimited). |
+| `PLAY_COOLDOWN_SECONDS` | `0` | Seconds a member must wait between two `/play` calls (`0` = none). |
 | `MEDIA_FORMAT` | max 720p H.264 + m4a | yt-dlp format selector. The default is `bestvideo[height<=720][vcodec^=avc1]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]/best`. |
 | `TEMP_DIR` | a fresh temporary directory | Where downloaded tracks are stored. Files are deleted once played. |
 | `POT_BASE_URL` | `http://pot-provider:4416` | URL of the PO token provider. The default matches Docker Compose. |
@@ -17,7 +21,7 @@ DJ Snake is configured through environment variables. With Docker Compose, put t
 | `IDLE_DISCONNECT_SECONDS` | `300` | Seconds the bot stays in voice once the queue runs out, before leaving (30 s instead when no human is left in the channel). |
 | `AUTOPLAY` | `0` | Default of the per-session autoplay setting (`1`, `true`, `on` or `yes` to start with it on). Change it per session with `!autoplay` or the clip page. |
 | `SLASH_SYNC_GUILD` | empty | Server ID. When set, slash commands are published to that server only, and show up at once (for development). Empty publishes them globally, which Discord can take up to an hour to show. |
-| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), languages (`languages.json`), volumes (`volume.json`), DJ roles (`permissions.json`), saved playlists (`playlists.db`), logos (`logos/`), listening stats (`stats.db`) and cached lyrics (`lyrics/`). Compose mounts `./data` there. |
+| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), languages (`languages.json`), volumes (`volume.json`), DJ roles (`permissions.json`), queue limits (`limits.json`), saved playlists (`playlists.db`), logos (`logos/`), listening stats (`stats.db`) and cached lyrics (`lyrics/`). Compose mounts `./data` there. |
 | `WEB_CONTROL` | `everyone` | Who gets the clip page's control link. `everyone`: the status message shows it next to the view-only link. `dj`: it shows only the view-only link, and DJs get the control link by DM with `!weblink`. A server with a DJ role always behaves as `dj`. See [Who controls the music](clip-page.md#who-controls-the-music). |
 | `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`: `arcade`, `minimal`, `night`, `vinyl`, `club`, `terminal`, `space` or `cobalt`. |
 | `LYRICS` | `1` | Synced lyrics on the clip page, from [LRCLIB](https://lrclib.net). `0` turns them off: the bot sends no lookups and the page hides the Lyrics button. See [Lyrics](clip-page.md#lyrics). |

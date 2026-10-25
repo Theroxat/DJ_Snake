@@ -46,6 +46,10 @@ guild_perms = {}
 guild_themes = {}
 # Guild id -> volume percent (see volume.py); absent means VOLUME_DEFAULT.
 guild_volumes = {}
+# Guild id -> {field: value} limit overrides (see limits.py).
+guild_limits = {}
+# (guild id, member id) -> clock() of the last accepted /play (cooldown).
+play_times = {}
 # Guild id -> language code chosen with `!language` (see i18n.py).
 guild_languages = {}
 # `!theme edit` links: token -> (guild id, expiry on clock()). In memory only.

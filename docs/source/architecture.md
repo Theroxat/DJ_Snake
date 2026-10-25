@@ -17,6 +17,7 @@ Lowest layer first; each module imports only the ones above it.
 | `player.py` | `MusicPlayer` (per-server state), cleanup of files and history helpers. |
 | `themes.py` | Theme storage, logos and `!theme edit` tokens. |
 | `volume.py` | Per-server volume storage and the percent to gain mapping. |
+| `limits.py` | Anti-abuse queue limits: per-server settings (`limits.json`) over the `.env` defaults, the checks used wherever a track enters the queue, and the `/play` cooldown. |
 | `permissions.py` | The DJ role (`permissions.json`), `WEB_CONTROL`, and the list of Discord commands reserved for DJs. |
 | `sessions.py` | Session expiry, control and view-only link ids, and the status panel. |
 | `media.py` | YouTube URL parsing, yt-dlp downloads, the SponsorBlock cut, audio analysis and FFmpeg options, YouTube search. |
@@ -76,7 +77,7 @@ discord.py drops and resumes the gateway roughly every couple of hours. Do no cl
 
 ### Persistent data
 
-Everything persistent lives in `DATA_DIR`: `themes.json` (per-server themes, written atomically), `languages.json` (per-server languages), `volume.json` (per-server volume), `permissions.json` (DJ roles), `playlists.db` (saved playlists), `logos/`, `stats.db` (SQLite, WAL) and `lyrics/` (lyrics found on LRCLIB, one JSON file per YouTube video id).
+Everything persistent lives in `DATA_DIR`: `themes.json` (per-server themes, written atomically), `languages.json` (per-server languages), `volume.json` (per-server volume), `permissions.json` (DJ roles), `limits.json` (queue limits), `playlists.db` (saved playlists), `logos/`, `stats.db` (SQLite, WAL) and `lyrics/` (lyrics found on LRCLIB, one JSON file per YouTube video id).
 
 ## Demo site
 
