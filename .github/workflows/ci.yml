@@ -57,6 +57,31 @@ jobs:
               run: |
                   pytest -q
 
+    e2e:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Set up Python
+              uses: actions/setup-python@v7
+              with:
+                  python-version: "3.13"
+
+            - name: Install system dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y ffmpeg
+
+            - name: Install Python dependencies and Chromium
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install -r requirements-dev.txt
+                  python -m playwright install --with-deps chromium
+
+            - name: Run end-to-end tests
+              run: |
+                  pytest -m e2e -v -rs --durations=0
+
     docs:
         runs-on: ubuntu-latest
         steps:

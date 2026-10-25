@@ -30,7 +30,9 @@ Black uses its default 88-column limit.
 
 Run `pytest` (after `pip install -r requirements-dev.txt`). The suite in `tests/` needs no network, Discord or YouTube: voice, channels and FFmpeg are faked, and the few tests that need the real `ffmpeg` binary are skipped without it. Add tests for any behaviour you change.
 
-Playback itself still needs a hand test: run the bot against a test server and try your change, for example `!play <youtube url>`, plus the clip page if you touched `web/`.
+End-to-end tests (`tests/e2e/`, marked `e2e`, left out of a plain `pytest`) run the real FFmpeg pipeline on media generated at run time and drive the real clip page in headless Chromium. Run them with `python -m playwright install chromium` once, then `pytest -m e2e` (ffmpeg needed on `PATH`).
+
+Playback in Discord itself still needs a hand test: run the bot against a test server and try your change, for example `!play <youtube url>`, plus the clip page if you touched `web/`. The [contributing docs](docs/source/contributing.md#manual-test-on-a-real-discord-server) have a 20-minute checklist covering every feature.
 
 ## Pull requests
 

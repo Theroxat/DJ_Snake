@@ -67,7 +67,19 @@ the real `ffmpeg` binary are marked `ffmpeg` and skipped without it. Patch
 `permissions.PERMISSIONS_FILE` at the test's own directory and
 calls `stats.flush()` at teardown; call `stats.flush()` before reading the
 database in a test.
-Playback in Discord is still tested by hand, e.g. `!play <youtube url>`.
+End-to-end tests live in `tests/e2e/`, marked `e2e`: `pytest.ini`'s `addopts`
+leaves them out of `pytest`, `pytest -m e2e` runs only them (CI job `e2e`).
+`e2e_kit.py` generates the media with ffmpeg at run time (`chirp.mp4`: 1.5 s
+silence, an 18 s sweep whose pitch encodes the file time, 2 s silence;
+`tone.mp4`: a quiet steady 440 Hz) and has `PacedVoiceClient`, a voice client
+whose thread really reads the mixer's PCM frames (at `speed` times real time)
+and keeps them for measurement. `test_e2e_audio.py` drives the real
+`play_next()` chain; `test_e2e_web.py` serves `build_web_app()` on a free port
+and drives `web/index.html` in Chromium with Playwright (`requirements-dev.txt`,
+plus `python -m playwright install chromium`); they skip without ffmpeg or the
+browser. They wait on conditions (`wait_until()`, Playwright's `expect`), never
+on fixed sleeps. Playback in Discord is still tested by hand: see the checklist
+in `docs/source/contributing.md`.
 
 ## Release
 

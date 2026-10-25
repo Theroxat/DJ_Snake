@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- End-to-end tests (`pytest -m e2e`, a new `e2e` CI job): the real FFmpeg playback chain on generated media (automix trim and loudness, crossfade, seek, volume) and the clip page in headless Chromium (sync, live updates, controls, view-only link, themes, lyrics, narrow screens). The contributing docs add a manual checklist for a real Discord server.
+
 ## [1.4.0] - 2026-10-23
 
 ### Added
