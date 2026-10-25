@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Clip page: Media Session support. The lock screen, headsets and media keys show the current track (title, artist from an "Artist - Title" title, server and channel, artwork, position) and, with the control link, drive play, pause, next, previous and seeking (+/- 10 s). A silent audio element started on the first tap makes browsers show the controls; view-only links get metadata only.
+
 ## [1.4.0] - 2026-10-23
 
 ### Added

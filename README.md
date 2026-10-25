@@ -38,6 +38,7 @@
 - Optional autoplay ("radio"): when the queue runs out, a related YouTube track plays on.
 - Listening stats per server on the clip page: top tracks and artists, the most skipped track, hours played, sessions, peak listeners and a day-by-hour heatmap, for the last week, month or all time.
 - Live viewer count in the clip page header.
+- Lock screen, headset and media key controls through the browser's Media Session API (see the clip page docs for browser support).
 - Synced lyrics over the clip, from [LRCLIB](https://lrclib.net) (free, no key; `LYRICS=0` turns them off).
 - English and French: `!language fr` switches the bot's replies, the status message and the clip page for the whole server (see [Language](#language)).
 - Themable clip page: eight looks, including a custom one with your colors, name and logo (see [Themes](#themes) below).

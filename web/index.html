@@ -2055,6 +2055,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     endDissolve();
     video.pause();
     state = null; curId = null; curNp = null; // a revived session reloads the video from scratch
+    msClear();
     lyricsFor(null);
   }
 
@@ -2241,6 +2242,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     if (dissolveTimer) endDissolve(); // the server cancels the overlap too
     if (!pendingSeek && video.readyState >= 1) { try { video.currentTime = targetPos(); } catch (e) {} }
     tick();
+    msPosition();
     send("seek", { position: Math.round(pos * 10) / 10 });
   }
   seekEl.addEventListener("pointerdown", (e) => {
@@ -2271,6 +2273,98 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     seekTo(curElapsed() + (e.key === "ArrowLeft" ? -5 : 5));
   });
   setInterval(tick, 200);
+
+  // ---- Media Session: lock screen, headset and OS media keys.
+  // Browsers only show these controls while a media element plays with sound,
+  // and the clip <video> is muted, so a tiny silent looping <audio> is started
+  // on the first user gesture (autoplay rules). Metadata is shown for everyone;
+  // action handlers are registered only with the control link (view-only: none).
+  const MS = "mediaSession" in navigator ? navigator.mediaSession : null;
+  const MS_SEEK_STEP = 10;
+  let msAudio = null, msUnlocked = false, msHandlers = false, msLive = false, msSig = "";
+  function msSilentUrl() {
+    // 1 s of 16-bit mono 8 kHz silence as a WAV blob: no asset to serve.
+    const n = 8000, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    str(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); str(8, "WAVEfmt ");
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, n, true); v.setUint32(28, n * 2, true); v.setUint16(32, 2, true);
+    v.setUint16(34, 16, true); str(36, "data"); v.setUint32(40, n * 2, true);
+    return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+  }
+  function msEnsureAudio() {
+    if (!MS || !msUnlocked || !msLive) return;
+    try {
+      if (!msAudio) {
+        msAudio = new Audio(msSilentUrl());
+        msAudio.loop = true;
+        msAudio.setAttribute("aria-hidden", "true");
+      }
+      if (msAudio.paused) { const p = msAudio.play(); if (p && p.catch) p.catch(() => {}); }
+    } catch (e) {}
+  }
+  function msUnlock() {
+    if (msUnlocked) return;
+    msUnlocked = true;
+    for (const ev of ["pointerdown", "keydown", "touchend"]) window.removeEventListener(ev, msUnlock, true);
+    msEnsureAudio();
+  }
+  if (MS) for (const ev of ["pointerdown", "keydown", "touchend"]) window.addEventListener(ev, msUnlock, true);
+  function msSet(action, fn) { try { MS.setActionHandler(action, fn); } catch (e) {} }
+  function msBind(on) {
+    if (!MS || on === msHandlers) return;
+    msHandlers = on;
+    msSet("play", on ? () => { if (active() && paused) send("resume"); } : null);
+    msSet("pause", on ? () => { if (active() && !paused) send("pause"); } : null);
+    msSet("nexttrack", on ? () => { if (active()) send("next"); } : null);
+    msSet("previoustrack", on ? () => { if (active()) send("previous"); } : null);
+    msSet("seekto", on ? (d) => { if (d && Number.isFinite(d.seekTime) && state) seekTo(state.start + d.seekTime); } : null);
+    msSet("seekbackward", on ? (d) => { if (state) seekTo(curElapsed() - ((d && d.seekOffset) || MS_SEEK_STEP)); } : null);
+    msSet("seekforward", on ? (d) => { if (state) seekTo(curElapsed() + ((d && d.seekOffset) || MS_SEEK_STEP)); } : null);
+  }
+  // "Artist - Title" titles give an artist; anything else has none.
+  function msSplitTitle(title) {
+    const m = /^(.{1,80}?)\s+[-–—]\s+(.+)$/.exec(title || "");
+    return m ? { artist: m[1], title: m[2] } : { artist: "", title: title || "" };
+  }
+  function msPosition() {
+    if (!MS || !MS.setPositionState || !state || !(state.end > state.start)) return;
+    try {
+      const dur = state.end - state.start;
+      MS.setPositionState({
+        duration: dur,
+        position: Math.max(0, Math.min(dur, curElapsed() - state.start)),
+        playbackRate: 1,
+      });
+    } catch (e) {}
+  }
+  function msUpdate(np, d) {
+    if (!MS) return;
+    msLive = true;
+    msBind(canControl);
+    const sp = msSplitTitle(np.title);
+    const album = [d.guild, d.channel].filter(Boolean).join(" · ");
+    const sig = [np.id, np.title, np.thumbnail, album].join("|");
+    if (sig !== msSig) {
+      msSig = sig;
+      const meta = { title: sp.title, artist: sp.artist, album };
+      if (np.thumbnail) {
+        meta.artwork = ["96x96", "192x192", "256x256", "384x384", "512x512"].map((sizes) => ({ src: np.thumbnail, sizes }));
+      }
+      try { MS.metadata = new MediaMetadata(meta); } catch (e) {}
+    }
+    MS.playbackState = paused ? "paused" : "playing";
+    msPosition();
+    msEnsureAudio();
+  }
+  function msClear() {
+    if (!MS) return;
+    msLive = false;
+    msSig = "";
+    msBind(false);
+    try { MS.metadata = null; MS.playbackState = "none"; } catch (e) {}
+    if (msAudio && !msAudio.paused) { try { msAudio.pause(); } catch (e) {} }
+  }
 
   // ---- lyrics (LRCLIB, through the bot): GET /api/{sid}/lyrics/{track id}
   // answers {synced: [[ms, line]...] | null, plain}, 202 while the bot is
@@ -2742,6 +2836,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
       setLive(false, "live_idle");
       lyricsFor(null);
       updateControls();
+      msClear();
       return;
     }
     if (!np) {
@@ -2754,6 +2849,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
       setLive(false);
       lyricsFor(null);
       updateControls();
+      msClear();
       return;
     }
     const tl = $("title"), tsig = np.id + "|" + np.title + "|" + np.url;
@@ -2778,6 +2874,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     else curNp = np;
     lyricsFor(np.id);
     updateControls();
+    msUpdate(np, d);
   }
 
   // ---- controls
