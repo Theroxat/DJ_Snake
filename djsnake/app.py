@@ -8,6 +8,7 @@ import discord
 from . import commands  # noqa: F401  (registers the commands)
 from . import state, stats
 from .config import COMMAND_PREFIX, SLASH_SYNC_GUILD
+from .controls import voteskip_update
 from .i18n import t
 from .playback import idle_channel_emptied
 from .sessions import refresh_panel, session_cleanup_loop
@@ -34,6 +35,7 @@ async def on_voice_state_update(member, before, after):
     """Handle voice state changes for cleanup"""
     _record_listeners(member, after)
     _check_lingering_alone(member, before)
+    await _recount_votes(member, before, after)
     if member == bot.user and before.channel and not after.channel:
         print(f"Bot was disconnected from voice channel: {before.channel.name}")
 
@@ -51,6 +53,23 @@ async def on_voice_state_update(member, before, after):
             player.is_playing = False
             refresh_panel(player)
             # The web session stays; it expires after SESSION_IDLE_HOURS.
+
+
+async def _recount_votes(member, before, after):
+    """Someone joined, left or (un)deafened in the bot's channel: the skip
+    votes count again, and may now be enough (or the track may have changed
+    hands: votes of members who left no longer count)."""
+    try:
+        if member.bot:
+            return
+        player = state.music_players.get(member.guild.id)
+        if not player or not player.votes or not player.in_voice():
+            return
+        if player.voice_client.channel not in (before.channel, after.channel):
+            return
+        await voteskip_update(player, member.guild.id)
+    except Exception as e:
+        print(f"Vote recount failed: {e}")
 
 
 def _check_lingering_alone(member, before):

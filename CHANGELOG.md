@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Vote to skip: `/voteskip` (`!vs`) lets members in the voice channel vote to skip the current track when they cannot use `/next`. More than `VOTESKIP_PERCENT` (default 50) of the non-deafened humans in the channel must vote; DJs and the requester skip at once, votes are recounted when people join, leave or deafen and reset with each track. One message shows the count and is edited in place, then reads "Skipped by vote". `/voteskip threshold <1-100>` (DJs) sets it per server (`DATA_DIR/voteskip.json`). The `/next` refusal suggests `/voteskip`, the status panel shows the count, and `/api/{sid}/state` has `votes: {count, needed}` shown as a small badge on the page.
+
 ## [1.4.0] - 2026-10-23
 
 ### Added

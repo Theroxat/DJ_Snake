@@ -81,6 +81,7 @@ Every command is both a `!` command and a slash command (`/play`, `/playlist sav
 | `!play <link or search text>` | Join your voice channel and queue a YouTube video or playlist, a SoundCloud or Bandcamp track or set, a Spotify, Deezer or Apple Music playlist, album or track, or the best YouTube match for the text. |
 | `!list` | Show the current queue. |
 | `!next` | Skip to the next track. |
+| `!voteskip` (`!vs`), `!voteskip threshold <1-100>` | Vote to skip the current track, open to everyone in the bot's voice channel (more than 50% of the listeners by default). DJs and the requester skip at once. The threshold is set by DJs, see `VOTESKIP_PERCENT`. |
 | `!pause` / `!resume` | Pause or resume playback. |
 | `!seek <pos>` | Jump to a position in the track, in seconds or `mm:ss`, as the clip page shows it. |
 | `!crossfade on\|off` | Enable or disable crossfade for this session (off by default). |
@@ -97,7 +98,7 @@ Every command is both a `!` command and a slash command (`/play`, `/playlist sav
 
 | `!language [code\|reset]` | Show or set the language of the bot and the clip page for the server (`en`, `fr`). Needs the Manage Server permission. |
 
-When a server has a DJ role, `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!volume`, `!autoplay`, `!stop` and `!reset` need that role or the Manage Server permission; whoever queued the playing track may still skip it with `!next`. `!play` and `!list` stay open to everyone. See [Who controls the music](#who-controls-the-music).
+When a server has a DJ role, `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!volume`, `!autoplay`, `!stop` and `!reset` need that role or the Manage Server permission; whoever queued the playing track may still skip it with `!next`, and anyone in the voice channel can `!voteskip`. `!play` and `!list` stay open to everyone. See [Who controls the music](#who-controls-the-music).
 
 ## Language
 
@@ -214,8 +215,9 @@ Set these in `.env` (see `.env.example`).
 | `PUBLIC_BASE_URL` | empty (`http://localhost:WEB_PORT`) | Public address used in the posted clip link. |
 | `SESSION_IDLE_HOURS` | `6` | Idle hours before a clip link expires. |
 | `AUTOPLAY` | `0` | Default of the per-session autoplay setting (`1` to start with it on). |
+| `VOTESKIP_PERCENT` | `50` | Default vote-to-skip threshold, 1 to 100: more than this share of the listeners must vote. Change it per server with `/voteskip threshold`. |
 | `SLASH_SYNC_GUILD` | empty | Server ID to publish slash commands to instantly (development). Empty: global sync. |
-| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), languages (`languages.json`), volumes (`volume.json`), DJ roles (`permissions.json`), saved playlists (`playlists.db`), logos (`logos/`), listening stats (`stats.db`) and cached lyrics (`lyrics/`). Compose mounts `./data` there. |
+| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), languages (`languages.json`), volumes (`volume.json`), vote-skip thresholds (`voteskip.json`), DJ roles (`permissions.json`), saved playlists (`playlists.db`), logos (`logos/`), listening stats (`stats.db`) and cached lyrics (`lyrics/`). Compose mounts `./data` there. |
 | `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`. |
 | `LYRICS` | `1` | Synced lyrics on the clip page, from lrclib.net (`0` turns them off: no lookups, no button). |
 | `WEB_CONTROL` | `everyone` | `everyone`: the status message shows the control link and the view-only link. `dj`: only the view-only link; DJs get the control link with `!weblink`. A server with a DJ role always behaves as `dj`. |

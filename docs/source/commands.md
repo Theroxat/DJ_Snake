@@ -7,6 +7,7 @@ Every command works two ways: as a text message with the prefix, `!` by default 
 | `!play <link or search text>` | Join your voice channel and queue a YouTube video or playlist, a SoundCloud or Bandcamp track or set, a Spotify, Deezer or Apple Music playlist, album or track, or the best YouTube match for the text. |
 | `!list` | Show the current queue. |
 | `!next` | Skip to the next track. |
+| `!voteskip` (`!vs`), `!voteskip threshold <1-100>` | Vote to skip the current track, open to everyone in the bot's voice channel (more than 50% of the listeners by default). DJs and the requester skip at once. The threshold is set by DJs, see `VOTESKIP_PERCENT`. |
 | `!pause` / `!resume` | Pause or resume playback. |
 | `!seek <pos>` | Jump to a position in the track, in seconds or `mm:ss`, as the clip page shows it. |
 | `!crossfade on\|off` | Enable or disable crossfade for this session (off by default). |
@@ -70,6 +71,10 @@ Shuffles the upcoming queue once. The current track keeps playing and the order 
 
 Without an argument, shows the server's volume. With a number from 0 to 150 (a trailing `%` is fine), sets it. 100 is the normal level (tracks are normalised to -14 LUFS); 0 is silent and 150 is about 3.5 dB louder, with a soft limiter so loud peaks are squeezed instead of clipping. The change applies to the playing track at once, without restarting it, and glides over a tenth of a second to avoid clicks. The volume belongs to the server, is shared with the clip page and is saved in `DATA_DIR/volume.json`.
 
+### `!voteskip` and `!voteskip threshold <1-100>`
+
+For servers with a DJ role: members who cannot use `!next` can ask to skip the track instead (the refusal message suggests it). `!voteskip` (alias `!vs`, or `/voteskip`) records your vote for the current track; you must be in the bot's voice channel. Once more than the threshold share of the listeners have voted (50% by default: 3 of 5, 2 of 3, everyone when there are 2), the track is skipped. DJs and the member who queued the track skip at once, as with `!next`. Who counts: the humans in the channel who are not deafened (a deafened member does not hear the track, so does not count in the total and cannot vote). Votes are counted again whenever someone joins, leaves or deafens, so members who left no longer count, and the votes start over with each new track. The bot posts one message with the count ("🗳️ Vote to skip: 2/3 votes"), edits it as votes change and finishes it with "Skipped by vote". The status message shows the count while votes are active, and the clip page shows it in the header (it cannot vote: it has no identity). `!voteskip threshold <1-100>` sets the server's share (DJ role or Manage Server; without an argument it shows it) and is saved in `DATA_DIR/voteskip.json`; `VOTESKIP_PERCENT` sets the default.
+
 ### `!autoplay [on|off]`
 
 Keeps the music going when the queue runs out. With autoplay on, the bot picks a track related to the last one (from YouTube's mix for that video), downloads it while the current track is still playing so there is no gap, and plays it. Tracks played in the last 50, live streams, anything over 10 minutes and titles that look like podcasts, interviews or compilations are skipped. If nothing suitable is found or no pick is ready in time, the bot lingers in voice as usual, and it never autoplays into an empty channel. A loop mode, when active, takes precedence over autoplay, and a track you queue always plays before an autoplay pick. Without an argument, shows the current setting. Off by default; `AUTOPLAY=1` changes the default. The status message shows "📻 Autoplay on" and marks autoplay tracks.
@@ -121,7 +126,7 @@ Needs the **Manage Server** permission. The setting is saved per server in `DATA
 
 With a DJ role set:
 
-- `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!volume`, `!autoplay`, `!stop` and `!reset` need the DJ role or the Manage Server permission. The member who queued the playing track may still skip it with `!next`.
+- `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!volume`, `!autoplay`, `!stop` and `!reset` need the DJ role or the Manage Server permission. The member who queued the playing track may still skip it with `!next`, and everyone can use `!voteskip`.
 - `!play` and `!list` stay open to everyone: adding a track never interrupts what plays, and DJs can still skip or remove it.
 - The status message shows only the clip page's view-only link, and the control link posted before stops working (every change of the role gives a live session a new one and retires the server's `!theme edit` links). See [Who controls the music](clip-page.md#who-controls-the-music).
 

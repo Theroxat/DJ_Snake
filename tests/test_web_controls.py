@@ -24,6 +24,7 @@ STATE_KEYS = {
     "crossfade",
     "loop",
     "autoplay",
+    "votes",
     "crossfading",
     "volume",
     "server_time",

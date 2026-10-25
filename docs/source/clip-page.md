@@ -28,6 +28,8 @@ The page shows the current video, the queue ("Up next"), a "Now playing" row, tr
 - save the current track and queue as a playlist, or load a saved one (see `!playlist` in [Commands](commands.md));
 - show the lyrics of the current track.
 
+When members are voting to skip the track on Discord (`!voteskip`), a small "Skip 2/3" badge appears in the header. The page itself has no identity, so it cannot vote.
+
 Web actions are applied exactly like Discord commands and are reflected in the status message. The header shows how many people have the page open and a chart button that opens the server's listening stats.
 
 ### Sync

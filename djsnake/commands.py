@@ -36,6 +36,8 @@ from .controls import (
     control_seek,
     control_shuffle,
     control_volume,
+    control_voteskip,
+    control_voteskip_threshold,
     playlist_entries,
     read_spotify,
     seek_label,
@@ -70,11 +72,12 @@ from .permissions import (
 )
 from .themes import issue_edit_token, reset_theme, save_themes, theme_for
 from .volume import parse_volume, volume_for
+from .voteskip import parse_percent, threshold_for
 
 bot = state.bot
 
 
-def hybrid(name, description):
+def hybrid(name, description, **kwargs):
     """Register a command that works as `!name` and as `/name`.
 
     Every command goes through this decorator (see "Adding a command" in
@@ -84,7 +87,7 @@ def hybrid(name, description):
     """
 
     def decorate(func):
-        command = bot.hybrid_command(name=name, description=description)(func)
+        command = bot.hybrid_command(name=name, description=description, **kwargs)(func)
         return commands.guild_only()(command)
 
     return decorate
@@ -121,7 +124,18 @@ def error_message(error, command=None, slash=False, guild=None):
         name = getattr(command, "name", command) or ""
         extra = t("cmd.not_dj_requester", lang) if name in REQUESTER_COMMANDS else ""
         need = _dj_requirement(guild, lang)
-        return t("cmd.not_dj", lang, prefix=prefix, name=name, need=need, extra=extra)
+        hint = ""
+        if name == "next" and guild is not None and dj_role(guild.id) is not None:
+            hint = t("cmd.not_dj_voteskip", lang, prefix=prefix)
+        return t(
+            "cmd.not_dj",
+            lang,
+            prefix=prefix,
+            name=name,
+            need=need,
+            extra=extra,
+            hint=hint,
+        )
     if isinstance(error, (commands.CommandNotFound, app_commands.CommandNotFound)):
         return None
     if isinstance(error, commands.MissingRequiredArgument):
@@ -471,6 +485,54 @@ async def next_track(ctx):
     if await _run_command_control(ctx, control_next) is not _FAILED:
         player = state.music_players[ctx.guild.id]
         set_action(player, t("action.skipped", player_lang(player)))
+
+
+@hybrid("voteskip", "Vote to skip the current track", aliases=["vs"])
+@app_commands.describe(
+    setting="threshold to set the share of votes needed (DJ only)",
+    percent="1 to 100 (with threshold)",
+)
+@app_commands.choices(
+    setting=[app_commands.Choice(name="threshold", value="threshold")]
+)
+async def voteskip(ctx, setting: str = None, percent: str = None):
+    """Vote to skip the current track, or set how many votes it takes."""
+    lang = ctx_lang(ctx)
+    if setting is not None:
+        if setting.lower() != "threshold":
+            await fail_t(ctx, "cmd.voteskip_usage")
+            return
+        if percent is None:
+            value = threshold_for(ctx.guild.id)
+            await ctx.send(t("cmd.voteskip_info", lang, percent=value), ephemeral=True)
+            return
+        value = parse_percent(percent)
+        if value is None:
+            await fail_t(ctx, "cmd.voteskip_usage")
+            return
+        require_dj(ctx)
+        try:
+            control_voteskip_threshold(ctx.guild.id, value)
+        except ControlError as e:
+            await ctx.send(f"⚠️ {e.text(lang)}", ephemeral=True)
+            return
+        await ack(ctx)
+        return
+    player = state.music_players.get(ctx.guild.id)
+    if not player:
+        await fail(ctx, ControlError("nothing_playing").text(lang))
+        return
+    touch(player)
+    if can_run_dj_command(ctx.author, ctx.guild.id, "next", player):
+        # A DJ, or the requester of this track: skip at once, as !next.
+        await next_track.callback(ctx)
+        return
+    try:
+        await control_voteskip(player, ctx.guild.id, ctx.author, ctx.channel)
+    except ControlError as e:
+        await fail(ctx, e.text(lang))
+        return
+    await ack(ctx)
 
 
 def parse_position(text):
@@ -1075,6 +1137,7 @@ HELP_ORDER = (
     "play",
     "list",
     "next",
+    "voteskip",
     "pause",
     "resume",
     "seek",

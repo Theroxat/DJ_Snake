@@ -98,10 +98,10 @@ which is no longer read), `TEMP_DIR`, `POT_BASE_URL`, `WEB_PORT` (47823),
 `PUBLIC_BASE_URL` (e.g. `https://dj.example.com`; empty falls back to
 `http://localhost:WEB_PORT`), `SESSION_IDLE_HOURS` (6), `IDLE_DISCONNECT_SECONDS`
 (300, the idle linger before leaving voice once the queue runs out), `AUTOPLAY`
-(0, default of the per-session autoplay), `DATA_DIR` (`/app/data`, mounted from
+(0, default of the per-session autoplay), `VOTESKIP_PERCENT` (50, default vote-to-skip threshold, 1-100), `DATA_DIR` (`/app/data`, mounted from
 `./data` by Compose; the container's UID 1000 must be able to write it; it
 holds `themes.json`, `logos/`, `languages.json`, `volume.json`,
-`permissions.json`, `playlists.db`, `stats.db` and `lyrics/`),
+`permissions.json`, `voteskip.json`, `playlists.db`, `stats.db` and `lyrics/`),
 `SLASH_SYNC_GUILD` (empty: slash commands sync globally at startup; a server ID
 syncs to it only, at once, for development), `WEB_THEME` (`arcade`, the theme of
 guilds that never chose one), `WEB_CONTROL` (`everyone`, or `dj`: the control
@@ -143,6 +143,8 @@ Module map, lowest layer first (each imports only the ones above it):
 - `permissions.py`: the DJ role (`load_perms()`, `set_dj_role()`,
   `dj_role()`), `is_dj()`, `web_control_restricted()` and the Discord gate
   (`DJ_COMMANDS`, `REQUESTER_COMMANDS`, `can_run_dj_command()`).
+- `voteskip.py`: vote to skip (see Vote to skip): thresholds in
+  `{DATA_DIR}/voteskip.json`, `status()`, `votes_needed()`, `web_status()`.
 - `sessions.py`: session expiry (`touch()`, `session_player()`,
   `session_cleanup_loop()`, `open_session()`), link ids (`resolve_link()`,
   `rotate_control_link()`) and the status panel (`refresh_panel()`,
@@ -289,6 +291,31 @@ Module map, lowest layer first (each imports only the ones above it):
   a YouTube `v=` link also keeps its `list=` id for the playlist prompt; any
   other host gets the `bad_url` error. Web actions are announced in the
   session's text channel.
+- **Vote to skip** (`voteskip.py`, `control_voteskip()`, `voteskip_update()`;
+  `!voteskip` / `!vs` / `/voteskip`, not in `DJ_COMMANDS`): a member in the
+  bot's voice channel adds their id to `player.votes`. Eligible listeners are
+  the humans in the channel who are not deafened (self or server); deafened
+  members do not count in the total and cannot vote. The count is the votes
+  of members who are still eligible listeners, recomputed from the channel
+  every time (`status()`), so leaving, joining and deafening need no
+  bookkeeping: `app._recount_votes()` just calls `voteskip_update()` on
+  voice state updates in the bot's channel. Needed = `votes_needed(total,
+  percent)`: strictly more than `percent` of the listeners (`total * percent
+  // 100 + 1`), at least 1 and at most `total`. When enough, `control_next()`
+  runs. `player.reset_votes()` (from `mark_started(same_track=False)`, so every
+  new track including a loop replay and a crossfade promotion, and
+  `stop_and_clear()`) clears the votes and `player.vote_message`, the one
+  message per track, edited in place and finished with "Skipped by vote".
+  `!voteskip` by a DJ or the track's requester (`can_run_dj_command(...,
+  "next")`) skips at once. `!voteskip threshold [1-100]` is one hybrid command
+  with a `setting` argument (a slash group could not also be invoked bare);
+  setting needs `require_dj()`, persisted like volume (`control_voteskip_
+  threshold()`: `bad_threshold`, `threshold_not_saved`). Errors:
+  `vote_not_in_channel`, `vote_deafened`, `vote_already`. When a DJ role is
+  set, the `NotDJ` message for `next` adds `cmd.not_dj_voteskip`. The panel
+  shows "Skip votes n/m" and the state has `votes: {count, needed} | null`
+  (the page shows a header badge; it cannot vote: no identity, so no
+  `CONTROL_ACTIONS` entry). Tests: `tests/test_voteskip.py`.
 - **Loop and shuffle** (`player.loop`, per session, `off` by default; `!loop
   [off|track|queue]` or the web `loop` action, kept by `!reset`): `_advance()`
   replays `finished` when the track ended by itself under `track` (a new play
@@ -459,7 +486,7 @@ Module map, lowest layer first (each imports only the ones above it):
   `0.0.0.0:WEB_PORT`. Routes, the contract `web/index.html` relies on:
   `GET /` landing text; `GET /{sid}` serves `web/index.html`;
   `GET /api/{sid}/state` returns `{active, in_voice, guild, channel, loading,
-  paused, can_previous, can_control, crossfade, loop, volume, autoplay,
+  paused, can_previous, can_control, crossfade, loop, volume, autoplay, votes,
   crossfading, server_time, viewers, lang, lyrics, now_playing: {id, title,
   duration, thumbnail, url, autoplay, video_url, audio_only, elapsed, start,
   end} | null, queue: [{id, title, duration, thumbnail, url, autoplay}],
@@ -668,7 +695,7 @@ Module map, lowest layer first (each imports only the ones above it):
   `!pause`, `!resume`, `!seek` (position relative to the track's automix
   `start`, as the page shows it), `!crossfade on|off`, `!loop
   [off|track|queue]`, `!shuffle`, `!volume [0-150]`, `!autoplay [on|off]`,
-  `!playlist save|add|load|show|delete <name>` and `!playlist list` (a
+  `!voteskip [threshold <1-100>]` (alias `!vs`), `!playlist save|add|load|show|delete <name>` and `!playlist list` (a
   `hybrid_group`: `/playlist save`, ...), `!stop`, `!reset`, `!weblink` (see
   Permissions), and the Manage Server ones (`commands.has_guild_permissions`):
   `!theme [preset|reset|edit]`, `!djrole [role|off]` and `!language
