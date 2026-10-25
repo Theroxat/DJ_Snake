@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- 24/7 mode: `!stay [on|off]` (DJ to set, saved in `DATA_DIR/stay.json`) keeps the bot in its voice channel: no idle disconnect, `!stop` no longer leaves, and it rejoins the saved channel after a restart without playing anything. Dropped by Discord, it rejoins once, then turns 24/7 off (no reconnect loop). Optional `STAY_247` default, a `stay` field in `/api/{sid}/state`, "24/7" in the status panel and a header badge on the clip page.
+
 ## [1.4.0] - 2026-10-23
 
 ### Added

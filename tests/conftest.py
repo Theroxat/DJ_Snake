@@ -29,6 +29,7 @@ from djsnake import (  # noqa: E402
     permissions,
     playlists,
     state,
+    stay,
     stats,
     themes,
     volume,
@@ -56,6 +57,8 @@ def fresh_state(tmp_path, monkeypatch):
         state.guild_perms,
         state.guild_themes,
         state.guild_volumes,
+        state.guild_stay,
+        state.stay_retries,
         state.guild_languages,
         state.edit_tokens,
         state.viewers,
@@ -72,6 +75,8 @@ def fresh_state(tmp_path, monkeypatch):
     monkeypatch.setattr(themes, "THEMES_FILE", str(data_dir / "themes.json"))
     monkeypatch.setattr(themes, "LOGO_DIR", str(data_dir / "logos"))
     monkeypatch.setattr(volume, "VOLUME_FILE", str(data_dir / "volume.json"))
+    monkeypatch.setattr(stay, "STAY_FILE", str(data_dir / "stay.json"))
+    monkeypatch.setattr(stay, "STAY_247", False)
     monkeypatch.setattr(lyrics, "LYRICS_DIR", str(data_dir / "lyrics"))
     monkeypatch.setattr(lyrics, "ENABLED", True)
 

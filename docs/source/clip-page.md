@@ -54,7 +54,7 @@ A session belongs to the server, not to a voice connection: it survives the bot 
 
 A session expires after `SESSION_IDLE_HOURS` (6 by default) without playback, voice presence, commands or web actions. Its downloaded files are then deleted, and the old link answers that the session is unknown. Run `!play` again for a fresh one.
 
-When the queue runs out, the bot stays in voice for `IDLE_DISCONNECT_SECONDS` (300 by default) so a track added meanwhile plays at once without rejoining; the page stays usable. It leaves after 30 seconds if nobody is left in the channel.
+When the queue runs out, the bot stays in voice for `IDLE_DISCONNECT_SECONDS` (300 by default) so a track added meanwhile plays at once without rejoining; the page stays usable. It leaves after 30 seconds if nobody is left in the channel. With [24/7 mode](commands.md) on (`!stay on`) it never leaves, and the session does not expire while the bot is in voice; the page shows a small "24/7" badge.
 
 ## Exposing the page
 

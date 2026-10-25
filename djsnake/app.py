@@ -9,11 +9,13 @@ from . import commands  # noqa: F401  (registers the commands)
 from . import state, stats
 from .config import COMMAND_PREFIX, SLASH_SYNC_GUILD
 from .i18n import t
-from .playback import idle_channel_emptied
+from .playback import idle_channel_emptied, recover_stay, restore_stay
 from .sessions import refresh_panel, session_cleanup_loop
+from .stay import remember_channel, stay_on
 from .web import start_web_server, stop_web_server
 
 bot = state.bot
+_stay_restored = False  # on_ready runs again after gateway reconnects
 
 
 @bot.event
@@ -27,6 +29,12 @@ async def on_ready():
             name=t("presence"),
         )
     )
+    global _stay_restored
+    if not _stay_restored:
+        _stay_restored = True
+        task = asyncio.get_running_loop().create_task(restore_stay(list(bot.guilds)))
+        state.background_tasks.add(task)
+        task.add_done_callback(state.background_tasks.discard)
 
 
 @bot.event
@@ -34,6 +42,13 @@ async def on_voice_state_update(member, before, after):
     """Handle voice state changes for cleanup"""
     _record_listeners(member, after)
     _check_lingering_alone(member, before)
+    if (
+        member == bot.user
+        and before.channel
+        and after.channel
+        and before.channel != after.channel
+    ):
+        remember_channel(after.channel.guild.id, after.channel.id)  # Moved: 24/7
     if member == bot.user and before.channel and not after.channel:
         print(f"Bot was disconnected from voice channel: {before.channel.name}")
 
@@ -51,6 +66,9 @@ async def on_voice_state_update(member, before, after):
             player.is_playing = False
             refresh_panel(player)
             # The web session stays; it expires after SESSION_IDLE_HOURS.
+        if stay_on(guild.id):
+            # 24/7: rejoin once, else turn it off (no reconnect loop).
+            await recover_stay(guild)
 
 
 def _check_lingering_alone(member, before):

@@ -75,6 +75,13 @@ LOGO_DIR = os.path.join(DATA_DIR, "logos")
 VOLUME_FILE = os.path.join(DATA_DIR, "volume.json")
 # Per-guild DJ role (`!djrole`), see permissions.py.
 PERMISSIONS_FILE = os.path.join(DATA_DIR, "permissions.json")
+# 24/7 mode (`!stay`), see stay.py. STAY_247 is the default of guilds that never
+# ran the command (they still need a remembered channel to rejoin at startup).
+STAY_FILE = os.path.join(DATA_DIR, "stay.json")
+STAY_247 = os.getenv("STAY_247", "0").strip().lower() in ("1", "true", "on", "yes")
+# A 24/7 bot dropped from voice rejoins once; dropped again within this many
+# seconds it gives up and turns 24/7 off (no reconnect loop).
+STAY_RETRY_WINDOW = 120.0
 # Who gets the clip page's control link: "everyone" (posted in the status
 # panel next to the view-only link) or "dj" (the panel shows only the
 # view-only link; DJs get the control link by DM with `!weblink`). A guild

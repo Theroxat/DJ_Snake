@@ -424,6 +424,8 @@ header.dragover { outline: 2px dashed var(--accent); outline-offset: -6px; }
    it looks or acts clickable, and the remaining tools close up the gaps. */
 .viewonly { color: var(--muted); border-color: var(--hair); }
 .viewonly svg { width: 14px; height: 14px; }
+/* 24/7 mode (state `stay`): the bot never leaves its voice channel. */
+.stay { color: var(--accent); border-color: var(--accent); }
 [data-viewonly] .tcenter, [data-viewonly] .tside:not(.end), [data-viewonly] #addform,
 [data-viewonly] li button.grip, [data-viewonly] li button.rm,
 [data-viewonly] #voltoggle, [data-viewonly] #volpanel, [data-viewonly] #autoplay,
@@ -995,6 +997,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     <span id="net" class="badge net hud" data-i18n="net" hidden>Reconnecting…</span>
     <span id="live" class="badge live off hud"><i>●</i> <span id="livetxt">NOT SYNCED</span></span>
     <span id="viewonly" class="badge hud viewonly" title="This link can watch but not control the music. Ask a DJ for the control link." data-i18n-title="viewonly_title" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 10V7A5 5 0 0 0 7 7v3H5v11h14V10zM9 7a3 3 0 0 1 6 0v3H9z"/></svg><span data-i18n="viewonly">View only</span></span>
+    <span id="stay" class="badge hud stay" title="24/7 mode: the bot stays in the voice channel" data-i18n-title="stay_title" hidden><span data-i18n="stay">24/7</span></span>
     <span class="hud credits" data-i18n="credits">CREDITS: ∞</span>
     <span id="viewers" class="badge hud viewers" title="people on the page" data-i18n-title="viewers_title" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C6.5 5 2.7 9.3 1.5 12c1.2 2.7 5 7 10.5 7s9.3-4.3 10.5-7C21.3 9.3 17.5 5 12 5zm0 11.5a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9zm0-2.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg> <b id="viewcount">1</b></span>
     <button id="statsbtn" class="ghost palette" type="button" aria-haspopup="dialog" aria-controls="stats" aria-label="Stats" title="Stats" data-i18n-aria="stats" data-i18n-title="stats">
@@ -1323,6 +1326,8 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
       end_p2: "When DJ Snake comes back, use the new link posted in Discord.",
       viewonly_title: "This link can watch but not control the music. Ask a DJ for the control link.",
       viewonly: "View only",
+      stay_title: "24/7 mode: the bot stays in the voice channel",
+      stay: "24/7",
       shuffle: "Shuffle the queue",
       shuffled: "Queue shuffled.",
       loop_title: "Loop: {mode}",
@@ -1500,6 +1505,8 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
       end_p2: "Au retour de DJ Snake, utiliser le nouveau lien publié sur Discord.",
       viewonly_title: "Ce lien permet de regarder mais pas de contrôler la musique. Demander le lien de contrôle à un DJ.",
       viewonly: "Lecture seule",
+      stay_title: "Mode 24h/24 : le bot reste dans le salon vocal",
+      stay: "24h/24",
       shuffle: "Mélanger la file d’attente",
       shuffled: "File d’attente mélangée.",
       loop_title: "Boucle : {mode}",
@@ -2707,6 +2714,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
       document.documentElement.toggleAttribute("data-viewonly", !cc);
       $("viewonly").hidden = cc;
     }
+    $("stay").hidden = !d.stay;
     paused = !!d.paused && inVoice;
     canPrev = !!d.can_previous;
     if (!pending.has("crossfade")) xfade = !!d.crossfade;

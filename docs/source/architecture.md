@@ -76,7 +76,7 @@ discord.py drops and resumes the gateway roughly every couple of hours. Do no cl
 
 ### Persistent data
 
-Everything persistent lives in `DATA_DIR`: `themes.json` (per-server themes, written atomically), `languages.json` (per-server languages), `volume.json` (per-server volume), `permissions.json` (DJ roles), `playlists.db` (saved playlists), `logos/`, `stats.db` (SQLite, WAL) and `lyrics/` (lyrics found on LRCLIB, one JSON file per YouTube video id).
+Everything persistent lives in `DATA_DIR`: `themes.json` (per-server themes, written atomically), `languages.json` (per-server languages), `volume.json` (per-server volume), `permissions.json` (DJ roles), `stay.json` (24/7 mode and its voice channel), `playlists.db` (saved playlists), `logos/`, `stats.db` (SQLite, WAL) and `lyrics/` (lyrics found on LRCLIB, one JSON file per YouTube video id).
 
 ## Demo site
 

@@ -16,6 +16,7 @@ from .config import (
 from .i18n import lang_for, t
 from .permissions import web_control_restricted
 from .player import discard_tracks, guild_of, notify_state
+from .stay import stay_on
 from .volume import volume_for
 
 # --- Sessions ---------------------------------------------------------------
@@ -233,7 +234,10 @@ def render_panel(player):
         lines.append(t("panel.crossfade_on", lang))
     if player.loop != "off":
         lines.append(t("panel.loop", lang, mode=t(f"loop.mode.{player.loop}", lang)))
-    volume = volume_for(state.sessions.get(player.sid))
+    guild_id = state.sessions.get(player.sid)
+    if guild_id is not None and stay_on(guild_id):
+        lines.append(t("panel.stay", lang))
+    volume = volume_for(guild_id)
     if volume != VOLUME_DEFAULT:
         lines.append(t("panel.volume", lang, volume=volume))
     if player.autoplay:

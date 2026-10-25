@@ -15,6 +15,7 @@ from fakes import FakeVoiceClient, make_track, settle, titles
 
 STATE_KEYS = {
     "active",
+    "stay",
     "in_voice",
     "guild",
     "channel",

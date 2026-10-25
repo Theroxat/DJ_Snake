@@ -273,6 +273,7 @@
     `\`${P}shuffle\`: shuffle the upcoming queue once`,
     `\`${P}volume [0-150]\`: show or set the server's volume`,
     `\`${P}autoplay [on|off]\`: keep playing related tracks when the queue runs out`,
+    `\`${P}stay [on|off]\`: 24/7 mode, stay in the voice channel even when idle`,
     `\`${P}playlist save|add|load|show|delete <name>\`, \`${P}playlist list\`: saved playlists of the server`,
     `\`${P}theme [preset|reset|edit]\`: clip page theme (Manage Server)`,
     `\`${P}djrole [role|off]\`: the role that may control the music (Manage Server)`,
@@ -339,6 +340,18 @@
       }
       if (mode !== "on" && mode !== "off") return botSay(`📻 Autoplay is ${B.autoplay ? "on" : "off"}. Usage: \`${P}autoplay on|off\``);
       B.C.autoplay(mode === "on");
+      await later(250);
+      react(msg);
+    },
+    async stay(msg, arg) {
+      const mode = (arg || "").toLowerCase();
+      if (mode !== "on" && mode !== "off") {
+        return botSay(`🌙 24/7 mode is ${B.stay ? "on" : "off"}. Usage: \`${P}stay on|off\``);
+      }
+      B.C.stay(mode === "on");
+      botSay(mode === "on"
+        ? "🌙 24/7 mode on: I will stay in the voice channel, even when idle or after a restart."
+        : "🌙 24/7 mode off: I leave voice when the queue stays empty.");
       await later(250);
       react(msg);
     },

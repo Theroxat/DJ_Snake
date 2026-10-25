@@ -137,7 +137,7 @@
     const S = {
       sid: null, wid: null, inVoice: false, current: null, queue: [], history: [],
       startedAt: 0, pausedAt: null, pausedTotal: 0,
-      crossfade: false, loop: "off", volume: 100, autoplay: false, epoch: 0, jobs: 0, single: 0,
+      crossfade: false, loop: "off", volume: 100, autoplay: false, stay: false, epoch: 0, jobs: 0, single: 0,
       playlists: [], // saved playlists: {name, ids: YouTube video ids}
       pending: [], // pending_downloads: {key, title (null: link not read), source}
       loadLine: null, loadFinal: false, lastAction: null,
@@ -175,6 +175,7 @@
       clearIdle();
       S.current = null;
       S.pausedAt = null;
+      if (S.stay) return; // 24/7 mode: no timer, the bot never leaves
       idleTimer = setTimeout(() => {
         idleTimer = null;
         if (!S.inVoice || S.current || S.queue.length) return;
@@ -400,6 +401,7 @@
         changed();
       },
       autoplay(on) { S.autoplay = !!on; changed(); },
+      stay(on) { S.stay = !!on; if (S.stay) clearIdle(); else if (S.inVoice && !S.current && !S.queue.length) startIdle(); changed(); },
       add(url) {
         if (!S.inVoice) throw new ControlError("not_in_voice");
         queueLink(parseLink(url));
@@ -423,7 +425,8 @@
       stop() {
         S.epoch++;
         S.queue = []; S.history = []; S.pending = [];
-        leaveVoice();
+        if (S.stay) { clearIdle(); S.current = null; S.pausedAt = null; } // 24/7: stays
+        else leaveVoice();
         if (!S.jobs) { S.loadLine = null; S.loadFinal = false; }
         setAction("⏹️ Stopped");
       },
@@ -453,6 +456,7 @@
       if (S.crossfade) lines.push("🔀 Crossfade on");
       if (S.loop !== "off") lines.push(`🔁 Loop: ${S.loop}`);
       if (S.volume !== 100) lines.push(`🔊 Volume ${S.volume}%`);
+      if (S.stay) lines.push("🌙 24/7");
       if (S.autoplay) lines.push("📻 Autoplay on");
       if (S.loadLine) lines.push(S.loadLine);
       else if (S.pending.length > 1) lines.push(`📥 Downloading ${S.pending.length} tracks…`);
@@ -471,7 +475,7 @@
         body: {
           active: true, in_voice: S.inVoice, guild: "Friday Night", channel: "Lounge",
           loading: S.jobs > 0, paused: !!c && paused(), can_previous: !!c,
-          crossfade: S.crossfade, loop: S.loop, volume: S.volume, autoplay: S.autoplay, crossfading: false, server_time: Date.now() / 1000,
+          crossfade: S.crossfade, loop: S.loop, volume: S.volume, autoplay: S.autoplay, stay: S.stay, crossfading: false, server_time: Date.now() / 1000,
           viewers: viewers(), lang,
           theme: S.theme,
           lyrics: true,
@@ -656,6 +660,7 @@
       get theme() { return S.theme; },
       get volume() { return S.volume; },
       get autoplay() { return S.autoplay; },
+      get stay() { return S.stay; },
       setSkin(skin) { S.theme = Object.assign({}, S.theme, { skin }); changed(); },
       setAction,
     };

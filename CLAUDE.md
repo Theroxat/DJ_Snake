@@ -98,10 +98,10 @@ which is no longer read), `TEMP_DIR`, `POT_BASE_URL`, `WEB_PORT` (47823),
 `PUBLIC_BASE_URL` (e.g. `https://dj.example.com`; empty falls back to
 `http://localhost:WEB_PORT`), `SESSION_IDLE_HOURS` (6), `IDLE_DISCONNECT_SECONDS`
 (300, the idle linger before leaving voice once the queue runs out), `AUTOPLAY`
-(0, default of the per-session autoplay), `DATA_DIR` (`/app/data`, mounted from
+(0, default of the per-session autoplay), `STAY_247` (0, default of the per-guild 24/7 mode, see Stay 24/7), `DATA_DIR` (`/app/data`, mounted from
 `./data` by Compose; the container's UID 1000 must be able to write it; it
 holds `themes.json`, `logos/`, `languages.json`, `volume.json`,
-`permissions.json`, `playlists.db`, `stats.db` and `lyrics/`),
+`permissions.json`, `stay.json`, `playlists.db`, `stats.db` and `lyrics/`),
 `SLASH_SYNC_GUILD` (empty: slash commands sync globally at startup; a server ID
 syncs to it only, at once, for development), `WEB_THEME` (`arcade`, the theme of
 guilds that never chose one), `WEB_CONTROL` (`everyone`, or `dj`: the control
@@ -121,7 +121,7 @@ Module map, lowest layer first (each imports only the ones above it):
   (`WEB_INDEX` resolves `web/index.html` from the repository root).
 - `state.py`: shared mutable state: the `bot` instance, `music_players`,
   `sessions`, `watch_ids`, `guild_perms`, `guild_themes`, `guild_languages`,
-  `guild_volumes`, `edit_tokens`, `viewers`, `streams` (open live update
+  `guild_volumes`, `guild_stay`, `stay_retries`, `edit_tokens`, `viewers`, `streams` (open live update
   streams per sid), `counters`, `background_tasks` and `clock()`.
   Always use it as `state.music_players` (never `from .state import ...`), so
   every module and test sees the same objects.
@@ -140,6 +140,7 @@ Module map, lowest layer first (each imports only the ones above it):
 - `themes.py`: theme storage, logos and `!theme edit` tokens.
 - `volume.py`: per-server volume storage (`{DATA_DIR}/volume.json`) and
   `percent_to_gain()`.
+- `stay.py`: 24/7 mode storage (`{DATA_DIR}/stay.json`: `load_stay()`, `stay_on()`, `stay_channel()`, `set_stay()`, `remember_channel()`).
 - `permissions.py`: the DJ role (`load_perms()`, `set_dj_role()`,
   `dj_role()`), `is_dj()`, `web_control_restricted()` and the Discord gate
   (`DJ_COMMANDS`, `REQUESTER_COMMANDS`, `can_run_dj_command()`).
@@ -220,6 +221,29 @@ Module map, lowest layer first (each imports only the ones above it):
   `!stop` (`stop_and_clear()`), `!reset`, a kick and session expiry cancel
   it (`player.cancel_idle()`). The panel shows "💤 Queue empty — leaving in
   …". The demo backend lingers 60 s.
+- **Stay 24/7** (`stay.py`, `state.guild_stay`: guild id to `{on, channel}`,
+  saved in `{DATA_DIR}/stay.json`, atomic, cleaned on load; a guild with no
+  record follows `config.STAY_247`): `!stay [on|off]` (a `DJ_WHEN_SETTING`
+  command; no argument shows it; `on` outside voice joins the author's channel)
+  keeps the bot in voice. `schedule_idle_disconnect()` returns without a timer
+  when it is on (so the 30 s empty-channel rule is skipped too), `_idle_disconnect()`
+  re-checks it, and `!stop` clears the queue without leaving. The channel id is
+  remembered by `join_voice_channel()` and when a mod moves the bot
+  (`remember_channel()`). `on_ready` runs `restore_stay()` once: for each guild
+  with it on, `rejoin_stay()` joins the remembered channel through
+  `safe_voice_connect()` (2 attempts), skipping a deleted channel, a missing
+  Connect permission or a client already connected; nothing plays. A drop
+  (kick, deleted channel, Discord ending the voice session; `reconnect=False`
+  means a network blip is one too) runs `recover_stay()` from
+  `on_voice_state_update`: one rejoin, then if it happens again within
+  `STAY_RETRY_WINDOW` (120 s), or the channel is gone or off limits, or the
+  connect fails, `give_up_stay()` turns it off and shows `action.stay_lost`.
+  No reconnect loop. The web session already never expires while the bot is in
+  voice (`_session_expired()`), so nothing special is needed: 24/7 keeps it
+  alive. After a restart there is no session until the next `!play` (sessions
+  are in memory). Autoplay is unchanged (it still needs a human in the
+  channel). Panel line "🌙 24/7", state field `stay`, header badge `#stay`.
+  Tests: `tests/test_stay.py`.
 - **Autoplay** (`player.autoplay`, per session, default `config.AUTOPLAY`; `!autoplay
   [on|off]` or the web `autoplay` action, `control_autoplay()`): when `_advance()`
   finds the queue empty after a track that ended or was skipped and
@@ -437,7 +461,7 @@ Module map, lowest layer first (each imports only the ones above it):
     request used, so a view-only page never sees the control id.
   - Discord: the global `bot.check` `dj_gate()` calls
     `can_run_dj_command()`: a command named in `DJ_COMMANDS` (next, pause,
-    resume, seek, stop, reset, crossfade, loop, shuffle) needs `is_dj()`; `volume` and `autoplay` need it only to set a value (bare, they show the setting; `DJ_WHEN_SETTING`, `require_dj()`) (Manage Server, or
+    resume, seek, stop, reset, crossfade, loop, shuffle) needs `is_dj()`; `volume`, `autoplay` and `stay` need it only to set a value (bare, they show the setting; `DJ_WHEN_SETTING`, `require_dj()`) (Manage Server, or
     the guild's DJ role; no role set = everyone), except that
     `REQUESTER_COMMANDS` (next) is allowed to `track["requester_id"]` (set by
     `download_and_queue_song()`) on the playing track. A new mutating command
@@ -459,7 +483,7 @@ Module map, lowest layer first (each imports only the ones above it):
   `0.0.0.0:WEB_PORT`. Routes, the contract `web/index.html` relies on:
   `GET /` landing text; `GET /{sid}` serves `web/index.html`;
   `GET /api/{sid}/state` returns `{active, in_voice, guild, channel, loading,
-  paused, can_previous, can_control, crossfade, loop, volume, autoplay,
+  paused, can_previous, can_control, crossfade, loop, volume, autoplay, stay,
   crossfading, server_time, viewers, lang, lyrics, now_playing: {id, title,
   duration, thumbnail, url, autoplay, video_url, audio_only, elapsed, start,
   end} | null, queue: [{id, title, duration, thumbnail, url, autoplay}],
@@ -667,7 +691,7 @@ Module map, lowest layer first (each imports only the ones above it):
   Spotify, Deezer or Apple Music link, or search text), `!list`, `!next`,
   `!pause`, `!resume`, `!seek` (position relative to the track's automix
   `start`, as the page shows it), `!crossfade on|off`, `!loop
-  [off|track|queue]`, `!shuffle`, `!volume [0-150]`, `!autoplay [on|off]`,
+  [off|track|queue]`, `!shuffle`, `!volume [0-150]`, `!autoplay [on|off]`, `!stay [on|off]`,
   `!playlist save|add|load|show|delete <name>` and `!playlist list` (a
   `hybrid_group`: `/playlist save`, ...), `!stop`, `!reset`, `!weblink` (see
   Permissions), and the Manage Server ones (`commands.has_guild_permissions`):

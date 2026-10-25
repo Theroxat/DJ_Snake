@@ -17,6 +17,7 @@
 - **Optional crossfade** between tracks.
 - **Loop and shuffle**: repeat a track or the whole queue, or shuffle what is coming up.
 - **Optional autoplay**: a related track plays on when the queue runs out.
+- **24/7 mode**: the bot can stay in its voice channel for good, restarts included.
 - **Volume** from 0 to 150%, remembered per server.
 - **Saved playlists**: save the queue under a name and load it again later.
 - **Plain text search**: `!play never gonna give you up` queues the best YouTube match.
