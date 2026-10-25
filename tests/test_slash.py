@@ -32,6 +32,7 @@ NAMES = {
     "playlist",
     "djrole",
     "weblink",
+    "lastfm",
     "language",
 }
 

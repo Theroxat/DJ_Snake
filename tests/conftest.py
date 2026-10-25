@@ -24,6 +24,7 @@ from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 
 from djsnake import (  # noqa: E402
     i18n,
+    lastfm,
     lyrics,
     media,
     permissions,
@@ -60,6 +61,9 @@ def fresh_state(tmp_path, monkeypatch):
         state.edit_tokens,
         state.viewers,
         state.streams,
+        state.lastfm_links,
+        state.lastfm_pending_auth,
+        state.lastfm_queue,
         stats._peaks,
         web._stats_cache,
         lyrics._cache,
@@ -74,6 +78,7 @@ def fresh_state(tmp_path, monkeypatch):
     monkeypatch.setattr(volume, "VOLUME_FILE", str(data_dir / "volume.json"))
     monkeypatch.setattr(lyrics, "LYRICS_DIR", str(data_dir / "lyrics"))
     monkeypatch.setattr(lyrics, "ENABLED", True)
+    monkeypatch.setattr(lastfm, "FILE", str(data_dir / "lastfm.json"))
 
     def no_network(url):
         raise lyrics.LyricsUnavailable("no network in tests")

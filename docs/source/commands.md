@@ -19,6 +19,7 @@ Every command works two ways: as a text message with the prefix, `!` by default 
 | `!reset` | Force a clean voice reconnect. |
 | `!theme [preset\|reset\|edit]` | Show or set the clip page's default theme for the server. `edit` DMs you a private editor link. Needs the Manage Server permission. |
 | `!weblink` | DM you the clip page's control link and its view-only link. DJs only when control is limited. |
+| `!lastfm link\|unlink\|status` | Link, unlink or check your own Last.fm account for scrobbling. Only when Last.fm is configured, see [Last.fm](lastfm.md). |
 | `!djrole [role\|off]` | Show, set or remove the DJ role. Needs the Manage Server permission. |
 | `!language [code\|reset]` | Show or set the language of the bot and the clip page for the server (`en`, `fr`). Needs the Manage Server permission. |
 | `!help [command]` | List the commands, or show one, in the server's language. |

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Optional Last.fm scrobbling, off unless `LASTFM_API_KEY` and `LASTFM_API_SECRET` are set. `/lastfm link|unlink|status` lets each user link their own account (the authorisation link is sent privately); linked users in the voice channel get "now playing" and a scrobble after half the track or 4 minutes (tracks under 30 s are skipped). Scrobbles are sent in batches of 50 and retried without ever blocking playback. Session keys are stored in `DATA_DIR/lastfm.json` (mode 0600).
+
 ## [1.4.0] - 2026-10-23
 
 ### Added

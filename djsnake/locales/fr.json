@@ -196,5 +196,22 @@
   "web.lyrics_unavailable": "Les paroles sont indisponibles pour l’instant.",
   "loop.mode.off": "désactivée",
   "loop.mode.track": "titre",
-  "loop.mode.queue": "file d’attente"
+  "loop.mode.queue": "file d’attente",
+  "help.cmd.lastfm": "`{prefix}lastfm link|unlink|status` : envoie l’écoute sur un compte Last.fm",
+  "lastfm.usage": "❌ Utilisation : `{prefix}lastfm link`, `{prefix}lastfm unlink` ou `{prefix}lastfm status`",
+  "lastfm.disabled": "❌ Le scrobbling Last.fm n’est pas activé sur ce bot.",
+  "lastfm.link_prompt": "🎧 Ouvrir ce lien, autoriser DJ Snake sur Last.fm, puis appuyer sur **Terminé** (ou relancer `{prefix}lastfm link`) :\n{url}",
+  "lastfm.done": "Terminé",
+  "lastfm.linked": "✅ Compte Last.fm **{name}** lié. Les titres écoutés dans un salon vocal avec le bot sont désormais scrobblés.",
+  "lastfm.not_authorised": "❌ Last.fm n’a pas encore été autorisé. Ouvrir le lien, autoriser DJ Snake, puis réessayer.",
+  "lastfm.token_expired": "❌ Le lien a expiré. Relancer `{prefix}lastfm link`.",
+  "lastfm.no_link_in_progress": "❌ Aucune liaison en cours. Lancer d’abord `{prefix}lastfm link`.",
+  "lastfm.unavailable": "❌ Last.fm est injoignable pour le moment. Réessayer plus tard.",
+  "lastfm.save_failed": "❌ Impossible d’enregistrer la liaison Last.fm (le dossier de données n’est pas accessible en écriture).",
+  "lastfm.unlinked": "✅ Compte Last.fm dissocié.",
+  "lastfm.not_linked": "ℹ️ Aucun compte Last.fm n’est lié. Lancer `{prefix}lastfm link`.",
+  "lastfm.status.one": "✅ Compte Last.fm **{name}** lié ({count} scrobble en attente d’envoi).",
+  "lastfm.status.other": "✅ Compte Last.fm **{name}** lié ({count} scrobbles en attente d’envoi).",
+  "lastfm.dm_failed": "❌ Impossible d’envoyer un message privé. Autoriser les messages privés des membres du serveur, puis réessayer.",
+  "lastfm.dm_sent": "📬 Message privé envoyé."
 }

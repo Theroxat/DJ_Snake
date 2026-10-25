@@ -196,5 +196,22 @@
   "web.lyrics_unavailable": "Lyrics are unavailable right now.",
   "loop.mode.off": "off",
   "loop.mode.track": "track",
-  "loop.mode.queue": "queue"
+  "loop.mode.queue": "queue",
+  "help.cmd.lastfm": "`{prefix}lastfm link|unlink|status`: scrobble your listening to your Last.fm account",
+  "lastfm.usage": "❌ Usage: `{prefix}lastfm link`, `{prefix}lastfm unlink` or `{prefix}lastfm status`",
+  "lastfm.disabled": "❌ Last.fm scrobbling is not enabled on this bot.",
+  "lastfm.link_prompt": "🎧 Open this link, allow DJ Snake on Last.fm, then press **Done** (or run `{prefix}lastfm link` again):\n{url}",
+  "lastfm.done": "Done",
+  "lastfm.linked": "✅ Linked to the Last.fm account **{name}**. Tracks you hear in a voice channel with the bot are now scrobbled.",
+  "lastfm.not_authorised": "❌ Last.fm has not been authorised yet. Open the link, allow DJ Snake, then try again.",
+  "lastfm.token_expired": "❌ The link expired. Run `{prefix}lastfm link` again.",
+  "lastfm.no_link_in_progress": "❌ No link in progress. Run `{prefix}lastfm link` first.",
+  "lastfm.unavailable": "❌ Last.fm is not reachable right now. Try again later.",
+  "lastfm.save_failed": "❌ Could not save the Last.fm link (the data folder is not writable).",
+  "lastfm.unlinked": "✅ Your Last.fm account is unlinked.",
+  "lastfm.not_linked": "ℹ️ No Last.fm account is linked. Run `{prefix}lastfm link`.",
+  "lastfm.status.one": "✅ Linked to the Last.fm account **{name}** ({count} scrobble waiting to be sent).",
+  "lastfm.status.other": "✅ Linked to the Last.fm account **{name}** ({count} scrobbles waiting to be sent).",
+  "lastfm.dm_failed": "❌ I can't send you a direct message. Allow DMs from server members, then try again.",
+  "lastfm.dm_sent": "📬 I sent you a direct message."
 }
