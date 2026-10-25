@@ -437,10 +437,13 @@ Module map, lowest layer first (each imports only the ones above it):
     request used, so a view-only page never sees the control id.
   - Discord: the global `bot.check` `dj_gate()` calls
     `can_run_dj_command()`: a command named in `DJ_COMMANDS` (next, pause,
-    resume, seek, stop, reset, crossfade, loop, shuffle) needs `is_dj()`; `volume` and `autoplay` need it only to set a value (bare, they show the setting; `DJ_WHEN_SETTING`, `require_dj()`) (Manage Server, or
+    resume, seek, stop, reset, crossfade, loop, shuffle, previous, move, clear) needs `is_dj()`; `volume` and `autoplay` need it only to set a value (bare, they show the setting; `DJ_WHEN_SETTING`, `require_dj()`) (Manage Server, or
     the guild's DJ role; no role set = everyone), except that
     `REQUESTER_COMMANDS` (next) is allowed to `track["requester_id"]` (set by
-    `download_and_queue_song()`) on the playing track. A new mutating command
+    `download_and_queue_song()`) on the playing track. `remove` is in
+    `OWN_TRACK_COMMANDS`: it passes the gate and calls `require_dj_or_owner()`
+    once the track at the given position is known (a non-DJ may remove only a
+    track whose `requester_id` is theirs). A new mutating command
     is added to `DJ_COMMANDS`. Refusals raise `NotDJ`, answered by
     `on_command_error`. `!play` and `!list` stay open.
   - Links: the DJ role (`!djrole <role>|off`, Manage Server) is stored in
@@ -667,7 +670,13 @@ Module map, lowest layer first (each imports only the ones above it):
   Spotify, Deezer or Apple Music link, or search text), `!list`, `!next`,
   `!pause`, `!resume`, `!seek` (position relative to the track's automix
   `start`, as the page shows it), `!crossfade on|off`, `!loop
-  [off|track|queue]`, `!shuffle`, `!volume [0-150]`, `!autoplay [on|off]`,
+  [off|track|queue]`, `!shuffle`, `!remove <position>`, `!move <from> <to>`, `!previous`,
+  `!clear` (positions are 1-based, as `!list` shows them; `/remove` and `/move`
+  autocomplete the queue; `control_clear()` is the one control only Discord
+  uses), `!nowplaying` (`!np`, an embed built by `now_playing_embed()`; its
+  clip link is `sessions.public_link()`), `!history [count]` (reads
+  `player.played`, the last `HISTORY_LOG_SIZE` 25 titles kept by
+  `push_history()`, cleared by `!stop`), `!volume [0-150]`, `!autoplay [on|off]`,
   `!playlist save|add|load|show|delete <name>` and `!playlist list` (a
   `hybrid_group`: `/playlist save`, ...), `!stop`, `!reset`, `!weblink` (see
   Permissions), and the Manage Server ones (`commands.has_guild_permissions`):

@@ -33,6 +33,12 @@ NAMES = {
     "djrole",
     "weblink",
     "language",
+    "remove",
+    "move",
+    "previous",
+    "clear",
+    "nowplaying",
+    "history",
 }
 
 

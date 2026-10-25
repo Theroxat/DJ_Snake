@@ -148,6 +148,8 @@ LOGO_TYPES = {
 }
 # Played tracks kept (files on disk) so "previous" can go back.
 HISTORY_SIZE = 5
+# Titles kept for /history (no files): the most it can show.
+HISTORY_LOG_SIZE = 25
 # "Previous" restarts the current track once it has played this long.
 PREVIOUS_RESTART_SECONDS = 5
 MAX_CONTROL_BODY = 4096

@@ -80,6 +80,12 @@ Every command is both a `!` command and a slash command (`/play`, `/playlist sav
 | --- | --- |
 | `!play <link or search text>` | Join your voice channel and queue a YouTube video or playlist, a SoundCloud or Bandcamp track or set, a Spotify, Deezer or Apple Music playlist, album or track, or the best YouTube match for the text. |
 | `!list` | Show the current queue. |
+| `!remove <position>` | Remove a queued track by its position in `!list` (1 = next). Autocompletes the queue. Anyone may remove a track they queued themselves. |
+| `!move <from> <to>` | Move a queued track to another position. Autocompletes the queue. |
+| `!previous` | Go back to the previous track, or restart the current one after 5 s of play. |
+| `!clear` | Empty the upcoming queue; the current track keeps playing. |
+| `!nowplaying` (`!np`) | Show the playing track as an embed: requester, source, progress bar with elapsed/total, loop, autoplay and volume, and the clip page link. |
+| `!history [count]` | The last tracks played in this session (default 10, max 25), newest first. |
 | `!next` | Skip to the next track. |
 | `!pause` / `!resume` | Pause or resume playback. |
 | `!seek <pos>` | Jump to a position in the track, in seconds or `mm:ss`, as the clip page shows it. |
@@ -97,7 +103,7 @@ Every command is both a `!` command and a slash command (`/play`, `/playlist sav
 
 | `!language [code\|reset]` | Show or set the language of the bot and the clip page for the server (`en`, `fr`). Needs the Manage Server permission. |
 
-When a server has a DJ role, `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!volume`, `!autoplay`, `!stop` and `!reset` need that role or the Manage Server permission; whoever queued the playing track may still skip it with `!next`. `!play` and `!list` stay open to everyone. See [Who controls the music](#who-controls-the-music).
+When a server has a DJ role, `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!previous`, `!move`, `!clear`, `!volume`, `!autoplay`, `!stop` and `!reset` need that role or the Manage Server permission; whoever queued the playing track may still skip it with `!next`, and remove their own queued tracks with `!remove` (anyone else needs the role for that). `!play`, `!list`, `!nowplaying` and `!history` stay open to everyone. See [Who controls the music](#who-controls-the-music).
 
 ## Language
 

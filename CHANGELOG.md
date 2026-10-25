@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Queue commands that used to exist only on the clip page: `!remove <position>` and `!move <from> <to>` (positions as `!list` shows them, with a queue autocomplete on the slash versions), `!previous` and `!clear` (empties the upcoming queue, the current track keeps playing). `!move`, `!previous` and `!clear` need the DJ role when one is set; `!remove` also works on a track you queued yourself.
+- `!nowplaying` (alias `!np`): an embed with the linked title, requester, source, thumbnail, a progress bar with elapsed and total time, the loop, autoplay and volume state and the clip page link (the view-only one when control is limited).
+- `!history [count]`: the last tracks played in the session (default 10, max 25), newest first.
+
 ## [1.4.0] - 2026-10-23
 
 ### Added
