@@ -118,7 +118,7 @@ Anyone who has the control link can control the queue. Treat it as a secret and 
 
 ## Language
 
-The page is available in English and French. It follows the server's language (`!language`, or `BOT_LANGUAGE` for servers that never set one), then the browser's language. Viewers can override it for themselves under **Language** in the palette menu: Automatic, English or Français. That choice stays in their browser.
+The page is available in English, French, Spanish and German. It follows the server's language (`!language`, or `BOT_LANGUAGE` for servers that never set one), then the browser's language. Viewers can override it for themselves under **Language** in the palette menu: Automatic, English, Français, Español or Deutsch. That choice stays in their browser.
 
 ## Themes
 

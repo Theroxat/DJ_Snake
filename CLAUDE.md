@@ -107,7 +107,7 @@ syncs to it only, at once, for development), `WEB_THEME` (`arcade`, the theme of
 guilds that never chose one), `WEB_CONTROL` (`everyone`, or `dj`: the control
 link is never posted publicly, see Permissions; anything else falls back to
 `everyone`), `BOT_LANGUAGE` (`en`, the language of guilds that never ran
-`!language`; `en` or `fr`), `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET`
+`!language`; `en`, `fr`, `es` or `de`), `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET`
 (optional, both needed to use the Spotify Web API), `METRICS` (`0`; `1` enables
 `GET /metrics`), `APP_VERSION` (set by the Dockerfile build arg, `dev`
 otherwise; shown by `/healthz`), `LYRICS` (`1`; `0`, `false`, `no` or `off`
@@ -676,7 +676,11 @@ Module map, lowest layer first (each imports only the ones above it):
   `help.cmd.<name>` line per command in `HELP_ORDER`.
 - **Translations** (`i18n.py`): every user-facing text is a key in
   `djsnake/locales/en.json` and `fr.json` (flat, same keys and same
-  `{placeholders}` in both; `tests/test_i18n.py` checks it). `t(key, lang,
+  `{placeholders}` in both; `tests/test_i18n.py` checks it). `es.json` and
+  `de.json` are best effort: they may lack keys (never add keys absent from
+  English; placeholders must match) and a missing key falls back to English
+  per key, bot and page alike; `python3 scripts/i18n-missing.py` lists them.
+  Plurals: one vs other for en, es and de, French also counts 0 as singular. `t(key, lang,
   **params)` formats it (`{prefix}` is always filled in; a `count` param picks
   `key.one` / `key.other`, French singular for 0 and 1), falling back to
   English, then to the key itself. A guild's language is
@@ -771,6 +775,9 @@ Slash commands are synced in `app.sync_commands()`. `tests/fakes.py` has
 - Code comments, docs, log lines and the host-side refresh script are in
   English. User-facing messages are English by default and translated (see
   Translations).
+- **Languages**: en and fr are mandatory for every new string; es/de are
+  best-effort, missing keys fall back to English (informal "tú"/"du";
+  Spanish ¿ ¡, German „…“).
 - **Adding a user-facing string**: never write the text inline. Add a key to
   `djsnake/locales/en.json` (English) and `fr.json` (French: neutral
   imperative, no "vous"/"tu", typographic apostrophe ’, U+00A0 before `:`,

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Spanish and German translations (`!language es|de`): command replies, errors, `!help`, the status message and the clip page, with informal "tú" / "du", and the page language menu lists Español and Deutsch (`es-*` and `de-*` browsers are detected). Spanish and German are best effort: a key they lack falls back to English, so new strings only need English and French. `scripts/i18n-missing.py` lists what each language is missing, and `/language` suggests the available languages.
+
 ## [1.4.0] - 2026-10-23
 
 ### Added

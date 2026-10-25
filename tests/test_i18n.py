@@ -19,13 +19,61 @@ def placeholders(text):
 # --- Catalogs -----------------------------------------------------------------
 
 
-def test_every_language_has_the_same_keys_and_placeholders():
+MANDATORY = ("en", "fr")  # Complete catalogs; the others are best effort
+BEST_EFFORT = ("es", "de")
+
+
+def test_mandatory_languages_have_the_same_keys_and_placeholders():
     english = i18n.CATALOGS["en"]
-    assert set(i18n.LANGUAGES) >= {"en", "fr"}
-    for lang, catalog in i18n.CATALOGS.items():
+    assert set(i18n.LANGUAGES) >= {"en", "fr", "es", "de"}
+    for lang in MANDATORY:
+        catalog = i18n.CATALOGS[lang]
         assert set(catalog) == set(english), lang
         for key, text in catalog.items():
             assert placeholders(text) == placeholders(english[key]), (lang, key)
+
+
+def test_best_effort_languages_add_no_keys_and_keep_placeholders(capsys):
+    english = i18n.CATALOGS["en"]
+    for lang in BEST_EFFORT:
+        catalog = i18n.CATALOGS[lang]
+        assert set(catalog) <= set(english), (lang, set(catalog) - set(english))
+        for key, text in catalog.items():
+            assert placeholders(text) == placeholders(english[key]), (lang, key)
+        with capsys.disabled():
+            print(f"\n{lang}: {100 * len(catalog) // len(english)}% translated")
+
+
+def test_best_effort_languages_fall_back_to_english_per_key(monkeypatch):
+    for lang in BEST_EFFORT:
+        monkeypatch.delitem(i18n.CATALOGS[lang], "panel.expired")
+        assert t("panel.expired", lang) == "⌛ Session expired"
+    monkeypatch.delitem(i18n.CATALOGS["de"], "load.done.one")
+    monkeypatch.delitem(i18n.CATALOGS["de"], "load.done.other")
+    assert t("load.done", "de", loaded=1, count=2) == "✅ 1/2 tracks loaded"
+    assert t("panel.up_next_more", "de", count=3) == " und 3 weitere"
+
+
+def test_spanish_and_german_text_and_plurals():
+    assert t("panel.expired", "es") == "⌛ Sesión caducada"
+    assert t("panel.expired", "de-AT") == "⌛ Sitzung abgelaufen"
+    assert t("action.playlist_saved", "es", name="X", count=1).endswith("(1 canción)")
+    assert t("action.playlist_saved", "es", name="X", count=0).endswith("(0 canciones)")
+    assert t("panel.up_next_more", "de", count=1) == " und 1 weiterer"
+    assert t("panel.up_next_more", "de", count=0) == " und 0 weitere"
+    # French keeps 0 as singular, es and de do not
+    assert i18n._plural_one("fr", 0) and not i18n._plural_one("es", 0)
+    assert not i18n._plural_one("de", 0) and i18n._plural_one("de", 1)
+
+
+def test_german_quotes_and_spanish_punctuation():
+    for key, text in i18n.CATALOGS["de"].items():
+        assert '"' not in text, key  # „…“ instead
+        assert text.count("„") == text.count("“"), key
+    for key, text in i18n.CATALOGS["es"].items():
+        assert text.count("¿") == text.count("?"), key
+        if key != "control.bad_playlist_name":  # Lists the allowed "!" itself
+            assert text.count("¡") == text.count("!"), key
 
 
 def test_plural_keys_come_in_pairs():
@@ -55,7 +103,7 @@ def test_lookup_and_fallbacks(monkeypatch):
     assert t("panel.expired") == "⌛ Session expired"  # BOT_LANGUAGE=en
     assert t("panel.expired", "fr") == "⌛ Session expirée"
     assert t("panel.expired", "fr-CA") == "⌛ Session expirée"
-    assert t("panel.expired", "de") == "⌛ Session expired"
+    assert t("panel.expired", "xx") == "⌛ Session expired"
     assert t("not a key at all {x}") == "not a key at all {x}"
     monkeypatch.delitem(i18n.CATALOGS["fr"], "panel.expired")
     assert t("panel.expired", "fr") == "⌛ Session expired"
@@ -188,6 +236,13 @@ def test_page_dictionaries_match():
     english, french = _page_dictionary(page, "en"), _page_dictionary(page, "fr")
     assert len(english) > 100
     assert set(english) == set(french)
+    for lang in BEST_EFFORT:
+        other = _page_dictionary(page, lang)
+        assert set(other) <= set(english), (lang, set(other) - set(english))
+        for key, text in other.items():
+            assert set(re.findall(r"{(\w+)}", text)) == set(
+                re.findall(r"{(\w+)}", english[key])
+            ), (lang, key)
     for key, text in english.items():
         assert set(re.findall(r"{(\w+)}", text)) == set(
             re.findall(r"{(\w+)}", french[key])
@@ -238,3 +293,12 @@ async def test_text_search_no_match_is_translated(player, ctx, channel, monkeypa
     monkeypatch.setattr(spotify, "find_text_match", lambda q: None)
     await playback.queue_search(ctx, player, "zzz nothing")
     assert channel.log[-1].startswith("❌ Aucune correspondance YouTube")
+
+
+async def test_language_autocomplete_lists_every_language():
+    options = await commands.language_autocomplete(None, "")
+    assert {c.value for c in options} == {*i18n.LANGUAGES, "reset"}
+    found = await commands.language_autocomplete(None, "deu")
+    assert [c.value for c in found] == ["de"]
+    found = await commands.language_autocomplete(None, "esp")
+    assert [c.value for c in found] == ["es"]

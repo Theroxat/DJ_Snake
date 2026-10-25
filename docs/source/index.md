@@ -24,7 +24,7 @@
 - **Synced lyrics** over the clip, from LRCLIB (`LYRICS=0` turns them off).
 - **Live updates**: the clip page follows the queue in real time, with no refresh.
 - **View-only link and DJ role**: share a page that cannot control playback, and limit who can skip, stop or change settings.
-- **English and French**, chosen per server with `!language`.
+- **English, French, Spanish and German**, chosen per server with `!language`.
 - **Health check and metrics**: `GET /healthz` for Docker, and optional Prometheus `GET /metrics`.
 - **Listening stats** per server on the clip page: top tracks and artists, the most skipped track, hours played, sessions, peak listeners and a day-by-hour heatmap.
 - **Themable clip page**: eight presets plus a custom look with your colors, name and logo.
