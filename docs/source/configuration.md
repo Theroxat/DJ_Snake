@@ -23,6 +23,8 @@ DJ Snake is configured through environment variables. With Docker Compose, put t
 | `LYRICS` | `1` | Synced lyrics on the clip page, from [LRCLIB](https://lrclib.net). `0` turns them off: the bot sends no lookups and the page hides the Lyrics button. See [Lyrics](clip-page.md#lyrics). |
 | `BOT_LANGUAGE` | `en` | Language of the bot's messages and of the clip page for servers that never ran `!language`: `en` (English) or `fr` (French). |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | empty | Optional Spotify Web API credentials, for playlists over 100 tracks. Both are needed. See [Spotify](spotify.md). |
+| `BACKUP_INTERVAL_HOURS` | `0` | Hours between automatic backups of `DATA_DIR` into `DATA_DIR/backups/` (`0` = off). See [Backup and restore](backup.md). |
+| `BACKUP_KEEP` | `7` | Automatic backups to keep. See [Backup and restore](backup.md). |
 | `YTDLP_AUTO_UPDATE` | `1` | Upgrade yt-dlp on container start (`0` to skip). Used by the container entrypoint only. |
 | `METRICS` | `0` | Set to `1` to serve Prometheus metrics on `GET /metrics` (same port as the clip page). Off, the route answers 404. See [Troubleshooting](troubleshooting.md#health-check-and-metrics). |
 | `DJ_SNAKE_TAG` | `latest` | Image tag to pull (Compose only), for example `1.0.0`. |

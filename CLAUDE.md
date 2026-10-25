@@ -111,7 +111,8 @@ link is never posted publicly, see Permissions; anything else falls back to
 (optional, both needed to use the Spotify Web API), `METRICS` (`0`; `1` enables
 `GET /metrics`), `APP_VERSION` (set by the Dockerfile build arg, `dev`
 otherwise; shown by `/healthz`), `LYRICS` (`1`; `0`, `false`, `no` or `off`
-turns the LRCLIB lyrics off), and `YTDLP_AUTO_UPDATE` (entrypoint only).
+turns the LRCLIB lyrics off), and `BACKUP_INTERVAL_HOURS` (0, automatic backups off) and `BACKUP_KEEP` (7), see
+Backup, and `YTDLP_AUTO_UPDATE` (entrypoint only).
 
 ## Architecture (`djsnake/`)
 
@@ -140,6 +141,7 @@ Module map, lowest layer first (each imports only the ones above it):
 - `themes.py`: theme storage, logos and `!theme edit` tokens.
 - `volume.py`: per-server volume storage (`{DATA_DIR}/volume.json`) and
   `percent_to_gain()`.
+- `backup.py`: backup and restore of `DATA_DIR` (see Backup). Imports only `config`.
 - `permissions.py`: the DJ role (`load_perms()`, `set_dj_role()`,
   `dj_role()`), `is_dj()`, `web_control_restricted()` and the Discord gate
   (`DJ_COMMANDS`, `REQUESTER_COMMANDS`, `can_run_dj_command()`).
@@ -650,6 +652,21 @@ Module map, lowest layer first (each imports only the ones above it):
   `conftest.py` replaces `lyrics._http` with a function raising
   `LyricsUnavailable`, so no test reaches the network; patch `lyrics._http`
   to fake LRCLIB.
+- **Backup** (`backup.py`, `python -m djsnake.backup create|restore|verify|list`):
+  one `.tar.gz` with `manifest.json` (version 1, date, files with size and
+  sha256) and `data/<path>`. SQLite files (detected by magic bytes) go through
+  `sqlite3.Connection.backup()` from a read-only connection, so a live bot is
+  fine; `-wal/-shm/-journal/.tmp` files, `backups/`, `.pre-restore-*`, the lock
+  and (unless `--include-cache`) `lyrics/` are skipped. `main()` takes an
+  exclusive `flock` on `DATA_DIR/.bot.lock` (`acquire_bot_lock()`); `restore`
+  refuses while `bot_running()` sees it held, verifies while extracting into
+  `.restore-tmp-*`, moves the current top-level entries to
+  `.pre-restore-<date>/`, renames the restored ones in, and rolls back on
+  error. `backup_loop()` (started in `setup_hook`) calls `create_auto()` in an
+  executor every `BACKUP_INTERVAL_HOURS`, writing `backups/djsnake-auto-*`
+  and keeping `BACKUP_KEEP` of them (`rotate()`; manual files are never
+  rotated). New persistent files under `DATA_DIR` are picked up
+  automatically. No Discord command. Tests: `tests/test_backup.py`.
 - **Status panel**: each web session has one message in its text channel
   (`player.panel_message`), edited in place instead of announcing events:
   clip links (see Permissions), now playing / paused / idle, up next, loading progress and the

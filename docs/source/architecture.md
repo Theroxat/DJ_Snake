@@ -13,6 +13,7 @@ Lowest layer first; each module imports only the ones above it.
 | `i18n.py` | Translations: `t(key, lang, **params)` over the catalogs in `djsnake/locales/` (`en.json`, `fr.json`), and each server's language (`!language`, `languages.json`). |
 | `stats.py` | Listening stats in SQLite, written by one background thread. |
 | `playlists.py` | Saved playlists in SQLite (`playlists.db`). |
+| `backup.py` | Backup and restore of `DATA_DIR` (`python -m djsnake.backup`), plus the automatic backup task. |
 | `lyrics.py` | Lyrics from LRCLIB: LRC and YouTube title parsing, the lookup run in the background when a track is queued, and its memory and disk cache. |
 | `player.py` | `MusicPlayer` (per-server state), cleanup of files and history helpers. |
 | `themes.py` | Theme storage, logos and `!theme edit` tokens. |
@@ -76,7 +77,7 @@ discord.py drops and resumes the gateway roughly every couple of hours. Do no cl
 
 ### Persistent data
 
-Everything persistent lives in `DATA_DIR`: `themes.json` (per-server themes, written atomically), `languages.json` (per-server languages), `volume.json` (per-server volume), `permissions.json` (DJ roles), `playlists.db` (saved playlists), `logos/`, `stats.db` (SQLite, WAL) and `lyrics/` (lyrics found on LRCLIB, one JSON file per YouTube video id).
+Everything persistent lives in `DATA_DIR`: `themes.json` (per-server themes, written atomically), `languages.json` (per-server languages), `volume.json` (per-server volume), `permissions.json` (DJ roles), `playlists.db` (saved playlists), `logos/`, `stats.db` (SQLite, WAL) and `lyrics/` (lyrics found on LRCLIB, one JSON file per YouTube video id). `backup.py` archives all of it; see [Backup and restore](backup.md).
 
 ## Demo site
 

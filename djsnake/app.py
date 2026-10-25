@@ -6,7 +6,7 @@ import os
 import discord
 
 from . import commands  # noqa: F401  (registers the commands)
-from . import state, stats
+from . import backup, state, stats
 from .config import COMMAND_PREFIX, SLASH_SYNC_GUILD
 from .i18n import t
 from .playback import idle_channel_emptied
@@ -118,6 +118,8 @@ async def setup_hook():
     await sync_commands()
     task = asyncio.get_running_loop().create_task(session_cleanup_loop())
     state.background_tasks.add(task)
+    task = asyncio.get_running_loop().create_task(backup.backup_loop())
+    state.background_tasks.add(task)
 
 
 bot.setup_hook = setup_hook
@@ -161,6 +163,10 @@ def main():
     print("Starting Discord Music Bot (fixed version)")
     print("-" * 50)
     TOKEN = get_discord_token()
+    if not backup.acquire_bot_lock():
+        print(
+            "⚠️  Could not take the data lock; `backup restore` will not detect this bot."
+        )
     try:
         bot.run(TOKEN)
     finally:
