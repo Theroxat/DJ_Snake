@@ -132,6 +132,10 @@ Module map, lowest layer first (each imports only the ones above it):
   written by one background thread. Imports only `config`.
 - `playlists.py`: saved playlists in SQLite (`{DATA_DIR}/playlists.db`, see
   Saved playlists). Imports only `config`.
+- `playlist_io.py`: playlist export (`export_bytes()`: json, m3u, txt) and
+  file import (`parse_import()`, 256 KB, strict schema `djsnake.playlist` v1,
+  every URL through `media.parse_media_url()`, deduped, capped). Imports
+  `media` and `playlists`.
 - `lyrics.py`: LRCLIB lyrics (`parse_lrc()`, `parse_title()`,
   `lookup_fields()`, `fetch()`, `prefetch()`, `get()`). Imports `config`,
   `state`, `stats.clean_artist` and `spotify`'s HTTP helpers.
@@ -329,7 +333,15 @@ Module map, lowest layer first (each imports only the ones above it):
   only create new names and load. Commands: `!playlist save|add|load|show|
   delete <name>`, `!playlist list`. Web: `GET /api/{sid}/playlists` ->
   `{playlists: [{name, tracks, duration}]}`, control actions `save_playlist`
-  and `load_playlist` (`name`; load answers 202). Tests: `tests/test_playlists.py`.
+  and `load_playlist` (`name`; load answers 202). Export/import: `/playlist export
+  <name> [json|m3u|txt]` (`queue` is reserved and exports the live queue;
+  `playlists.clean_name` refuses it) and `/playlist import <name> <link>|<file>`
+  (`control_playlist_export/import_file/import_url`). Link imports of a
+  YouTube/SoundCloud/Bandcamp list use `media.get_playlist_info(url, limit)`;
+  Spotify/Deezer/Apple tracks are matched on YouTube at import time (progress
+  message, unmatched counted), so stored links stay ordinary and loading needs
+  no matching. Permissions are checked first (`playlists.check_writable`) and
+  again by `save`. Tests: `tests/test_playlists.py`, `tests/test_playlist_io.py`.
 - **Spotify links** (`spotify.py`): `check_url()` accepts only
   `open.spotify.com` (`play.spotify.com`) paths `[/intl-xx][/embed]/{playlist|album|track}/{id}`
   and `spotify:{kind}:{id}` URIs, with a 22-char base62 id; anything else on

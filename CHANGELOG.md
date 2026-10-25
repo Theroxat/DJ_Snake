@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `/playlist import <name> <link>` creates or replaces a saved playlist from a YouTube playlist, a SoundCloud set, a Bandcamp album or a Spotify, Deezer or Apple Music playlist or album (those are matched on YouTube at import time, with unmatched tracks counted), or from an attached JSON, M3U or TXT file (up to 256 KB, only allowed sources). `/playlist export <name> [json|m3u|txt]` sends a playlist, or `queue` the current queue, as a file. Saved playlists can no longer be named `queue`.
+
 ## [1.4.0] - 2026-10-23
 
 ### Added

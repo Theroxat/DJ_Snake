@@ -231,8 +231,9 @@ def entry_url(entry):
     return f"https://www.youtube.com/watch?v={video_id}"
 
 
-def get_playlist_info(url):
-    """Extract playlist information without downloading."""
+def get_playlist_info(url, limit=None):
+    """Extract playlist information without downloading (at most `limit`
+    entries, default MAX_PLAYLIST_SIZE)."""
     try:
         print(f"Extracting playlist from: {url}")
 
@@ -242,7 +243,7 @@ def get_playlist_info(url):
             "quiet": True,  # Reduce log spam
             "no_warnings": True,
             "ignoreerrors": True,  # Continue even if some videos have errors
-            "playlistend": MAX_PLAYLIST_SIZE,  # Limit based on config
+            "playlistend": limit or MAX_PLAYLIST_SIZE,  # Limit based on config
             "remote_components": REMOTE_COMPONENTS,
             "extractor_args": EXTRACTOR_ARGS,
         }
@@ -278,6 +279,7 @@ def get_playlist_info(url):
                                 or f"https://www.youtube.com/watch?v={entry.get('id')}",
                                 "webpage_url": entry.get("webpage_url")
                                 or entry.get("url"),
+                                "duration": entry.get("duration"),
                             }
                             if processed_entry["id"]:
                                 valid_entries.append(processed_entry)

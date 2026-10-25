@@ -28,6 +28,8 @@ URL_MAX = 200
 
 # Letters, digits, spaces and a few marks: nothing that pings or formats.
 _NAME_RE = re.compile(r"^\w[\w .'&!+()-]*$")
+# `/playlist export queue` means the live queue, so no playlist may take it.
+RESERVED_KEYS = frozenset({"queue"})
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS playlists (
@@ -94,6 +96,8 @@ def clean_name(name):
     name = " ".join(str(name or "").split())
     if not name or len(name) > SAVED_PLAYLIST_NAME_MAX or not _NAME_RE.match(name):
         raise PlaylistError("bad_playlist_name")
+    if name.casefold() in RESERVED_KEYS:
+        raise PlaylistError("bad_playlist_name")
     return name, name.casefold()
 
 
@@ -130,6 +134,28 @@ def can_edit(row, user_id, is_admin):
     """Who may replace or delete a playlist: its creator, or a manager."""
     mine = user_id is not None and row["creator_id"] == user_id
     return bool(is_admin or mine)
+
+
+def check_writable(guild_id, name, creator_id=None, is_admin=False):
+    """Raise PlaylistError unless `save()` could create or replace `name` for
+    this caller now (the same rules, checked before slow work such as
+    matching tracks). Returns the display name."""
+    name, key = clean_name(name)
+    conn = _connect()
+    try:
+        row = _find(conn, guild_id, key)
+        if row is not None:
+            if not can_edit(row, creator_id, is_admin):
+                raise PlaylistError("playlist_exists")
+        else:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM playlists WHERE guild_id = ?", (guild_id,)
+            ).fetchone()[0]
+            if count >= MAX_SAVED_PLAYLISTS:
+                raise PlaylistError("playlist_limit")
+    finally:
+        conn.close()
+    return name
 
 
 def _insert_tracks(conn, playlist_id, start, tracks):

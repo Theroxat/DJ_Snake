@@ -88,7 +88,7 @@ Every command is both a `!` command and a slash command (`/play`, `/playlist sav
 | `!shuffle` | Shuffle the upcoming queue once; the current track keeps playing. |
 | `!volume [0-150]` | Show the server's volume, or set it in percent (100 is the normal level). Saved across restarts. |
 | `!autoplay [on\|off]` | Keep playing related tracks when the queue runs out, or show the current setting (off by default, see `AUTOPLAY`). |
-| `!playlist save\|add\|load\|show\|delete <name>`, `!playlist list` | Saved playlists for the server: links and titles kept across restarts, downloaded again when loaded. |
+| `!playlist save\|add\|load\|show\|delete\|export <name>`, `!playlist import <name> <link>`, `!playlist list` | Saved playlists for the server: links and titles kept across restarts, downloaded again when loaded. Import from a playlist link or a file, export as a file. |
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
 | `!theme [preset\|reset\|edit]` | Show or set the clip page's default theme for the server. `edit` DMs you a private editor link. Needs the Manage Server permission. |

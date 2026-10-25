@@ -14,7 +14,7 @@ Every command works two ways: as a text message with the prefix, `!` by default 
 | `!shuffle` | Shuffle the upcoming queue once; the current track keeps playing. |
 | `!volume [0-150]` | Show the server's volume, or set it in percent (100 is the normal level). Saved across restarts. |
 | `!autoplay [on\|off]` | Keep playing related tracks when the queue runs out, or show the current setting (off by default, see `AUTOPLAY`). |
-| `!playlist save\|add\|load\|show\|delete <name>`, `!playlist list` | Saved playlists for the server: links and titles kept across restarts, downloaded again when loaded. |
+| `!playlist save\|add\|load\|show\|delete\|export <name>`, `!playlist import <name> <link>`, `!playlist list` | Saved playlists for the server: links and titles kept across restarts, downloaded again when loaded. Import from a playlist link or a file, export as a file. |
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
 | `!theme [preset\|reset\|edit]` | Show or set the clip page's default theme for the server. `edit` DMs you a private editor link. Needs the Manage Server permission. |
@@ -83,6 +83,12 @@ Saved playlists belong to the server and survive restarts. Only the YouTube link
 - `!playlist load <name>` joins your voice channel and queues every track, loading them one at a time like a YouTube playlist.
 - `!playlist list` shows the server's playlists, and `!playlist show <name>` the tracks of one.
 - `!playlist delete <name>` deletes a playlist. Only its creator or a member with Manage Server can.
+
+- `!playlist export <name> [json|m3u|txt]` sends the playlist as a file (JSON by default). `!playlist export queue` exports the current queue. The JSON file is versioned (`schema` `djsnake.playlist`, `version` 1, `name`, `created_by`, `entries` of `url`, `title`, `duration`), M3U has `#EXTINF` lines, TXT has one link per line.
+- `!playlist import <name> <link>` creates or replaces a playlist from a YouTube playlist, a SoundCloud set, a Bandcamp album, or a Spotify, Deezer or Apple Music playlist or album. Replacing follows the same rule as `save`. Spotify, Deezer and Apple Music tracks are matched on YouTube **at import time** (with a progress message), so the saved playlist holds ordinary links and loading it later needs no matching; tracks with no match are counted as skipped. At most 200 tracks are kept (the message says so when the list was longer).
+- `!playlist import <name>` with a JSON, M3U or TXT file attached (a slash command has a `file` option) imports that file: up to 256 KB, strict schema for JSON, duplicates dropped, and only YouTube, SoundCloud and Bandcamp track links accepted (anything else is skipped and counted, never fetched). A file made by `export` imports back to the same entries.
+
+In a `!` command, put a name with spaces in quotes (`!playlist export "Road Trip" m3u`). A saved playlist cannot be named `queue`.
 
 The [clip page](clip-page.md) can also save the queue and load a playlist.
 

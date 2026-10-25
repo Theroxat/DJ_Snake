@@ -64,7 +64,16 @@ def test_loop_and_autoplay_have_choices():
 def test_playlist_is_a_slash_group():
     group = state.bot.tree.get_command("playlist")
     names = {c.name for c in group.commands}
-    assert names == {"save", "add", "load", "list", "show", "delete"}
+    assert names == {
+        "save",
+        "add",
+        "load",
+        "list",
+        "show",
+        "delete",
+        "import",
+        "export",
+    }
 
 
 def test_parameters_are_described():
