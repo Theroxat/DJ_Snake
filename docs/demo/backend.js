@@ -57,7 +57,8 @@
     nothing_to_shuffle: [409, "Not enough queued tracks to shuffle."],
     bad_volume: [400, "Volume must be a whole number from 0 to 150."],
     bad_url: [400,
-      "Only YouTube, SoundCloud and Bandcamp links (track or playlist) and Spotify, Deezer and Apple Music (track, album or playlist) links are accepted."],
+      "Only YouTube, SoundCloud and Bandcamp links (track or playlist), Twitch channels, internet radio streams (.mp3, .aac, .ogg, .m3u8, .m3u, .pls or a /stream mount point) and Spotify, Deezer and Apple Music (track, album or playlist) links are accepted."],
+    live_no_seek: [409, "A live stream has no position to seek to."],
     spotify_short_link: [400,
       "Short spotify.link links are not supported: open it and copy the open.spotify.com link."],
     bad_playlist_name: [400, "Invalid playlist name: use up to 32 letters, digits, spaces or . ' & ! + ( ) -"],
@@ -103,6 +104,13 @@
     if (host === "youtu.be") {
       const v = u.pathname.slice(1);
       if (/^[\w-]{11}$/.test(v)) return { kind: "youtube", video: v, list: null };
+    }
+    // Live streams (media.parse_media_url's Twitch channels, parse_radio_url).
+    m = /^\/([A-Za-z0-9_]{3,25})\/?$/.exec(u.pathname);
+    if (/^(www\.|m\.)?twitch\.tv$/.test(host) && m) return { kind: "live", source: "twitch", title: m[1] };
+    const seg = u.pathname.replace(/\/+$/, "").split("/").pop();
+    if (/([-_.](mp3|aac|aacp|ogg|oga|opus|flac|m3u8?|pls)|^(stream|listen|live|;))$/i.test(seg)) {
+      return { kind: "live", source: "radio", title: host };
     }
     throw new ControlError("bad_url");
   }
@@ -199,7 +207,7 @@
         play(S.history.pop());
         return;
       }
-      if (action === "end" && S.loop === "track" && S.current) { play(S.current); changed(); return; }
+      if (action === "end" && S.loop === "track" && S.current && !S.current.live) { play(S.current); changed(); return; }
       if (S.current) {
         S.history.push(S.current);
         if (S.loop === "queue") S.queue.push(S.current); // back to the end of the queue
@@ -221,7 +229,7 @@
       if (!S.current && S.inVoice) advance();
       changed();
     }
-    setInterval(() => { if (S.current && !paused() && elapsed() >= END) advance("end"); }, 250);
+    setInterval(() => { if (S.current && !S.current.live && !paused() && elapsed() >= END) advance("end"); }, 250);
 
     // ---- session and voice
     const sidChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
@@ -313,8 +321,26 @@
       setAction(`➕ Added: ${short(t.title)}`);
       if (!S.current) advance();
     }
+    // Live items (media.live_track): no file, no duration, never downloaded.
+    const NOW_ON_AIR = ["Nightdrive – Neon Avenue", "Lumen – Slow Tide", "Kaito – Paper Moons"];
+    async function loadLive(link) {
+      const epoch = S.epoch;
+      const key = pend(null, link.source === "twitch" ? "twitch" : "youtube");
+      try { await wait(900); } finally { unpend(key); }
+      if (cancelled(epoch)) { changed(); return; }
+      seq++;
+      const t = {
+        id: "demo" + seq, title: link.source === "twitch" ? link.title + " (Twitch)" : link.title,
+        duration: null, thumbnail: link.source === "twitch" ? thumb(rot % CATALOG.length) : null,
+        url: null, video_url: null, live: true, radio: link.source === "radio",
+      };
+      S.queue.push(t);
+      setAction(`➕ Added: ${short(t.title)}`);
+      if (!S.current) advance();
+    }
     /** Queue whatever a link points to (after parseLink). */
     function queueLink(link) {
+      if (link.kind === "live") return loadLive(link);
       if (link.kind === "search") return loadOne(rot++, "🔎 Searching YouTube…", "youtube");
       if (link.kind === "spotify") {
         if (link.type === "track") return loadOne(rot++, "🔎 Reading the Spotify link…", "spotify");
@@ -369,6 +395,7 @@
       },
       seek(position) {
         requirePlaying();
+        if (S.current.live) throw new ControlError("live_no_seek");
         const p = Math.max(START, Math.min(position, END - 1));
         const was = paused();
         play(S.current);
@@ -408,7 +435,7 @@
         name = String(name || "").trim().replace(/\s+/g, " ");
         if (!name || name.length > 32 || !/^\w[\w .'&!+()-]*$/.test(name)) throw new ControlError("bad_playlist_name");
         if (S.playlists.some((p) => p.name.toLowerCase() === name.toLowerCase())) throw new ControlError("playlist_exists");
-        const ids = (S.current ? [S.current] : []).concat(S.queue).map((t) => t.url.split("v=")[1]);
+        const ids = (S.current ? [S.current] : []).concat(S.queue).filter((t) => !t.live).map((t) => t.url.split("v=")[1]);
         if (!ids.length) throw new ControlError("playlist_empty");
         S.playlists.push({ name, ids });
         return name;
@@ -443,7 +470,7 @@
       }
       if (!S.inVoice) lines.push(`💤 Idle — ${PREFIX}play to resume`);
       else if (!S.current && idleTimer && !S.queue.length) lines.push("💤 Queue empty — leaving in 1 min unless something is added");
-      else if (S.current) lines.push(`🎵 Now playing: **${short(S.current.title)}**` + (paused() ? " ⏸️ paused" : "") + (S.current.autoplay ? " 📻 Autoplay" : ""));
+      else if (S.current) lines.push(`🎵 Now playing: **${short(S.current.title)}**` + (paused() ? " ⏸️ paused" : "") + (S.current.autoplay ? " 📻 Autoplay" : "") + (S.current.live ? " 🔴 LIVE" : ""));
       else lines.push("🎵 Nothing playing yet");
       if (S.queue.length) {
         let line = `⏭️ Up next: ${short(S.queue[0].title)}`;
@@ -462,7 +489,14 @@
     }
 
     // ---- web API (web.py), errors as the real page expects
-    const pub = (t) => ({ id: t.id, title: t.title, duration: t.duration, thumbnail: t.thumbnail, url: t.url, autoplay: !!t.autoplay });
+    const pub = (t) => ({ id: t.id, title: t.title, duration: t.duration, thumbnail: t.thumbnail, url: t.url, autoplay: !!t.autoplay, live: !!t.live });
+    const nowPlaying = (c) => c.live
+      ? Object.assign(pub(c), {
+        video_url: null, audio_only: true, elapsed: elapsed(), start: 0, end: null,
+        // A radio's ICY StreamTitle changes now and then.
+        live_title: c.radio ? NOW_ON_AIR[Math.floor(Date.now() / 20000) % NOW_ON_AIR.length] : null,
+      })
+      : Object.assign(pub(c), { video_url: c.video_url, audio_only: false, elapsed: elapsed(), start: START, end: END, live_title: null });
     function state(view) {
       if (!S.sid) return { status: 404, body: { active: false } };
       const c = S.inVoice ? S.current : null;
@@ -476,7 +510,7 @@
           theme: S.theme,
           lyrics: true,
           can_control: !view,
-          now_playing: c ? Object.assign(pub(c), { video_url: c.video_url, audio_only: false, elapsed: elapsed(), start: START, end: END }) : null,
+          now_playing: c ? nowPlaying(c) : null,
           queue: S.inVoice ? S.queue.map(pub) : [],
           downloading: S.inVoice ? S.pending.slice(0, 50).map((p) => Object.assign({}, p)) : [],
           downloading_total: S.inVoice ? S.pending.length : 0,

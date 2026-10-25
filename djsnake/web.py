@@ -233,6 +233,7 @@ def _track_summary(track):
         "thumbnail": track.get("thumbnail"),
         "url": track.get("url"),
         "autoplay": bool(track.get("autoplay")),
+        "live": bool(track.get("live")),
     }
 
 
@@ -308,6 +309,11 @@ def state_body(link, sid, player, viewers, can_control):
             # Built from the id the page used: a view-only page never sees
             # the control id.
             now_playing["video_url"] = f"/media/{link}/{track['id']}"
+            if track.get("live"):
+                # A live item has no file: artwork and a LIVE badge instead.
+                now_playing["video_url"] = None
+            # What a live radio plays now (ICY StreamTitle), else None.
+            now_playing["live_title"] = track.get("live_title")
             # No video stream: the page shows the artwork instead.
             now_playing["audio_only"] = bool(track.get("audio_only"))
             now_playing["elapsed"] = player.elapsed()  # File time
@@ -554,12 +560,13 @@ async def web_media(request):
     if player is None:
         raise web.HTTPNotFound()
     track = _find_track(player, track_id)
-    if track is not None and os.path.isfile(track["filepath"]):
+    filepath = track.get("filepath") if track is not None else None
+    if filepath and os.path.isfile(filepath):
         # Never stored by a proxy or tunnel in front (private), and
         # revalidated by the browser (no-cache): a clip URL must always
         # serve the file of that track.
         headers = {"Cache-Control": "private, no-cache"}
-        return web.FileResponse(track["filepath"], headers=headers)
+        return web.FileResponse(filepath, headers=headers)
     raise web.HTTPNotFound()
 
 
@@ -571,6 +578,8 @@ async def web_lyrics(request):
     track = _find_track(player, request.match_info["track_id"])
     if track is None:
         return _fail(request, 404, "web.unknown_track")
+    if track.get("live"):
+        return _fail(request, 404, "web.no_lyrics")  # Nothing to look up
     result = await lyrics.get(track)
     if result == lyrics.PENDING:
         return web.json_response({"pending": True}, status=202, headers=headers)

@@ -37,6 +37,7 @@ from .controls import (
     control_shuffle,
     control_volume,
     playlist_entries,
+    read_radio_link,
     read_spotify,
     seek_label,
 )
@@ -45,6 +46,7 @@ from .media import get_video_id_from_url, looks_like_url
 from .playback import (
     download_and_queue_song,
     join_voice_channel,
+    queue_live_track,
     queue_playlist,
     queue_search,
     queue_spotify,
@@ -216,7 +218,7 @@ async def record_command_activity(ctx):
 
 @hybrid("play", "Queue a music link, or the best YouTube match for some text")
 @app_commands.describe(
-    query="YouTube, SoundCloud, Bandcamp, Spotify, Deezer or Apple Music link, "
+    query="A music link (YouTube, Spotify, Twitch, radio...), "
     "or text to search on YouTube"
 )
 async def play(ctx, *, query: str = None):
@@ -240,13 +242,23 @@ async def play(ctx, *, query: str = None):
     except spotify.SpotifyError as e:
         await fail(ctx, ControlError(e.code).text(lang))
         return
+    radio = None
     if not text_search and spotify_ref is None:
         # As the page's add: only allowlisted hosts, rebuilt canonically,
         # ever reach yt-dlp.
-        url = media.parse_play_url(url)
-        if url is None:
+        clean = media.parse_play_url(url)
+        radio_url = media.parse_radio_url(url) if clean is None else None
+        if clean is None and radio_url is None:
             await fail(ctx, ControlError("bad_url").text(lang))
             return
+        if radio_url is not None:
+            # An internet radio: read it now, so a bad link is a private error.
+            try:
+                radio = await read_radio_link(radio_url)
+            except ControlError as e:
+                await fail(ctx, e.text(lang))
+                return
+        url = clean
 
     if not await join_voice_channel(ctx):
         return
@@ -259,6 +271,11 @@ async def play(ctx, *, query: str = None):
 
     if spotify_ref is not None:
         await _play_spotify(ctx, player, *spotify_ref)
+        return
+
+    if radio is not None:
+        await ack(ctx)
+        await queue_live_track(ChannelContext(ctx), player, radio)
         return
 
     if text_search:
@@ -392,6 +409,7 @@ async def reset_voice(ctx):
     # Clean the player. The web session survives a reset: same link.
     if player:
         player.cancel_idle()
+        player.cancel_live()
         player.should_stop = True
         player.epoch += 1
         await player.disconnect_voice_client()

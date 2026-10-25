@@ -1,6 +1,6 @@
 # More sources
 
-Besides YouTube and [Spotify](spotify.md), `!play` and the clip page's add box accept SoundCloud, Bandcamp, Deezer and Apple Music links. None of them needs an account or an API key.
+Besides YouTube and [Spotify](spotify.md), `!play` and the clip page's add box accept SoundCloud, Bandcamp, Deezer and Apple Music links, and [live streams](#live-streams) (YouTube lives, Twitch channels, internet radios). None of them needs an account or an API key.
 
 ## SoundCloud and Bandcamp
 
@@ -31,4 +31,24 @@ Like Spotify, these links are only used to read the track list (title, artists, 
 - Lists are capped at `MAX_PLAYLIST_SIZE`. Progress is shown as for Spotify, including `not found on YouTube` for tracks without a match.
 - Private playlists cannot be read, and a service that changes its page or API can make a link unreadable until the bot is updated.
 
-DJ Snake is not affiliated with or endorsed by SoundCloud, Bandcamp, Deezer or Apple.
+## Live streams
+
+YouTube lives, Twitch channels and internet radios cannot be downloaded, so they are played as they come: FFmpeg reads the stream and reconnects by itself after a network hiccup.
+
+```text
+!play https://www.youtube.com/watch?v=jfKfPfyJRdk
+!play https://www.twitch.tv/somechannel
+!play https://icecast.radiofrance.fr/fip-midfi.mp3
+!play https://somafm.com/groovesalad.pls
+```
+
+- **YouTube**: any video link that is live right now (also `youtube.com/live/<id>`). A live that has not started yet is refused; a finished one is a normal video.
+- **Twitch**: a channel link, `twitch.tv/<channel>`, while the channel is live. Videos and clips are not accepted.
+- **Internet radios**: an Icecast or Shoutcast stream, an HLS `.m3u8` playlist, or a `.pls` / `.m3u` file pointing to one. The link must end in a stream or playlist file (`.mp3`, `.aac`, `.ogg`, `.opus`, `.flac`, `.m3u8`, `.m3u`, `.pls`, or a name like `groovesalad-128-mp3`) or a usual mount point (`/stream`, `/listen`, `/live`, `/;`). The bot checks it before queueing it: it must answer with an audio content type, and its address must be public (links to private or local addresses are refused). The station name comes from the stream's `icy-name`, and the song playing now (`StreamTitle`) is read every 30 seconds and shown on the clip page and in the status message.
+- A live item plays until it is skipped, `!stop` is used, the stream ends or `LIVE_MAX_HOURS` (4 by default) is reached; then the queue goes on.
+- There is nothing to seek in: the clip page shows a LIVE badge instead of the progress bar, and `!seek` or the page's seek answer that a live stream has no position. Loop track does not replay a stream that ended, and no crossfade is made into or out of a live item.
+- Loudness is evened out on the fly (one-pass normalisation) instead of the measured automix; there is no SponsorBlock cut and no silence trimming.
+- The clip page shows the stream's artwork (the YouTube or Twitch thumbnail) or an "On air" card, never the live video. Lyrics are not looked up.
+- Listening time counts in the stats, with no duration.
+
+DJ Snake is not affiliated with or endorsed by SoundCloud, Bandcamp, Deezer, Apple or Twitch.

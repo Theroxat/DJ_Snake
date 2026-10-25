@@ -49,8 +49,10 @@ NOW_PLAYING_KEYS = {
     "end",
     "autoplay",
     "audio_only",
+    "live",
+    "live_title",
 }
-QUEUE_KEYS = {"id", "title", "duration", "thumbnail", "url", "autoplay"}
+QUEUE_KEYS = {"id", "title", "duration", "thumbnail", "url", "autoplay", "live"}
 
 
 @pytest.fixture

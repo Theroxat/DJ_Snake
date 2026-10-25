@@ -21,9 +21,11 @@ from .playback import (
     download_and_queue_song,
     play_next,
     prefetch_autoplay,
+    queue_live_track,
     queue_playlist,
     queue_search,
     queue_spotify,
+    read_radio,
 )
 from .player import discard_tracks, guild_of
 from .i18n import ctx_lang, t
@@ -110,6 +112,9 @@ class ControlError(Exception):
         "playlist_full": 409,
         "playlist_empty": 400,
         "playlist_unavailable": 500,
+        "live_no_seek": 409,
+        "not_a_stream": 400,
+        "stream_unreachable": 502,
     }
 
     def __init__(self, code):
@@ -172,8 +177,10 @@ async def control_seek(player, position):
     track), keeping it paused if it was. Returns the applied position."""
     async with player.lock:
         _require_playing(player)
-        position = max(0.0, float(position))
         track = player.now_playing
+        if track.get("live"):
+            raise ControlError("live_no_seek")  # Nothing to seek in
+        position = max(0.0, float(position))
         start, end = track.get("start") or 0.0, track.get("end")
         if end is not None:  # Automix window, as playback_options clamps it
             position = max(start, min(position, end - 1))
@@ -358,6 +365,10 @@ async def control_add(player, guild_id, url):
     parsed = parse_media_url(url)
     if parsed is None:
         text = " ".join(url.split()) if isinstance(url, str) else ""
+        radio = media.parse_radio_url(url)
+        if radio is not None:
+            await _add_radio(player, guild_id, radio)
+            return
         if not text or len(text) > MAX_SEARCH_LENGTH or looks_like_url(text):
             raise ControlError("bad_url")
         if not player.in_voice():
@@ -368,6 +379,26 @@ async def control_add(player, guild_id, url):
         raise ControlError("not_in_voice")
     kind, clean_url = parsed
     _background(_add_from_web(player, guild_id, kind, clean_url))
+
+
+async def _add_radio(player, guild_id, url):
+    """An internet radio link: read it before answering (so a link that is
+    no stream is an HTTP error), then queue its live item."""
+    if not player.in_voice():
+        raise ControlError("not_in_voice")
+    epoch = player.epoch
+    track = await read_radio_link(url)
+    if player.epoch != epoch:
+        return  # Stopped or reset while the link was being read
+    _background(queue_live_track(WebContext(guild_id, player), player, track))
+
+
+async def read_radio_link(url):
+    """The live item of a radio link. Raises ControlError."""
+    try:
+        return await read_radio(url)
+    except media.StreamError as e:
+        raise ControlError(e.code)
 
 
 async def read_spotify(kind, ref, provider="spotify"):

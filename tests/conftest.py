@@ -79,6 +79,12 @@ def fresh_state(tmp_path, monkeypatch):
         raise lyrics.LyricsUnavailable("no network in tests")
 
     monkeypatch.setattr(lyrics, "_http", no_network)
+
+    def no_radio(url):
+        raise media.StreamError("stream_unreachable")
+
+    # Radio links (probe_stream, read_icy_title) never reach the network.
+    monkeypatch.setattr(media, "_open", no_radio)
     monkeypatch.setattr(
         permissions, "PERMISSIONS_FILE", str(data_dir / "permissions.json")
     )

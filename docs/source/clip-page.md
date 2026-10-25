@@ -20,7 +20,7 @@ The page shows the current video, the queue ("Up next"), a "Now playing" row, tr
 - seek by clicking the progress bar;
 - play a queued track now (jump);
 - remove or reorder queued tracks by dragging;
-- add YouTube, [Spotify](spotify.md), SoundCloud, Bandcamp, Deezer or Apple Music ([details](sources.md)) links, or type a song to search on YouTube;
+- add YouTube, [Spotify](spotify.md), SoundCloud, Bandcamp, Deezer or Apple Music ([details](sources.md)) links, a YouTube live, a Twitch channel or an internet radio ([live streams](sources.md#live-streams): a LIVE badge replaces the progress bar), or type a song to search on YouTube;
 - shuffle the queue once and cycle the loop mode (off, track, queue) with the two buttons around the transport controls;
 - toggle crossfade;
 - change the server's volume with the speaker button next to Sync (a slider from 0 to 150%, keyboard accessible; the change is sent after you stop dragging);
