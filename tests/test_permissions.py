@@ -155,9 +155,29 @@ async def test_rotation_ends_control_streams_keeps_watch_streams(
     old = player.sid
     sessions.rotate_control_link(player)
     assert player.sid != old
-    assert json.loads(await _first_event(control)) == {"active": False}
-    raw = await _first_event(watch)
-    assert json.loads(raw)["active"] is True and player.sid not in raw
+    # Events sent before the rotation may still be buffered: the watch
+    # stream connecting wakes the control stream, which then sends a second
+    # state (viewers 2) unless that wake-up coalesced with its first one.
+    # Read up to the event that reflects the rotation instead of the next one.
+
+    async def control_ends():
+        while (body := json.loads(await _first_event(control))) != {"active": False}:
+            assert body["active"] is True
+        while await control.content.readline():  # The event's blank line
+            pass  # Then the stream closes (readline() returns b"")
+
+    async def watch_follows():
+        while True:
+            raw = await _first_event(watch)
+            body = json.loads(raw)
+            assert body["active"] is True
+            assert old not in raw and player.sid not in raw
+            # Viewers 1: the watch stream now counts under the new id alone.
+            if body["viewers"] == 1:
+                return
+
+    await asyncio.wait_for(control_ends(), 5)
+    await asyncio.wait_for(watch_follows(), 5)
     control.close()
     watch.close()
 
