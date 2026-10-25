@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Installable clip page (PWA): a per-session web app manifest (`GET /{id}/manifest.webmanifest`, named and coloured after the server's theme, with its logo as icon or default DJ Snake icons), a service worker (`/sw.js`) that caches only the page shell and fonts and shows a localised "Session offline" page when the bot is unreachable, iOS home screen tags, and an "Install app" item in the palette menu. The API, live stream, media and lyrics are never cached; view-only links stay view-only. Needs HTTPS (or localhost) to install.
+
 ## [1.4.0] - 2026-10-23
 
 ### Added

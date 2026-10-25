@@ -188,6 +188,7 @@
   "web.logo_too_large": "Image trop lourde (512 Ko max.).",
   "web.logo_format": "Format non pris en charge (PNG, JPEG, WebP ou GIF).",
   "web.view_only": "Ce lien est en lecture seule. Demandez le lien de contrôle à un DJ ({prefix}weblink dans Discord).",
+  "web.pwa_description": "Page clip synchronisée et télécommande du bot musical DJ Snake.",
   "web.bad_playlist_name": "Nom de playlist invalide.",
   "web.shutting_down": "Arrêt en cours.",
   "web.too_many_streams": "Trop de connexions en direct.",

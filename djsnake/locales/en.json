@@ -188,6 +188,7 @@
   "web.logo_too_large": "Image too large (512 KB max).",
   "web.logo_format": "Unsupported format (PNG, JPEG, WebP or GIF).",
   "web.view_only": "This is a view-only link. Ask a DJ for the control link ({prefix}weblink in Discord).",
+  "web.pwa_description": "Synced clip page and remote for the DJ Snake music bot.",
   "web.bad_playlist_name": "Invalid playlist name.",
   "web.shutting_down": "Shutting down.",
   "web.too_many_streams": "Too many live connections.",

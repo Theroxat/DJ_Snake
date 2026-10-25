@@ -32,8 +32,10 @@ from .config import (
     THEME_PRESETS,
     THEME_SKINS,
     VIEWER_WINDOW_SECONDS,
+    WEB_ICON_DIR,
     WEB_INDEX,
     WEB_PORT,
+    WEB_SW,
 )
 from .controls import (
     ControlError,
@@ -74,6 +76,8 @@ from .themes import (
     save_themes,
     set_logo,
     sniff_image,
+    theme_bg,
+    theme_for,
     theme_state,
     valid_color,
 )
@@ -115,6 +119,10 @@ from .volume import valid_volume, volume_for
 #                              X-Edit-Token header of a `!theme edit` link
 #   POST|DELETE /api/{sid}/theme/logo   raw PNG/JPEG/WebP/GIF body (same token)
 #   GET /theme-logo/{sid}      the guild's logo (?v= busts caches)
+#   GET /sw.js                 the service worker (app shell only, never the API)
+#   GET /{sid}/manifest.webmanifest   the PWA manifest; start_url and the logo
+#                              URL use the id the request used (404 if none)
+#   GET /icons/{name}          the default PNG icons (a fixed list of names)
 #   GET /healthz               200 {"status": "ok", ...} when the bot is connected
 #                              to Discord, else 503 {"status": "unavailable",
 #                              ...}; no ids, names or secrets
@@ -943,6 +951,93 @@ async def web_theme_logo_file(request):
     )
 
 
+ICON_NAMES = (
+    "icon-192.png",
+    "icon-512.png",
+    "icon-maskable-512.png",
+    "apple-touch-icon.png",
+)
+
+
+async def web_sw(request):
+    """The service worker, versioned with the app so a release replaces the
+    cache. Served from the root, its scope is the whole site."""
+    try:
+        with open(WEB_SW, encoding="utf-8") as f:
+            body = f.read().replace("__VERSION__", re.sub(r"\W", "_", APP_VERSION))
+    except OSError:
+        raise web.HTTPNotFound()
+    return web.Response(
+        text=body,
+        content_type="text/javascript",
+        headers={
+            "Cache-Control": "no-cache",
+            "Service-Worker-Allowed": "/",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+async def web_icon(request):
+    name = request.match_info["name"]
+    if name not in ICON_NAMES:  # Never a path built from the request
+        raise web.HTTPNotFound()
+    return web.FileResponse(
+        os.path.join(WEB_ICON_DIR, name),
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+async def web_manifest(request):
+    """The PWA manifest of this session's link. Everything in it is built
+    from the id the request used, so a view-only link stays view-only."""
+    link, sid, player, _ = _session(request)
+    if player is None:
+        raise web.HTTPNotFound()
+    guild_id = state.sessions[sid]
+    theme = theme_for(guild_id)
+    lang = lang_for(guild_id)
+    name = theme["name"] or "DJ Snake"
+    if theme["logo"]:
+        # The logo is not resized (no image library): the browser scales it.
+        src = f"/theme-logo/{link}?v={theme['logo']['v']}"
+        kind = LOGO_TYPES[theme["logo"]["ext"]]
+        icons = [
+            {"src": src, "sizes": size, "type": kind, "purpose": "any"}
+            for size in ("192x192", "512x512")
+        ]
+    else:
+        icons = [
+            {"src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
+            {"src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
+            {
+                "src": "/icons/icon-maskable-512.png",
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "maskable",
+            },
+        ]
+    bg = theme_bg(guild_id)
+    body = {
+        "id": f"/{link}",
+        "name": name,
+        "short_name": name[:12],
+        "description": t("web.pwa_description", lang),
+        "lang": lang,
+        "start_url": f"/{link}",
+        "scope": "/",
+        "display": "standalone",
+        "background_color": bg,
+        "theme_color": bg,
+        "icons": icons,
+    }
+    return web.json_response(
+        body,
+        content_type="application/manifest+json",
+        headers={"Cache-Control": "no-cache", "Referrer-Policy": "same-origin"},
+    )
+
+
 def _notifies(handler):
     """Wrap a route that changes the session: whatever it did (even a failed
     action), the page's live streams get a fresh state. New control actions
@@ -965,6 +1060,9 @@ def build_web_app():
     app[_STREAMS] = {"closing": False}
     app.on_shutdown.append(_close_streams)
     app.router.add_get("/", web_landing)
+    app.router.add_get("/sw.js", web_sw)
+    app.router.add_get("/icons/{name}", web_icon)
+    app.router.add_get("/{sid}/manifest.webmanifest", web_manifest)
     app.router.add_get("/healthz", web_healthz)
     app.router.add_get("/metrics", web_metrics)
     app.router.add_get("/api/{sid}/state", web_state)
