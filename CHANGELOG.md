@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Sharding: the bot runs as `commands.AutoShardedBot` (single process), with an optional `SHARD_COUNT`. `/healthz` and `/metrics` report each shard; `/healthz` answers `degraded` (still 200) when only some shards are down and 503 when all are.
+
 ## [1.4.0] - 2026-10-23
 
 ### Added

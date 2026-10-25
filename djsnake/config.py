@@ -25,6 +25,22 @@ MEDIA_FORMAT = os.getenv("MEDIA_FORMAT") or DEFAULT_MEDIA_FORMAT
 if os.getenv("AUDIO_FORMAT") and not os.getenv("MEDIA_FORMAT"):
     print("⚠️  AUDIO_FORMAT is no longer read; set MEDIA_FORMAT instead.")
 
+
+def parse_shard_count(raw):
+    """SHARD_COUNT: a positive integer, or None (empty, invalid) so discord.py
+    picks the count Discord recommends."""
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    if raw.isdigit() and int(raw) > 0:
+        return int(raw)
+    print(f"⚠️  SHARD_COUNT={raw!r} is not a positive integer; using automatic.")
+    return None
+
+
+# Gateway shards (one process runs them all). None: discord.py asks Discord.
+SHARD_COUNT = parse_shard_count(os.getenv("SHARD_COUNT"))
+
 # Slash commands sync globally at startup (up to an hour to show everywhere).
 # SLASH_SYNC_GUILD, a server ID, syncs to that server only, at once: for dev.
 _slash_guild = (os.getenv("SLASH_SYNC_GUILD") or "").strip()

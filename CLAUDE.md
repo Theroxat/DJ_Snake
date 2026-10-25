@@ -110,7 +110,7 @@ link is never posted publicly, see Permissions; anything else falls back to
 `!language`; `en` or `fr`), `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET`
 (optional, both needed to use the Spotify Web API), `METRICS` (`0`; `1` enables
 `GET /metrics`), `APP_VERSION` (set by the Dockerfile build arg, `dev`
-otherwise; shown by `/healthz`), `LYRICS` (`1`; `0`, `false`, `no` or `off`
+otherwise; shown by `/healthz`), `SHARD_COUNT` (empty: automatic; a positive integer forces the gateway shard count; the bot is an `AutoShardedBot` in one process, enough for a few thousand servers, Discord requires sharding from 2,500; no multi-process clustering), `LYRICS` (`1`; `0`, `false`, `no` or `off`
 turns the LRCLIB lyrics off), and `YTDLP_AUTO_UPDATE` (entrypoint only).
 
 ## Architecture (`djsnake/`)
@@ -511,14 +511,14 @@ Module map, lowest layer first (each imports only the ones above it):
   Theme routes: `POST /api/{sid}/theme`,
   `POST|DELETE /api/{sid}/theme/logo`, `GET /theme-logo/{sid}` (see Themes).
   `GET /healthz` returns 200 `{status: "ok", discord: "connected", latency_ms,
-  guilds, players, uptime_s, version}` when the bot is ready and its websocket
-  answers (finite `bot.latency`), else 503 `{status: "unavailable", discord:
+  guilds, players, uptime_s, version}` when the bot is ready and at least one shard's websocket
+  answers (finite latency; `status: "degraded"`, still 200, when some shards are down; a `shards` list gives id, up/down and latency per shard), else 503 `{status: "unavailable", discord:
   "closed" | "not ready" | "websocket closed", uptime_s}`; it carries no ids,
   names or secrets. The Dockerfile `HEALTHCHECK` polls it (urllib, 60 s start
   period, 3 retries to ride out gateway resumes). `GET /metrics` (Prometheus
   text written by hand, 404 unless `METRICS` is on) exposes
   `djsnake_active_players`, `_queued_tracks`, `_downloads_in_progress`,
-  `_web_viewers`, `_discord_latency_seconds` and the counter
+  `_web_viewers`, `_discord_latency_seconds`, `_shards`, `_shard_up{shard}`, `_shard_latency_seconds{shard}` and the counter
   `djsnake_tracks_played_total` (`state.counters`, bumped by `retire_play()`).
   Tests: `tests/test_health.py`.
 - **Live updates** (`web_events()`, `state_body()` builds the JSON shared with

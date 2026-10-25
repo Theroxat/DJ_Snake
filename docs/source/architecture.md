@@ -74,6 +74,10 @@ discord.py drops and resumes the gateway roughly every couple of hours. Do no cl
 
 `safe_voice_connect()` cleans up any stale voice client, adds delays, and retries. It exists to avoid Discord close code 4006 (invalid session). Voice needs `PyNaCl`, `davey` (DAVE encryption) and, on Python 3.13+, `audioop-lts`.
 
+### Sharding
+
+The bot is a `commands.AutoShardedBot`: discord.py asks Discord for the recommended shard count (or uses `SHARD_COUNT`) and runs every shard inside this one process. Voice connections go through the guild's own shard, and `safe_voice_connect()` only uses guild-level APIs (`guild.voice_client`, `channel.connect()`), so it needs no shard handling. One process handles a few thousand servers; Discord requires sharding from 2,500 servers. Multi-process clustering is out of scope. `/healthz` and `/metrics` report per-shard status and latency.
+
 ### Persistent data
 
 Everything persistent lives in `DATA_DIR`: `themes.json` (per-server themes, written atomically), `languages.json` (per-server languages), `volume.json` (per-server volume), `permissions.json` (DJ roles), `playlists.db` (saved playlists), `logos/`, `stats.db` (SQLite, WAL) and `lyrics/` (lyrics found on LRCLIB, one JSON file per YouTube video id).

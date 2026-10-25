@@ -9,7 +9,7 @@ import time
 import discord
 from discord.ext import commands
 
-from .config import COMMAND_PREFIX
+from .config import COMMAND_PREFIX, SHARD_COUNT
 
 # Configure intents with all necessary permissions
 intents = discord.Intents.default()
@@ -18,7 +18,11 @@ intents.voice_states = True
 intents.guilds = True
 intents.guild_messages = True
 
-bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
+# AutoShardedBot runs every gateway shard in this process; with one shard it
+# behaves like a plain Bot. SHARD_COUNT None lets discord.py pick the count.
+bot = commands.AutoShardedBot(
+    command_prefix=COMMAND_PREFIX, intents=intents, shard_count=SHARD_COUNT
+)
 
 
 def clock():

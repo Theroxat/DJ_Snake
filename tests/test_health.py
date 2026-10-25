@@ -12,7 +12,7 @@ from djsnake import state, web
 def connected(monkeypatch):
     """The bot is ready, with a live websocket at 42 ms."""
     monkeypatch.setattr(state.bot, "is_ready", lambda: True)
-    monkeypatch.setattr(commands.Bot, "latency", property(lambda self: 0.042))
+    monkeypatch.setattr(commands.AutoShardedBot, "latency", property(lambda s: 0.042))
 
 
 async def test_healthz_ok(client, connected, player):
@@ -38,7 +38,9 @@ async def test_healthz_not_ready(client):
 
 async def test_healthz_websocket_closed(client, monkeypatch):
     monkeypatch.setattr(state.bot, "is_ready", lambda: True)
-    monkeypatch.setattr(commands.Bot, "latency", property(lambda self: math.nan))
+    monkeypatch.setattr(
+        commands.AutoShardedBot, "latency", property(lambda s: math.nan)
+    )
     r = await client.get("/healthz")
     assert r.status == 503
     assert (await r.json())["discord"] == "websocket closed"
@@ -65,3 +67,76 @@ async def test_metrics_enabled(client, connected, player, monkeypatch):
     assert "djsnake_discord_latency_seconds 0.042000\n" in text
     assert "# TYPE djsnake_tracks_played_total counter" in text
     assert "djsnake_tracks_played_total 3\n" in text
+
+
+class FakeShard:
+    def __init__(self, latency, closed=False):
+        self.latency = latency
+        self._closed = closed
+
+    def is_closed(self):
+        return self._closed
+
+
+def fake_shards(monkeypatch, *shards):
+    monkeypatch.setattr(state.bot, "is_ready", lambda: True)
+    monkeypatch.setattr(
+        commands.AutoShardedBot,
+        "shards",
+        property(lambda self: dict(enumerate(shards))),
+    )
+
+
+def test_bot_is_autosharded():
+    assert isinstance(state.bot, commands.AutoShardedBot)
+
+
+async def test_healthz_all_shards_up(client, monkeypatch):
+    fake_shards(monkeypatch, FakeShard(0.03), FakeShard(0.05))
+    r = await client.get("/healthz")
+    assert r.status == 200
+    body = await r.json()
+    assert body["status"] == "ok"
+    assert body["latency_ms"] == 40.0
+    assert [s["status"] for s in body["shards"]] == ["up", "up"]
+
+
+async def test_healthz_one_shard_down_is_degraded(client, monkeypatch):
+    fake_shards(monkeypatch, FakeShard(0.03), FakeShard(math.nan, closed=True))
+    r = await client.get("/healthz")
+    assert r.status == 200
+    body = await r.json()
+    assert body["status"] == "degraded"
+    assert body["discord"] == "degraded"
+    assert body["latency_ms"] == 30.0
+    assert [s["status"] for s in body["shards"]] == ["up", "down"]
+    assert body["shards"][1]["latency_ms"] is None
+
+
+async def test_healthz_all_shards_down(client, monkeypatch):
+    fake_shards(monkeypatch, FakeShard(math.nan, True), FakeShard(math.nan))
+    r = await client.get("/healthz")
+    assert r.status == 503
+    assert (await r.json())["discord"] == "websocket closed"
+
+
+async def test_metrics_per_shard(client, monkeypatch):
+    monkeypatch.setattr(web, "METRICS_ENABLED", True)
+    fake_shards(monkeypatch, FakeShard(0.03), FakeShard(math.nan, closed=True))
+    text = await (await client.get("/metrics")).text()
+    assert "djsnake_shards 2\n" in text
+    assert 'djsnake_shard_up{shard="0"} 1\n' in text
+    assert 'djsnake_shard_up{shard="1"} 0\n' in text
+    assert 'djsnake_shard_latency_seconds{shard="0"} 0.030000\n' in text
+    assert 'djsnake_shard_latency_seconds{shard="1"} NaN\n' in text
+    assert "djsnake_discord_latency_seconds 0.030000\n" in text
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [(None, None), ("", None), (" 4 ", 4), ("0", None), ("-2", None), ("abc", None)],
+)
+def test_parse_shard_count(raw, expected):
+    from djsnake import config
+
+    assert config.parse_shard_count(raw) == expected
