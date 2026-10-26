@@ -36,6 +36,7 @@
 - Optional crossfade between tracks.
 - Loop (track or queue) and one-shot queue shuffle.
 - Optional autoplay ("radio"): when the queue runs out, a related YouTube track plays on.
+- 24/7 mode (`!stay on`): the bot stays in its voice channel, even when idle, and rejoins it after a restart.
 - Listening stats per server on the clip page: top tracks and artists, the most skipped track, hours played, sessions, peak listeners and a day-by-hour heatmap, for the last week, month or all time.
 - Live viewer count in the clip page header.
 - Synced lyrics over the clip, from [LRCLIB](https://lrclib.net) (free, no key; `LYRICS=0` turns them off).
@@ -96,6 +97,7 @@ Every command is both a `!` command and a slash command (`/play`, `/playlist sav
 | `!volume [0-150]` | Show the server's volume, or set it in percent (100 is the normal level). Saved across restarts. |
 | `!autoplay [on\|off]` | Keep playing related tracks when the queue runs out, or show the current setting (off by default, see `AUTOPLAY`). |
 | `!limits [queue\|user\|minutes\|cooldown] [number\|default]` | Show the queue limits, or change one (Manage Server): queue size, tracks per member, track length, /play cooldown. |
+| `!stay [on\|off]` | 24/7 mode: the bot never leaves its voice channel (no idle disconnect) and rejoins it after a restart; with no argument, shows the setting. Setting it needs the DJ role or Manage Server. See `STAY_247`. |
 | `!playlist save\|add\|load\|show\|delete <name>`, `!playlist list` | Saved playlists for the server: links and titles kept across restarts, downloaded again when loaded. |
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
@@ -105,7 +107,7 @@ Every command is both a `!` command and a slash command (`/play`, `/playlist sav
 
 | `!language [code\|reset]` | Show or set the language of the bot and the clip page for the server (`en`, `fr`). Needs the Manage Server permission. |
 
-When a server has a DJ role, `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!previous`, `!move`, `!clear`, `!volume`, `!autoplay`, `!stop` and `!reset` need that role or the Manage Server permission; whoever queued the playing track may still skip it with `!next`, and remove their own queued tracks with `!remove` (anyone else needs the role for that). Anyone in the voice channel can `!voteskip`. `!play`, `!list`, `!nowplaying` and `!history` stay open to everyone. See [Who controls the music](#who-controls-the-music).
+When a server has a DJ role, `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!previous`, `!move`, `!clear`, `!volume`, `!autoplay`, `!stay`, `!stop` and `!reset` need that role or the Manage Server permission; whoever queued the playing track may still skip it with `!next`, and remove their own queued tracks with `!remove` (anyone else needs the role for that). Anyone in the voice channel can `!voteskip`. `!play`, `!list`, `!nowplaying` and `!history` stay open to everyone. See [Who controls the music](#who-controls-the-music).
 
 ## Language
 
@@ -227,8 +229,9 @@ Set these in `.env` (see `.env.example`).
 | `SESSION_IDLE_HOURS` | `6` | Idle hours before a clip link expires. |
 | `AUTOPLAY` | `0` | Default of the per-session autoplay setting (`1` to start with it on). |
 | `VOTESKIP_PERCENT` | `50` | Default vote-to-skip threshold, 1 to 100: more than this share of the listeners must vote. Change it per server with `/voteskip threshold`. |
+| `STAY_247` | `0` | Default of the per-server 24/7 mode for servers that never ran `!stay` (`1`, `true`, `on` or `yes`): the bot never leaves voice on its own. A server needs a remembered voice channel to be rejoined after a restart. |
 | `SLASH_SYNC_GUILD` | empty | Server ID to publish slash commands to instantly (development). Empty: global sync. |
-| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), languages (`languages.json`), volumes (`volume.json`), vote-skip thresholds (`voteskip.json`), DJ roles (`permissions.json`), queue limits (`limits.json`), saved playlists (`playlists.db`), logos (`logos/`), listening stats (`stats.db`) and cached lyrics (`lyrics/`). Compose mounts `./data` there. |
+| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), languages (`languages.json`), volumes (`volume.json`), vote-skip thresholds (`voteskip.json`), DJ roles (`permissions.json`), queue limits (`limits.json`), 24/7 mode (`stay.json`), saved playlists (`playlists.db`), logos (`logos/`), listening stats (`stats.db`) and cached lyrics (`lyrics/`). Compose mounts `./data` there. |
 | `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`. |
 | `LYRICS` | `1` | Synced lyrics on the clip page, from lrclib.net (`0` turns them off: no lookups, no button). |
 | `WEB_CONTROL` | `everyone` | `everyone`: the status message shows the control link and the view-only link. `dj`: only the view-only link; DJs get the control link with `!weblink`. A server with a DJ role always behaves as `dj`. |

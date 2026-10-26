@@ -16,6 +16,7 @@ from conftest import GUILD_ID
 
 NAMES = {
     "play",
+    "stay",
     "next",
     "voteskip",
     "list",
@@ -367,4 +368,4 @@ def test_new_playback_commands_need_a_dj():
     from djsnake.permissions import DJ_COMMANDS, DJ_WHEN_SETTING
 
     assert {"loop", "shuffle"} <= DJ_COMMANDS
-    assert {"volume", "autoplay"} == DJ_WHEN_SETTING
+    assert {"volume", "autoplay", "stay"} == DJ_WHEN_SETTING

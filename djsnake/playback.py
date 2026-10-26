@@ -22,6 +22,7 @@ from .sessions import (
     short,
     touch,
 )
+from .stay import remember_channel, set_stay, stay_channel, stay_on
 from .volume import percent_to_gain, volume_for
 
 
@@ -128,6 +129,7 @@ async def join_voice_channel(ctx):
 
     if voice_client:
         player.voice_client = voice_client
+        remember_channel(ctx.guild.id, voice_channel.id)  # 24/7: rejoin it later
         if not already_here:
             stats.record_session(ctx.guild.id)
             stats.record_listeners(ctx.guild.id, stats.count_listeners(voice_channel))
@@ -865,7 +867,11 @@ def channel_empty(player):
 def schedule_idle_disconnect(ctx, player, delay=None):
     """(Re)start the player's single idle timer: leave voice after `delay`
     seconds (IDLE_DISCONNECT_SECONDS, or the empty channel grace) unless
-    something plays meanwhile. Any previous timer is cancelled first."""
+    something plays meanwhile. Any previous timer is cancelled first. In 24/7
+    mode there is no timer: the bot never leaves by itself (returns None)."""
+    if stay_on(ctx.guild.id):
+        player.cancel_idle()
+        return None
     if delay is None:
         delay = config.IDLE_DISCONNECT_SECONDS
         if channel_empty(player):
@@ -904,6 +910,7 @@ async def _idle_disconnect(ctx, player, gen, delay):
             or player.is_playing
             or player.queue
             or not player.in_voice()
+            or stay_on(ctx.guild.id)  # 24/7 was turned on meanwhile
         ):
             return  # Stale: replaced, stopped, playing again or already out
         if player.loading or player.pending_downloads or player.single_downloads:
@@ -913,6 +920,80 @@ async def _idle_disconnect(ctx, player, gen, delay):
         # Leave exactly as the queue end used to.
         await player.voice_client.disconnect()
     refresh_panel(player)
+
+
+# --- 24/7 mode ---------------------------------------------------------------
+
+
+async def rejoin_stay(guild):
+    """Join the guild's remembered 24/7 channel (nothing starts playing).
+    False when there is none, it is gone, the bot may not connect, or the
+    connection fails. Uses safe_voice_connect() with two attempts."""
+    channel_id = stay_channel(guild.id)
+    channel = guild.get_channel(channel_id) if channel_id else None
+    if channel is None or not callable(getattr(channel, "connect", None)):
+        return False  # Channel deleted (or not a voice channel)
+    if not channel.permissions_for(guild.me).connect:
+        return False
+    voice_client = await safe_voice_connect(channel, max_attempts=2)
+    if not voice_client:
+        return False
+    player = state.music_players.get(guild.id)
+    if player is None:
+        player = state.music_players[guild.id] = MusicPlayer()
+    player.voice_client = voice_client
+    refresh_panel(player)
+    return True
+
+
+def give_up_stay(guild_id):
+    """24/7 cannot be kept: turn it off and say so on the panel."""
+    try:
+        set_stay(guild_id, False)
+    except OSError as e:
+        print(f"⚠️  Could not save the 24/7 setting: {e}")
+    player = state.music_players.get(guild_id)
+    if player is not None:
+        set_action(player, t("action.stay_lost", player_lang(player)))
+    print(f"24/7 mode turned off for guild {guild_id}")
+
+
+async def restore_stay(guilds):
+    """After a restart: rejoin the remembered channel of every guild with 24/7
+    on, one at a time. A guild that is gone, a deleted channel or a missing
+    permission is skipped; nothing is played."""
+    for guild in guilds:
+        if not stay_on(guild.id) or not stay_channel(guild.id):
+            continue
+        if guild.voice_client and guild.voice_client.is_connected():
+            continue
+        try:
+            if await rejoin_stay(guild):
+                print(f"🌙 24/7: rejoined the voice channel of {guild.name}")
+            else:
+                print(f"🌙 24/7: could not rejoin the voice channel of {guild.name}")
+        except Exception as e:
+            print(f"🌙 24/7: rejoin failed for {guild.name}: {e}")
+
+
+async def recover_stay(guild):
+    """The bot was dropped from the voice channel of a 24/7 guild (Discord
+    ended the voice session, or someone disconnected or moved it away): rejoin
+    once. Dropped again within STAY_RETRY_WINDOW, or when the channel is gone
+    or off limits, 24/7 turns itself off, so there is never a reconnect loop."""
+    now = state.clock()
+    last = state.stay_retries.get(guild.id)
+    state.stay_retries[guild.id] = now
+    if last is not None and now - last < config.STAY_RETRY_WINDOW:
+        give_up_stay(guild.id)
+        return
+    try:
+        ok = await rejoin_stay(guild)
+    except Exception as e:
+        print(f"🌙 24/7: rejoin failed: {e}")
+        ok = False
+    if not ok:
+        give_up_stay(guild.id)
 
 
 async def _start_crossfade(player, mixer, gen, ctx=None):

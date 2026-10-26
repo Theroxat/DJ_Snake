@@ -55,6 +55,7 @@ from .playback import (
     queue_playlist,
     queue_search,
     queue_spotify,
+    schedule_idle_disconnect,
 )
 from .player import MusicPlayer, discard_tracks, retire_play
 from .sessions import (
@@ -81,6 +82,7 @@ from .permissions import (
     web_control_restricted,
 )
 from .themes import issue_edit_token, reset_theme, save_themes, theme_for
+from .stay import set_stay, stay_channel, stay_on
 from .volume import parse_volume, volume_for
 from .voteskip import parse_percent, threshold_for
 
@@ -416,7 +418,8 @@ async def stop(ctx):
     async with player.lock:
         retire_play(player, ctx.guild.id, "stop")
         player.stop_and_clear()
-    await player.disconnect_voice_client()
+    if not stay_on(ctx.guild.id):  # 24/7 mode stays in voice
+        await player.disconnect_voice_client()
     # The web session stays (same link on the next !play) until it expires.
     if not player.loading:
         player.load_line, player.load_final = None, False
@@ -937,6 +940,57 @@ async def autoplay(ctx, mode: str = None):
     await ack(ctx)
 
 
+@hybrid("stay", "24/7 mode: stay in the voice channel even when idle")
+@app_commands.describe(mode="on or off (leave empty to show the setting)")
+@app_commands.choices(
+    mode=[
+        app_commands.Choice(name="on", value="on"),
+        app_commands.Choice(name="off", value="off"),
+    ]
+)
+async def stay(ctx, mode: str = None):
+    """Stay in the voice channel for good (survives restarts)."""
+    await defer(ctx)
+    lang = ctx_lang(ctx)
+    mode = (mode or "").lower()
+    if mode not in ("on", "off"):
+        key = "cmd.stay_info_on" if stay_on(ctx.guild.id) else "cmd.stay_info_off"
+        await ctx.send(t(key, lang), ephemeral=True)
+        return
+    require_dj(ctx)
+    player = state.music_players.setdefault(ctx.guild.id, MusicPlayer())
+    touch(player)
+    channel = None
+    if mode == "on":
+        channel = getattr(getattr(player.voice_client, "channel", None), "id", None)
+        if channel is None and getattr(
+            getattr(ctx.author, "voice", None), "channel", None
+        ):
+            # Not in voice yet: join the author's channel so there is
+            # something to stay in.
+            if await join_voice_channel(ctx):
+                channel = ctx.author.voice.channel.id
+    try:
+        set_stay(ctx.guild.id, mode == "on", channel)
+    except OSError:
+        await ctx.send(t("cmd.stay_not_saved", lang), ephemeral=True)
+        return
+    if mode == "off":
+        await ctx.send(t("cmd.stay_off", lang))
+        if player.in_voice() and not player.is_playing and not player.queue:
+            schedule_idle_disconnect(ctx, player)  # Back to the normal linger
+    else:
+        player.cancel_idle()
+        remembered = stay_channel(ctx.guild.id)
+        if remembered is None:
+            await ctx.send(t("cmd.stay_on_later", lang))
+        else:
+            name = getattr(player.voice_client, "channel", None)
+            name = getattr(name, "name", None) or "voice"
+            await ctx.send(t("cmd.stay_on", lang, channel=name))
+    refresh_panel(player)
+
+
 @hybrid("theme", "Show or set the clip page theme of this server")
 @commands.has_guild_permissions(manage_guild=True)
 @app_commands.describe(
@@ -1434,6 +1488,7 @@ HELP_ORDER = (
     "volume",
     "autoplay",
     "limits",
+    "stay",
     "playlist",
     "theme",
     "djrole",

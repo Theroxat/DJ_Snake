@@ -77,6 +77,7 @@ from .themes import (
     theme_state,
     valid_color,
 )
+from .stay import stay_on
 from .volume import valid_volume, volume_for
 from .voteskip import web_status
 
@@ -332,6 +333,7 @@ def state_body(link, sid, player, viewers, can_control):
         "autoplay": player.autoplay,
         # Skip votes {count, needed} while any are active, else null.
         "votes": web_status(player, state.sessions[sid]),
+        "stay": stay_on(state.sessions[sid]),
         # True while the previous track still drains under this one.
         "crossfading": now_playing is not None
         and player.mixer is not None

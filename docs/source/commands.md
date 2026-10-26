@@ -22,6 +22,7 @@ Every command works two ways: as a text message with the prefix, `!` by default 
 | `!volume [0-150]` | Show the server's volume, or set it in percent (100 is the normal level). Saved across restarts. |
 | `!autoplay [on\|off]` | Keep playing related tracks when the queue runs out, or show the current setting (off by default, see `AUTOPLAY`). |
 | `!limits [queue\|user\|minutes\|cooldown] [number\|default]` | Show the queue limits, or change one (Manage Server): queue size, tracks per member, track length, /play cooldown. |
+| `!stay [on\|off]` | 24/7 mode: the bot never leaves its voice channel (no idle disconnect) and rejoins it after a restart; with no argument, shows the setting. Setting it needs the DJ role or Manage Server. See `STAY_247`. |
 | `!playlist save\|add\|load\|show\|delete <name>`, `!playlist list` | Saved playlists for the server: links and titles kept across restarts, downloaded again when loaded. |
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
@@ -98,6 +99,10 @@ For servers with a DJ role: members who cannot use `!next` can ask to skip the t
 
 Keeps the music going when the queue runs out. With autoplay on, the bot picks a track related to the last one (from YouTube's mix for that video), downloads it while the current track is still playing so there is no gap, and plays it. Tracks played in the last 50, live streams, anything over 10 minutes and titles that look like podcasts, interviews or compilations are skipped. If nothing suitable is found or no pick is ready in time, the bot lingers in voice as usual, and it never autoplays into an empty channel. A loop mode, when active, takes precedence over autoplay, and a track you queue always plays before an autoplay pick. Without an argument, shows the current setting. Off by default; `AUTOPLAY=1` changes the default. The status message shows "📻 Autoplay on" and marks autoplay tracks.
 
+### `!stay [on|off]`
+
+24/7 mode. With it on, the bot never leaves its voice channel on its own: the idle linger (`IDLE_DISCONNECT_SECONDS`, and the 30 seconds after the last human leaves) is skipped, and `!stop` clears the queue without leaving. It stays silent unless something plays; autoplay, if on, keeps going as usual. If the bot is not in voice, `!stay on` joins your channel. The setting and the channel are saved in `DATA_DIR/stay.json`, and after a restart the bot rejoins that channel (nothing starts playing; a deleted channel or a missing Connect permission is skipped). If Discord drops the bot, or someone disconnects it, it rejoins once; dropped again within two minutes, or if the channel is gone, 24/7 turns itself off and the status message says so. Without an argument, shows the setting. Setting it needs the DJ role or Manage Server. Off by default; `STAY_247=1` changes the default for servers that never chose. The status message shows "🌙 24/7" and the clip page a small "24/7" badge in its header.
+
 ### `!playlist`
 
 Saved playlists belong to the server and survive restarts. Only the YouTube link, title and duration of each track are stored, never the media: loading a playlist downloads its tracks again. Names are case-insensitive, up to 32 characters (letters, digits, spaces and `. ' & ! + ( ) -`). A server holds up to 50 playlists of up to 200 tracks each.
@@ -162,7 +167,7 @@ Needs the **Manage Server** permission. The setting is saved per server in `DATA
 
 With a DJ role set:
 
-- `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!previous`, `!move`, `!clear`, `!volume`, `!autoplay`, `!stop` and `!reset` need the DJ role or the Manage Server permission. The member who queued the playing track may still skip it with `!next`, `!remove` is open to whoever queued the track being removed, and everyone can use `!voteskip`. `!play`, `!list`, `!nowplaying` and `!history` stay open to everyone.
+- `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!previous`, `!move`, `!clear`, `!volume`, `!autoplay`, `!stay`, `!stop` and `!reset` need the DJ role or the Manage Server permission. The member who queued the playing track may still skip it with `!next`, `!remove` is open to whoever queued the track being removed, and everyone can use `!voteskip`. `!play`, `!list`, `!nowplaying` and `!history` stay open to everyone.
 - `!play` and `!list` stay open to everyone: adding a track never interrupts what plays, and DJs can still skip or remove it.
 - The status message shows only the clip page's view-only link, and the control link posted before stops working (every change of the role gives a live session a new one and retires the server's `!theme edit` links). See [Who controls the music](clip-page.md#who-controls-the-music).
 

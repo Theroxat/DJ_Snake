@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Queue limits against abuse: `MAX_QUEUE_SIZE` (200), `MAX_TRACKS_PER_USER`, `MAX_TRACK_MINUTES` and `PLAY_COOLDOWN_SECONDS` (all off at 0) are the defaults of every server, and `/limits` (Manage Server to change, saved in `DATA_DIR/limits.json`) overrides them per server. They apply to `/play`, the clip page's add, saved playlist loads and autoplay (queue size only); the page counts as one "web" member. DJs and Manage Server members skip the per-member limit and the cooldown. Playlists queue up to the limit and report what was skipped and why.
+### Added
+
+- 24/7 mode: `!stay [on|off]` (DJ to set, saved in `DATA_DIR/stay.json`) keeps the bot in its voice channel: no idle disconnect, `!stop` no longer leaves, and it rejoins the saved channel after a restart without playing anything. Dropped by Discord, it rejoins once, then turns 24/7 off (no reconnect loop). Optional `STAY_247` default, a `stay` field in `/api/{sid}/state`, "24/7" in the status panel and a header badge on the clip page.
 
 ## [1.4.0] - 2026-10-23
 
