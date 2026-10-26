@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-26
+
 ### Upgrade notes
 
 - New optional settings in `.env` (see `.env.example`): `VOTESKIP_PERCENT`, `MAX_QUEUE_SIZE`, `MAX_TRACKS_PER_USER`, `MAX_TRACK_MINUTES`, `PLAY_COOLDOWN_SECONDS`, `STAY_247`, `YTDLP_COOKIES`, `BACKUP_INTERVAL_HOURS`, `BACKUP_KEEP`, `LASTFM_API_KEY` / `LASTFM_API_SECRET`, `LIVE_MAX_HOURS` and `SHARD_COUNT`. Every default keeps the 1.4 behaviour, except the queue, which is now capped at 200 tracks (`MAX_QUEUE_SIZE`).
@@ -221,7 +223,8 @@ compose up -d`).
 - Queued tracks being wiped on routine gateway reconnects.
 - Python 3.13+ compatibility.
 
-[Unreleased]: https://github.com/Theroxat/DJ_Snake/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/Theroxat/DJ_Snake/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/Theroxat/DJ_Snake/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/Theroxat/DJ_Snake/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/Theroxat/DJ_Snake/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/Theroxat/DJ_Snake/compare/v1.2.0...v1.2.1
