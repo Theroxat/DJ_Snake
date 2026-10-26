@@ -28,6 +28,26 @@ YouTube challenges traffic from datacenter IPs and demands a Proof-of-Origin (PO
 
 The bot lets yt-dlp fetch the EJS challenge solver (`--remote-components ejs:github`), which needs the `deno` runtime. The Docker image includes it. Without it, signature challenges fail and some formats become unavailable. When running [without Docker](installation.md#running-without-docker), install `deno` yourself.
 
+## YouTube cookies (age-restricted and members-only videos)
+
+Optional. Without cookies the bot cannot play age-restricted, members-only or sign-in-required videos; it says so and points here. With `YTDLP_COOKIES` set to a Netscape-format `cookies.txt`, every yt-dlp call (download, playlist, search, autoplay) uses it.
+
+> **Warning: use a throwaway Google account, never your main one.** YouTube may ban or lock accounts that are used by bots, and the cookies give full access to the account. Treat the file like a password: mount it read-only and never commit it.
+
+1. Log in to YouTube with the throwaway account in a private/incognito window, then export `youtube.com` cookies with a browser extension that writes Netscape `cookies.txt` (for example "Get cookies.txt LOCALLY"), and close the window. On a desktop with yt-dlp you can instead run `yt-dlp --cookies-from-browser firefox --cookies cookies.txt` on any URL.
+2. Mount the file read-only and set the variable (see the commented lines in `docker-compose.yml`):
+
+```yaml
+    volumes:
+      - ./cookies.txt:/app/cookies.txt:ro
+```
+
+```
+YTDLP_COOKIES=/app/cookies.txt
+```
+
+At startup the bot checks that the file exists and looks like Netscape format (a warning is logged otherwise, never its contents), then copies it to a private temporary file (mode 0600). yt-dlp updates that copy, so your file is never modified and a read-only mount works. Cookies expire or get rotated by YouTube: when age-restricted videos fail again, export a fresh file and restart the bot.
+
 ## Diagnosing a failure
 
 Reproduce the download directly inside the container:

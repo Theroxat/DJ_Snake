@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, urlparse
 import yt_dlp
 from yt_dlp.postprocessor import ModifyChaptersPP, SponsorBlockPP
 
+from . import cookies
 from .config import (
     ANALYSIS_TIMEOUT,
     AUTOPLAY_CANDIDATES,
@@ -246,6 +247,7 @@ def get_playlist_info(url, limit=None):
             "playlistend": limit or MAX_PLAYLIST_SIZE,  # Limit based on config
             "remote_components": REMOTE_COMPONENTS,
             "extractor_args": EXTRACTOR_ARGS,
+            **cookies.options(),
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -310,6 +312,7 @@ def search_youtube(query, count):
         "skip_download": True,
         "remote_components": REMOTE_COMPONENTS,
         "extractor_args": EXTRACTOR_ARGS,
+        **cookies.options(),
     }
     query = " ".join(str(query).split())[:200]
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -352,6 +355,7 @@ def related_tracks(video_id):
         "playlistend": AUTOPLAY_CANDIDATES,
         "remote_components": REMOTE_COMPONENTS,
         "extractor_args": EXTRACTOR_ARGS,
+        **cookies.options(),
     }
     url = f"https://www.youtube.com/watch?v={video_id}&list=RD{video_id}"
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -535,6 +539,7 @@ def _download_once(url, on_title=None, max_seconds=None):
         "quiet": False,
         "remote_components": REMOTE_COMPONENTS,
         "extractor_args": EXTRACTOR_ARGS,
+        **cookies.options(),
     }
     if on_title is not None:
         ydl_opts["progress_hooks"] = [
@@ -679,6 +684,35 @@ def _is_permanent_failure(message):
     """True when retrying cannot help (deleted, private, blocked...)."""
     lowered = message.lower()
     return any(marker in lowered for marker in PERMANENT_ERROR_MARKERS)
+
+
+_ERROR_KINDS = (
+    (
+        "age",
+        (
+            "confirm your age",
+            "age-restricted",
+            "age restricted",
+            "inappropriate for some users",
+        ),
+    ),
+    ("members", ("members-only", "members only", "join this channel")),
+    ("private", ("private video",)),
+    ("signin", ("sign in", "log in", "login required")),
+)
+
+
+def classify_error(message):
+    """The kind of access error in a yt-dlp message ("age", "members",
+    "private" or "signin"), or None. The bot check ("confirm you're not a
+    bot") is not one: cookies do not fix it, the PO token provider does."""
+    lowered = str(message).lower().replace("’", "'")
+    if "not a bot" in lowered:
+        return None
+    for kind, markers in _ERROR_KINDS:
+        if any(marker in lowered for marker in markers):
+            return kind
+    return None
 
 
 def download_media(url, on_title=None, max_seconds=None):

@@ -42,6 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Spanish and German translations (`!language es|de`): command replies, errors, `!help`, the status message and the clip page, with informal "tú" / "du", and the page language menu lists Español and Deutsch (`es-*` and `de-*` browsers are detected). Spanish and German are best effort: a key they lack falls back to English, so new strings only need English and French. `scripts/i18n-missing.py` lists what each language is missing, and `/language` suggests the available languages.
+### Added
+
+- Optional `YTDLP_COOKIES` (Netscape `cookies.txt`) for age-restricted and members-only YouTube videos, used by every yt-dlp call. The file is validated at startup and copied to a private temp file, so a read-only mount works. Specific English and French messages for age-restricted, members-only, private and sign-in-required videos, suggesting cookies when not configured.
 
 ## [1.4.0] - 2026-10-23
 

@@ -260,6 +260,7 @@ Set these in `.env` (see `.env.example`).
 | `WEB_CONTROL` | `everyone` | `everyone`: the status message shows the control link and the view-only link. `dj`: only the view-only link; DJs get the control link with `!weblink`. A server with a DJ role always behaves as `dj`. |
 | `BOT_LANGUAGE` | `en` | Language of the bot's messages and the clip page for servers that never ran `!language`: `en`, `fr`, `es` or `de`. |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | empty | Optional Spotify Web API credentials, for playlists over 100 tracks. Without them, Spotify links are read from the public embed page. |
+| `YTDLP_COOKIES` | empty | Path to a Netscape `cookies.txt` for age-restricted / members-only videos. Use a throwaway account (see below). |
 | `YTDLP_AUTO_UPDATE` | `1` | Upgrade yt-dlp on container start (`0` to skip). |
 | `METRICS` | `0` | `1` serves Prometheus metrics on `GET /metrics`. `GET /healthz` (used by the Docker health check) is always on. |
 
@@ -287,6 +288,26 @@ YouTube breaks yt-dlp extractors every few weeks, usually showing up as `HTTP Er
 ```
 
 - The `bgutil-ytdlp-pot-provider` plugin version (`requirements.txt`) must match the `pot-provider` image tag in `docker-compose.yml`. Bump them together; the entrypoint never upgrades the plugin.
+
+### YouTube cookies (age-restricted and members-only videos)
+
+Optional. Without cookies the bot cannot play age-restricted, members-only or sign-in-required videos; it says so and points here. With `YTDLP_COOKIES` set to a Netscape-format `cookies.txt`, every yt-dlp call (download, playlist, search, autoplay) uses it.
+
+> **Warning: use a throwaway Google account, never your main one.** YouTube may ban or lock accounts that are used by bots, and the cookies give full access to the account. Treat the file like a password: mount it read-only and never commit it.
+
+1. Log in to YouTube with the throwaway account in a private/incognito window, then export `youtube.com` cookies with a browser extension that writes Netscape `cookies.txt` (for example "Get cookies.txt LOCALLY"), and close the window. On a desktop with yt-dlp you can instead run `yt-dlp --cookies-from-browser firefox --cookies cookies.txt` on any URL.
+2. Mount the file read-only and set the variable (see the commented lines in `docker-compose.yml`):
+
+```yaml
+    volumes:
+      - ./cookies.txt:/app/cookies.txt:ro
+```
+
+```
+YTDLP_COOKIES=/app/cookies.txt
+```
+
+At startup the bot checks that the file exists and looks like Netscape format (a warning is logged otherwise, never its contents), then copies it to a private temporary file (mode 0600). yt-dlp updates that copy, so your file is never modified and a read-only mount works. Cookies expire or get rotated by YouTube: when age-restricted videos fail again, export a fresh file and restart the bot.
 
 ## Troubleshooting
 

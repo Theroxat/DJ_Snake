@@ -16,6 +16,9 @@ services:
     # container runs as UID 1000, which must be able to write ./data.
     volumes:
       - ./data:/app/data
+      # Optional YouTube cookies (age-restricted / members-only videos), read-only;
+      # also set YTDLP_COOKIES=/app/cookies.txt in .env. Use a throwaway account.
+      # - ./cookies.txt:/app/cookies.txt:ro
     # Synced clip web page. WEB_BIND is the host IP the port is published on
     # (default 127.0.0.1; set a LAN IP or 0.0.0.0 for a reverse proxy/tunnel).
     ports:
