@@ -207,6 +207,8 @@
   "cmd.history_empty": "❌ Nothing has been played yet in this session.",
   "cmd.history_title": "🕘 **Recently played:**",
   "action.restarted": "⏮️ Track restarted",
+  "action.removed": "🗑️ Removed: {title}",
+  "action.moved": "🔀 Moved {title} to position {position}",
   "action.previous": "⏮️ Previous track",
   "action.cleared.one": "🧹 Queue cleared ({count} track removed)",
   "action.cleared.other": "🧹 Queue cleared ({count} tracks removed)",

@@ -286,3 +286,25 @@ async def test_played_tracks_are_logged(queue):
 
 def test_control_error_code():
     assert ControlError("queue_empty").status == 409
+
+
+async def test_remove_and_move_actions_do_not_mention_the_web(queue, channel):
+    await commands.remove.callback(run(channel), 2)
+    assert queue.last_action == "🗑️ Removed: C"
+    c = run(channel)
+    c.author.guild_permissions.manage_guild = True
+    await commands.move.callback(c, 2, 1)
+    assert queue.last_action == "🔀 Moved D to position 1"
+    assert "web" not in queue.last_action
+
+
+async def test_history_survives_reset(player, ctx, monkeypatch):
+    push_history(player, {"title": "Kept", "duration": 60, "requester": "bob"})
+    ctx.guild.voice_client = None
+    real_sleep = commands.asyncio.sleep
+    monkeypatch.setattr(commands.asyncio, "sleep", lambda s: real_sleep(min(s, 0.01)))
+    await commands.reset_voice.callback(ctx)
+    monkeypatch.undo()
+    fresh = state.music_players[GUILD_ID]
+    assert fresh is not player
+    assert [t["title"] for t in fresh.played] == ["Kept"]

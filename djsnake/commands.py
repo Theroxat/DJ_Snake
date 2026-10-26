@@ -423,6 +423,7 @@ async def reset_voice(ctx):
         fresh.text_channel = player.text_channel
         fresh.last_active = player.last_active
         fresh.history = player.history
+        fresh.played = player.played
         fresh.panel_message = player.panel_message
         fresh.panel_text = player.panel_text
         fresh.expired = player.expired
@@ -572,7 +573,7 @@ async def remove(ctx, position: int):
         await fail(ctx, e.text(lang))
         return
     await ack(ctx)
-    set_action(player, t("action.web_removed", lang, title=short(removed["title"])))
+    set_action(player, t("action.removed", lang, title=short(removed["title"])))
 
 
 @remove.autocomplete("position")
@@ -599,7 +600,8 @@ async def move(ctx, from_position: int, to_position: int):
         await fail(ctx, e.text(lang))
         return
     await ack(ctx)
-    set_action(player, t("action.web_reordered", lang))
+    label = t("action.moved", lang, title=short(track["title"]), position=to_position)
+    set_action(player, label)
 
 
 @move.autocomplete("from_position")

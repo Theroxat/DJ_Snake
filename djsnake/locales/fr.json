@@ -207,6 +207,8 @@
   "cmd.history_empty": "❌ Aucun titre n’a encore été joué dans cette session.",
   "cmd.history_title": "🕘 **Joués récemment :**",
   "action.restarted": "⏮️ Titre relancé",
+  "action.removed": "🗑️ Retiré : {title}",
+  "action.moved": "🔀 {title} déplacé en position {position}",
   "action.previous": "⏮️ Titre précédent",
   "action.cleared.one": "🧹 File d’attente vidée ({count} titre retiré)",
   "action.cleared.other": "🧹 File d’attente vidée ({count} titres retirés)",
