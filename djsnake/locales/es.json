@@ -61,7 +61,7 @@
   "cmd.volume_usage": "❌ Uso: `{prefix}volume [0-150]`",
   "cmd.autoplay_info_on": "📻 La reproducción automática está activada. Uso: `{prefix}autoplay on|off`",
   "cmd.autoplay_info_off": "📻 La reproducción automática está desactivada. Uso: `{prefix}autoplay on|off`",
-  "cmd.not_dj": "❌ Solo los DJ pueden usar `{prefix}{name}`: necesitas {need}{extra}.",
+  "cmd.not_dj": "❌ Solo los DJ pueden usar `{prefix}{name}`: necesitas {need}{extra}.{hint}",
   "cmd.not_dj_requester": " (o ser quien añadió la canción actual)",
   "cmd.dj_need_role": "el rol **{role}** o el permiso **Gestionar servidor**",
   "cmd.dj_need_manager": "el permiso **Gestionar servidor**",
