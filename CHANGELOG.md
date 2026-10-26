@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Clip page: Media Session support. The lock screen, headsets and media keys show the current track (title, artist from an "Artist - Title" title, server and channel, artwork, position) and, with the control link, drive play, pause, next, previous and seeking (+/- 10 s). A silent audio element started on the first tap makes browsers show the controls; view-only links get metadata only.
+### Added
+
+- Installable clip page (PWA): a per-session web app manifest (`GET /{id}/manifest.webmanifest`, named and coloured after the server's theme, with its logo as icon or default DJ Snake icons), a service worker (`/sw.js`) that caches only the page shell and fonts and shows a localised "Session offline" page when the bot is unreachable, iOS home screen tags, and an "Install app" item in the palette menu. The API, live stream, media and lyrics are never cached; view-only links stay view-only. Needs HTTPS (or localhost) to install.
 
 ## [1.4.0] - 2026-10-23
 

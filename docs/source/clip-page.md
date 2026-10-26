@@ -75,6 +75,12 @@ A session expires after `SESSION_IDLE_HOURS` (6 by default) without playback, vo
 
 When the queue runs out, the bot stays in voice for `IDLE_DISCONNECT_SECONDS` (300 by default) so a track added meanwhile plays at once without rejoining; the page stays usable. It leaves after 30 seconds if nobody is left in the channel. With [24/7 mode](commands.md) on (`!stay on`) it never leaves, and the session does not expire while the bot is in voice; the page shows a small "24/7" badge.
 
+### Installing the page as an app
+
+The page is a progressive web app. Over HTTPS (or on `localhost`) a browser that supports it offers to install it: Chromium-based browsers show an "Install app" item at the bottom of the palette menu (the small cross next to it hides it), and on iOS Safari use Share, then "Add to Home Screen". The installed app opens straight on the same session, with the server's theme name, background colour and logo (the default DJ Snake icon when no logo is set). A view-only link installs as a view-only app: nothing in the manifest ever names the control link.
+
+A service worker keeps only the page itself and the fonts, for a faster reopen. It never stores the API, the live stream, media or lyrics. When the bot cannot be reached, the app shows a "Session offline" page with a retry button, and an expired session still shows the usual "session ended" state. A new bot version replaces the cache on its own.
+
 ## Exposing the page
 
 The web server listens on `WEB_PORT`. Compose publishes it on `WEB_BIND`, which defaults to `127.0.0.1` (this machine only). To reach it from elsewhere, put a reverse proxy or a tunnel in front, and set `PUBLIC_BASE_URL` to the public address so the posted link is correct.

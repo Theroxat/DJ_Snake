@@ -137,6 +137,28 @@ def theme_state(sid, guild_id):
     return theme
 
 
+# Background colour of each preset, as in the page's CSS tokens: the PWA
+# manifest's colours for guilds that did not pick a custom theme.
+PRESET_BG = {
+    "arcade": "#0a0a0a",
+    "minimal": "#f1f2f5",
+    "night": "#11131b",
+    "vinyl": "#2a170d",
+    "club": "#0a0617",
+    "terminal": "#040b05",
+    "space": "#070a1c",
+    "cobalt": "#1a26c0",
+}
+
+
+def theme_bg(guild_id):
+    """The page background of the guild's theme (its custom one when set)."""
+    theme = theme_for(guild_id)
+    if theme["skin"] == "custom":
+        return theme["bg"]
+    return PRESET_BG.get(theme["skin"], PRESET_BG["arcade"])
+
+
 def logo_path(guild_id, ext):
     return os.path.join(LOGO_DIR, f"{int(guild_id)}.{ext}")
 

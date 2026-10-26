@@ -18,6 +18,24 @@ try {
   }
 } catch (e) {}
 </script>
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<script>
+// PWA manifest of this session's link (not in the static demo, which has no
+// server: it loads backend.js first).
+try {
+  const first = location.pathname.split("/").filter(Boolean)[0];
+  if (first && !window.DJDemoBackend) {
+    const l = document.createElement("link");
+    l.rel = "manifest";
+    l.href = "/" + encodeURIComponent(first) + "/manifest.webmanifest";
+    document.head.appendChild(l);
+  }
+} catch (e) {}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&family=VT323&family=Geist:wght@400;500;600;700&family=Nunito:wght@400;700;800&family=Fredoka:wght@400;600;700&family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&family=Orbitron:wght@500;700&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&family=IBM+Plex+Mono:wght@400;600;700&family=Unbounded:wght@500;600;700&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -590,6 +608,9 @@ a.ghub:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 .menu .tick { width: 1.2em; flex: none; }
 .dots { margin-left: auto; display: flex; gap: 4px; flex: none; }
 .dots i { width: 12px; height: 12px; border-radius: 50%; display: block; border: 1px solid color-mix(in srgb, var(--text) 35%, transparent); }
+.menu .installrow { display: flex; }
+.menu .installrow button:first-child { flex: 1 1 auto; width: auto; }
+.menu .installrow button:last-child { flex: 0 0 auto; width: auto; min-width: 42px; justify-content: center; text-align: center; color: var(--muted); }
 .menu hr { border: 0; border-top: 1px solid var(--hair); margin: 6px 4px; }
 .menu .mlbl { padding: 2px 10px 4px; color: var(--muted); font: 600 12px/1.3 var(--font-body); }
 .menu .mhint { margin-left: auto; color: var(--muted); font-size: 13px; font-weight: 400; }
@@ -1290,6 +1311,8 @@ html.demo-embedded .demo-ribbon { display: none; }
       menu_server: "Server theme (default) · {skin}",
       skin_custom: "Custom",
       menu_lang: "Language",
+      install_app: "Install app",
+      install_dismiss: "Hide the install button",
       lang_auto: "Automatic",
       now: "Now playing",
       upnext: "Up next",
@@ -1471,6 +1494,8 @@ html.demo-embedded .demo-ribbon { display: none; }
       menu_server: "Thème du serveur (par défaut) · {skin}",
       skin_custom: "Personnalisé",
       menu_lang: "Langue",
+      install_app: "Installer l’application",
+      install_dismiss: "Masquer le bouton d’installation",
       lang_auto: "Automatique",
       now: "En cours de lecture",
       upnext: "À suivre",
@@ -2609,6 +2634,8 @@ html.demo-embedded .demo-ribbon { display: none; }
     if (th.logo_url) { if (img.getAttribute("src") !== th.logo_url) img.src = th.logo_url; }
     else img.removeAttribute("src");
     $("e-logoclear").hidden = !th.logo_url;
+    const tc = document.querySelector('meta[name="theme-color"]');
+    if (tc) tc.content = getComputedStyle(html).getPropertyValue("--bg").trim() || tc.content;
     buildMenu();
   }
   function setServerTheme(raw) {
@@ -2634,6 +2661,18 @@ html.demo-embedded .demo-ribbon { display: none; }
     }
     return s;
   }
+  // Install (PWA): Chromium fires beforeinstallprompt; hidden once installed
+  // (standalone) or dismissed.
+  let installEvt = null;
+  const INSTALL_KEY = "djsnake.installHidden";
+  const standalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  function canInstall() {
+    let hidden = false;
+    try { hidden = localStorage.getItem(INSTALL_KEY) === "1"; } catch (x) {}
+    return !!installEvt && !hidden && !standalone();
+  }
+  window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; buildMenu(); });
+  window.addEventListener("appinstalled", () => { installEvt = null; buildMenu(); });
   function buildMenu() {
     if (menu.hidden) return;
     const focused = document.activeElement && menu.contains(document.activeElement) ? document.activeElement.dataset.choice : null;
@@ -2676,6 +2715,22 @@ html.demo-embedded .demo-ribbon { display: none; }
       grp.appendChild(b);
     });
     menu.appendChild(grp);
+    if (canInstall()) {
+      menu.appendChild(mk("hr"));
+      const row = mk("div", "installrow");
+      const b = mk("button", null, t("install_app"));
+      b.type = "button";
+      b.dataset.choice = "install";
+      b.setAttribute("role", "menuitem");
+      const x = mk("button", null, "\u00d7");
+      x.type = "button";
+      x.dataset.choice = "install-dismiss";
+      x.setAttribute("role", "menuitem");
+      x.setAttribute("aria-label", t("install_dismiss"));
+      x.title = t("install_dismiss");
+      row.append(b, x);
+      menu.appendChild(row);
+    }
     if (focused) { const f = menu.querySelector('[data-choice="' + focused + '"]'); if (f) f.focus(); }
   }
   function openMenu() {
@@ -2689,6 +2744,18 @@ html.demo-embedded .demo-ribbon { display: none; }
   menu.addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b) return;
+    if (b.dataset.choice === "install" || b.dataset.choice === "install-dismiss") {
+      if (b.dataset.choice === "install") {
+        const evt = installEvt;
+        installEvt = null; // a prompt can be used once
+        if (evt) evt.prompt();
+      } else {
+        try { localStorage.setItem(INSTALL_KEY, "1"); } catch (x) {}
+      }
+      closeMenu();
+      palbtn.focus();
+      return;
+    }
     if (b.dataset.choice.startsWith("lang:")) {
       langPref = b.dataset.choice.slice(5);
       try { if (langPref === "auto") localStorage.removeItem(LANG_KEY); else localStorage.setItem(LANG_KEY, langPref); } catch (x) {}
@@ -3377,6 +3444,11 @@ html.demo-embedded .demo-ribbon { display: none; }
     clearTimeout(sseLive);
     if (es) { es.onopen = es.onmessage = es.onerror = null; es.close(); es = null; }
     streaming = false;
+  }
+
+  // Service worker (app shell only, see web/sw.js); not in the static demo.
+  if ("serviceWorker" in navigator && !window.DJDemoBackend) {
+    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
   }
 
   setLang(true);

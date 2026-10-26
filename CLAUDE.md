@@ -676,6 +676,26 @@ Module map, lowest layer first (each imports only the ones above it):
   idle. Tests: `tests/test_media_session.py` (string checks plus a Chromium run
   of the demo when playwright is installed). Support matrix in
   `docs/source/clip-page.md`.
+- **PWA** (`web.py`, `web/sw.js`, `web/icons/`): `GET /{sid}/manifest.webmanifest`
+  (`web_manifest()`, `application/manifest+json`, 404 for an unknown id) builds
+  `id`/`start_url` and the logo icon URL from the id the request used, so a
+  view-only manifest never contains the control id; name = theme name or
+  "DJ Snake", `background_color` = `theme_color` = `themes.theme_bg()` (the
+  custom bg, else `PRESET_BG`: a new preset needs a colour there too), icons =
+  the guild logo (not resized, no image library) or the default PNGs. `GET
+  /sw.js` serves `web/sw.js` with `__VERSION__` replaced by `APP_VERSION`
+  (cache `djsnake-shell-<version>`, old ones deleted on activate),
+  `Service-Worker-Allowed: /`, `no-cache`. The worker only intercepts page
+  navigations (`/{sid}`, network first, a cached shell after 2.5 s, the
+  localised offline page on failure; one copy stored under a fixed key, never
+  a URL) and Google Fonts; every other request, so the API, `/events`, media,
+  lyrics and logos, is never touched. `GET /icons/{name}` serves four fixed
+  PNGs made by `scripts/make-pwa-icons.py` (stdlib only). The page adds the
+  manifest link and registers the worker only when `window.DJDemoBackend` is
+  absent (the static demo has none), keeps `<meta name="theme-color">` equal to
+  `--bg`, and shows an "Install app" item in the palette menu on
+  `beforeinstallprompt` (hidden when standalone or dismissed, `djsnake.installHidden`).
+  Tests: `tests/test_pwa.py`.
 - **Themes**: the page is fully token-driven: each preset is a `[data-skin]`
   block of CSS custom properties on `<html>` (Arcade is the original look;
   the presets are `THEME_PRESETS` in `config.py`: arcade, minimal, night,

@@ -43,6 +43,8 @@ PUBLIC_BASE_URL = (
     os.getenv("PUBLIC_BASE_URL") or f"http://localhost:{WEB_PORT}"
 ).rstrip("/")
 WEB_INDEX = os.path.join(ROOT_DIR, "web", "index.html")
+WEB_SW = os.path.join(ROOT_DIR, "web", "sw.js")
+WEB_ICON_DIR = os.path.join(ROOT_DIR, "web", "icons")
 # Reported by /healthz; the Docker image sets it at build time (release tag).
 APP_VERSION = os.getenv("APP_VERSION") or "dev"
 # GET /metrics (Prometheus text format) is off unless METRICS is truthy.
