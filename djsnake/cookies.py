@@ -3,6 +3,7 @@ videos. yt-dlp writes back to its cookie file, so the user's file is copied once
 to a private temporary file; the original is never modified and may be mounted
 read-only. The contents are never logged."""
 
+import atexit
 import os
 import shutil
 import tempfile
@@ -37,25 +38,46 @@ def validate(path):
     return "not in Netscape cookies.txt format (7 tab-separated fields per line)"
 
 
+def _remove(path):
+    if path:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
+def cleanup():
+    """Delete the private copy (also run at exit): the cookies are secrets
+    and must not outlive the bot in the temp directory."""
+    _remove(_state["path"])
+    _state["path"] = None
+
+
+atexit.register(cleanup)
+
+
 def setup(path=None):
     """Validate and copy the cookie file to a private temp file (0600).
     Returns the copy's path, or None when cookies are not configured or
-    unusable (a warning says why). Calling it again re-copies."""
+    unusable (a warning says why). Calling it again re-copies (the previous
+    copy is deleted)."""
     path = config.YTDLP_COOKIES if path is None else path
+    cleanup()
     _state["ready"] = True
-    _state["path"] = None
     if not path:
         return None
     problem = validate(path)
     if problem:
         print(f"⚠️  YTDLP_COOKIES={path!r} ignored: {problem}.")
         return None
+    copy = None
     try:
         fd, copy = tempfile.mkstemp(prefix="dj-snake-cookies-", suffix=".txt")
         os.chmod(copy, 0o600)
         with os.fdopen(fd, "wb") as dst, open(path, "rb") as src:
             shutil.copyfileobj(src, dst)
     except OSError as e:
+        _remove(copy)  # Never leave a partial copy of the secrets behind
         print(f"⚠️  YTDLP_COOKIES={path!r} ignored: copy failed ({e.strerror}).")
         return None
     _state["path"] = copy

@@ -137,3 +137,49 @@ def test_error_text_suggests_cookies_only_when_not_configured(tmp_path, monkeypa
 def test_generic_error_unchanged():
     text = playback.download_error_text(RuntimeError("boom"), "en")
     assert "Download error" in text and "boom" in text
+
+
+def test_failed_copy_leaves_no_temp_file(tmp_path, monkeypatch):
+    src = write(tmp_path, NETSCAPE)
+    made = []
+    real_mkstemp = cookies.tempfile.mkstemp
+
+    def mkstemp(**kwargs):
+        fd, path = real_mkstemp(dir=str(tmp_path), **kwargs)
+        made.append(path)
+        return fd, path
+
+    def broken_copy(src_file, dst_file):
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(cookies.tempfile, "mkstemp", mkstemp)
+    monkeypatch.setattr(cookies.shutil, "copyfileobj", broken_copy)
+    assert cookies.setup(src) is None
+    assert made and not os.path.exists(made[0])
+
+
+def test_copy_is_deleted_on_cleanup_and_resetup(tmp_path):
+    src = write(tmp_path, NETSCAPE)
+    first = cookies.setup(src)
+    second = cookies.setup(src)
+    assert not os.path.exists(first) and os.path.exists(second)
+    cookies.cleanup()
+    assert not os.path.exists(second) and cookies._state["path"] is None
+
+
+def test_cleanup_runs_at_exit():
+    import atexit
+
+    with mock.patch.object(atexit, "register") as register:
+        import importlib
+
+        importlib.reload(cookies)
+    register.assert_called_once_with(cookies.cleanup)
+
+
+def test_cookie_files_are_ignored_by_git_and_docker():
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for name in (".gitignore", ".dockerignore"):
+        with open(os.path.join(root, name)) as f:
+            lines = f.read().splitlines()
+        assert "cookies.txt" in lines and "*.cookies.txt" in lines, name

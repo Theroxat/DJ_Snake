@@ -1,6 +1,8 @@
 # Bot Configuration
 token
 .env
+cookies.txt
+*.cookies.txt
 config.json
 *.key
 

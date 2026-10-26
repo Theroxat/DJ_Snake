@@ -1,6 +1,8 @@
 # Keep secrets out of the image (the token is injected at runtime via env_file).
 .env
 token
+cookies.txt
+*.cookies.txt
 *.key
 
 # Python virtualenv / caches

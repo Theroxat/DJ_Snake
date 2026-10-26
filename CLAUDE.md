@@ -144,6 +144,10 @@ Module map, lowest layer first (each imports only the ones above it):
 - `stats.py`: listening stats in SQLite (`record_play()`,
   `record_session()`, `record_listeners()`, `summary()`, `guess_artist()`),
   written by one background thread. Imports only `config`.
+- `cookies.py`: optional YouTube cookies (`YTDLP_COOKIES`): `validate()`,
+  `setup()` (copies the file to a private 0600 temp file, deleted on failure,
+  on re-setup and at exit by `cleanup()`), `options()` merged into every yt-dlp
+  call, `enabled()`. Never logs the contents. Imports only `config`.
 - `playlists.py`: saved playlists in SQLite (`{DATA_DIR}/playlists.db`, see
   Saved playlists). Imports only `config`.
 - `playlist_io.py`: playlist export (`export_bytes()`: json, m3u, txt) and
