@@ -53,6 +53,7 @@ clip-page
 spotify
 sources
 youtube
+backup
 troubleshooting
 ```
 

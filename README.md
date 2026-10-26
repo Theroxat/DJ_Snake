@@ -229,6 +229,14 @@ Members with the **Manage Server** permission set the server's default:
 
 Themes and logos are stored in `DATA_DIR` (`./data` with Compose), so they survive restarts and rebuilds. The container runs as UID 1000, which must be able to write that directory.
 
+## Backup and restore
+
+```bash
+docker compose exec dj-snake python -m djsnake.backup create
+```
+
+Writes a checksummed `.tar.gz` of `DATA_DIR` to `./data/backups/` (SQLite databases are copied safely while the bot runs; `--include-cache` adds the lyrics cache). Set `BACKUP_INTERVAL_HOURS` for automatic, rotated backups. To restore, stop the bot, run `docker compose run --rm --no-deps dj-snake python -m djsnake.backup restore /app/data/backups/<file>`, and start it again; the previous data is kept in `data/.pre-restore-<date>/`. See [Backup and restore](docs/source/backup.md).
+
 ## Configuration
 
 Set these in `.env` (see `.env.example`).
@@ -261,6 +269,8 @@ Set these in `.env` (see `.env.example`).
 | `BOT_LANGUAGE` | `en` | Language of the bot's messages and the clip page for servers that never ran `!language`: `en`, `fr`, `es` or `de`. |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | empty | Optional Spotify Web API credentials, for playlists over 100 tracks. Without them, Spotify links are read from the public embed page. |
 | `YTDLP_COOKIES` | empty | Path to a Netscape `cookies.txt` for age-restricted / members-only videos. Use a throwaway account (see below). |
+| `BACKUP_INTERVAL_HOURS` | `0` | Hours between automatic backups of `DATA_DIR` into `DATA_DIR/backups/` (`0` = off). |
+| `BACKUP_KEEP` | `7` | Automatic backups to keep. |
 | `YTDLP_AUTO_UPDATE` | `1` | Upgrade yt-dlp on container start (`0` to skip). |
 | `METRICS` | `0` | `1` serves Prometheus metrics on `GET /metrics`. `GET /healthz` (used by the Docker health check) is always on. |
 

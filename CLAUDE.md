@@ -125,7 +125,9 @@ link is never posted publicly, see Permissions; anything else falls back to
 otherwise; shown by `/healthz`), `LYRICS` (`1`; `0`, `false`, `no` or `off`
 turns the LRCLIB lyrics off), `MAX_QUEUE_SIZE` (200), `MAX_TRACKS_PER_USER` (0),
 `MAX_TRACK_MINUTES` (0) and `PLAY_COOLDOWN_SECONDS` (0) (defaults of the per-guild
-queue limits, see Queue limits; 0 = unlimited/off), `YTDLP_COOKIES` (optional Netscape cookies.txt path; `cookies.py` validates it and copies it to a 0600 temp file at startup, `cookies.options()` is merged into every yt-dlp options dict in `media.py`; `media.classify_error()` and `playback.download_error_text()` map access errors to `play.error_*` messages), and `YTDLP_AUTO_UPDATE` (entrypoint only).
+queue limits, see Queue limits; 0 = unlimited/off), `YTDLP_COOKIES` (optional Netscape cookies.txt path; `cookies.py` validates it and copies it to a 0600 temp file at startup, `cookies.options()` is merged into every yt-dlp options dict in `media.py`; `media.classify_error()` and `playback.download_error_text()` map access errors to `play.error_*` messages),
+`BACKUP_INTERVAL_HOURS` (0, automatic backups off) and `BACKUP_KEEP` (7), see
+Backup, and `YTDLP_AUTO_UPDATE` (entrypoint only).
 
 ## Architecture (`djsnake/`)
 
@@ -165,6 +167,7 @@ Module map, lowest layer first (each imports only the ones above it):
 - `limits.py`: the queue limits (see Queue limits). Imports `permissions`
   and `themes`.
 - `stay.py`: 24/7 mode storage (`{DATA_DIR}/stay.json`: `load_stay()`, `stay_on()`, `stay_channel()`, `set_stay()`, `remember_channel()`).
+- `backup.py`: backup and restore of `DATA_DIR` (see Backup). Imports only `config`.
 - `permissions.py`: the DJ role (`load_perms()`, `set_dj_role()`,
   `dj_role()`), `is_dj()`, `web_control_restricted()` and the Discord gate
   (`DJ_COMMANDS`, `REQUESTER_COMMANDS`, `can_run_dj_command()`).
@@ -803,6 +806,21 @@ Module map, lowest layer first (each imports only the ones above it):
   `conftest.py` replaces `lyrics._http` with a function raising
   `LyricsUnavailable`, so no test reaches the network; patch `lyrics._http`
   to fake LRCLIB.
+- **Backup** (`backup.py`, `python -m djsnake.backup create|restore|verify|list`):
+  one `.tar.gz` with `manifest.json` (version 1, date, files with size and
+  sha256) and `data/<path>`. SQLite files (detected by magic bytes) go through
+  `sqlite3.Connection.backup()` from a read-only connection, so a live bot is
+  fine; `-wal/-shm/-journal/.tmp` files, `backups/`, `.pre-restore-*`, the lock
+  and (unless `--include-cache`) `lyrics/` are skipped. `main()` takes an
+  exclusive `flock` on `DATA_DIR/.bot.lock` (`acquire_bot_lock()`); `restore`
+  refuses while `bot_running()` sees it held, verifies while extracting into
+  `.restore-tmp-*`, moves the current top-level entries to
+  `.pre-restore-<date>/`, renames the restored ones in, and rolls back on
+  error. `backup_loop()` (started in `setup_hook`) calls `create_auto()` in an
+  executor every `BACKUP_INTERVAL_HOURS`, writing `backups/djsnake-auto-*`
+  and keeping `BACKUP_KEEP` of them (`rotate()`; manual files are never
+  rotated). New persistent files under `DATA_DIR` are picked up
+  automatically. No Discord command. Tests: `tests/test_backup.py`.
 - **Status panel**: each web session has one message in its text channel
   (`player.panel_message`), edited in place instead of announcing events:
   clip links (see Permissions), now playing / paused / idle, up next, loading progress and the

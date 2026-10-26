@@ -45,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Optional `YTDLP_COOKIES` (Netscape `cookies.txt`) for age-restricted and members-only YouTube videos, used by every yt-dlp call. The file is validated at startup and copied to a private temp file, so a read-only mount works. Specific English and French messages for age-restricted, members-only, private and sign-in-required videos, suggesting cookies when not configured.
+### Added
+
+- Backup and restore of `DATA_DIR`: `python -m djsnake.backup create|restore|verify|list` writes and reads a checksummed `.tar.gz` (SQLite databases copied consistently while the bot runs, lyrics cache optional). `restore` refuses while the bot runs, verifies every checksum, keeps the old data in `.pre-restore-<date>/` and swaps atomically.
+- Automatic backups: `BACKUP_INTERVAL_HOURS` (0 = off) and `BACKUP_KEEP` (7) write rotated archives to `DATA_DIR/backups/` from a background task.
 
 ## [1.4.0] - 2026-10-23
 

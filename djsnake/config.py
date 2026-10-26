@@ -103,6 +103,10 @@ STAY_247 = os.getenv("STAY_247", "0").strip().lower() in ("1", "true", "on", "ye
 # A 24/7 bot dropped from voice rejoins once; dropped again within this many
 # seconds it gives up and turns 24/7 off (no reconnect loop).
 STAY_RETRY_WINDOW = 120.0
+# Automatic backups of DATA_DIR into DATA_DIR/backups (see backup.py): every
+# BACKUP_INTERVAL_HOURS hours (0 = off), keeping the newest BACKUP_KEEP.
+BACKUP_INTERVAL_HOURS = max(0.0, float(os.getenv("BACKUP_INTERVAL_HOURS") or "0"))
+BACKUP_KEEP = max(1, int(os.getenv("BACKUP_KEEP") or "7"))
 # Who gets the clip page's control link: "everyone" (posted in the status
 # panel next to the view-only link) or "dj" (the panel shows only the
 # view-only link; DJs get the control link by DM with `!weblink`). A guild
