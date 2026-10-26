@@ -7,60 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Upgrade notes
+
+- New optional settings in `.env` (see `.env.example`): `VOTESKIP_PERCENT`, `MAX_QUEUE_SIZE`, `MAX_TRACKS_PER_USER`, `MAX_TRACK_MINUTES`, `PLAY_COOLDOWN_SECONDS`, `STAY_247`, `YTDLP_COOKIES`, `BACKUP_INTERVAL_HOURS`, `BACKUP_KEEP`, `LASTFM_API_KEY` / `LASTFM_API_SECRET`, `LIVE_MAX_HOURS` and `SHARD_COUNT`. Every default keeps the 1.4 behaviour, except the queue, which is now capped at 200 tracks (`MAX_QUEUE_SIZE`).
+- New files in `DATA_DIR`: `voteskip.json`, `limits.json`, `stay.json`, `lastfm.json` (0600, holds Last.fm session keys) and `backups/`. Backups contain those secrets: store them like a password.
+- YouTube cookies: mount a `cookies.txt` read-only outside `./data` (see `docker-compose.yml`) and set `YTDLP_COOKIES`; use a throwaway Google account.
+- Backups: `docker compose exec dj-snake python -m djsnake.backup create`; restoring needs the bot stopped (see the backup docs).
+- Saved playlists can no longer be named `queue` (it means the live queue in `/playlist export`).
+- New slash commands (`/remove`, `/move`, `/previous`, `/clear`, `/nowplaying`, `/history`, `/voteskip`, `/limits`, `/stay`, `/filter`, `/lastfm`) take up to an hour to appear when synced globally.
+
+### Added
+
+- Queue commands: `!remove <position>` and `!move <from> <to>` (positions as `!list` shows them, with a queue autocomplete on the slash versions), `!previous` and `!clear`. `!move`, `!previous` and `!clear` need the DJ role when one is set; `!remove` also works on a track you queued yourself.
+- `!nowplaying` (`!np`): an embed with the title, requester, source, artwork, a progress bar, the loop, autoplay and volume state and the clip page link (the view-only one when control is limited).
+- `!history [count]`: the last tracks played in the session (default 10, max 25), newest first; it survives `!reset`.
+- Vote to skip: `/voteskip` (`!vs`) for members in the voice channel who cannot use `/next`. More than `VOTESKIP_PERCENT` (50) of the non-deafened humans in the channel must vote; DJs and the requester skip at once, votes are recounted as people join, leave or deafen and reset with each track. `/voteskip threshold <1-100>` (DJs) sets it per server. The panel and the clip page show the count.
+- Queue limits against abuse: queue size, tracks per member, track length and a `/play` cooldown, with `.env` defaults and `/limits` (Manage Server) per server. They apply to `/play`, the page's add, playlist loads and autoplay (queue size only); a too-long single link is refused from its metadata, before anything is downloaded. DJs skip the per-member limit and the cooldown.
+- 24/7 mode: `!stay [on|off]` keeps the bot in its voice channel (no idle disconnect, `!stop` does not leave) and rejoins it after a restart. Dropped by Discord, it rejoins once, then turns itself off; `!reset` and channel moves do not count as drops.
+- Saved playlist import and export: `/playlist import <name> <link>` from a YouTube, SoundCloud, Bandcamp, Spotify, Deezer or Apple Music list or album, or from an attached JSON, M3U or TXT file; `/playlist export <name> [json|m3u|txt]` (or `queue`). One import runs at a time per server.
+- Audio filters per session: `!filter [off|bassboost|nightcore|vaporwave|8d|karaoke|soft]` and `!filter eq <low> <mid> <high>`, also on the clip page. A change restarts the track where it is; nightcore and vaporwave change the real speed and the page follows it.
+- Live streams: YouTube lives, Twitch channels and internet radios (Icecast, Shoutcast, `.pls`, `.m3u`) play straight from the stream, with a LIVE badge and a radio's current song on the clip page. Seek and crossfade are off for them, `LIVE_MAX_HOURS` (4, pauses not counted) stops a forgotten one, and they are left out of the listening stats.
+- Optional YouTube cookies (`YTDLP_COOKIES`) for age-restricted and members-only videos, with specific messages for age-restricted, members-only, private and sign-in-required videos.
+- Optional Last.fm scrobbling (`LASTFM_API_KEY`, `LASTFM_API_SECRET`): `/lastfm link|unlink|status`; linked listeners who are not deafened get "now playing" and scrobbles.
+- Backup and restore of `DATA_DIR`: `python -m djsnake.backup create|restore|verify|list` (checksummed `.tar.gz`, SQLite copied consistently while the bot runs), and automatic rotated backups with `BACKUP_INTERVAL_HOURS` and `BACKUP_KEEP`.
+- Spanish and German (`!language es|de`): bot replies, `!help`, the status message and the clip page. `scripts/i18n-missing.py` lists missing translations.
+- Clip page: Media Session support (lock screen, headset and media keys; control only with the control link).
+- Clip page: installable as an app (PWA), following the server's theme name, colour and logo, with a "Session offline" page; the API, streams and media are never cached.
+- Clip page: keyboard shortcuts and a help dialog (`?`).
+- Sharding: the bot is an `AutoShardedBot` with an optional `SHARD_COUNT`; `/healthz` and `/metrics` report each shard.
+- End-to-end tests (`pytest -m e2e`, a new CI job): the real FFmpeg playback chain and the clip page in headless Chromium, plus a manual checklist for a real Discord server.
+
+### Changed
+
+- `/healthz` reports `status` and `discord` as `degraded` (still 200) when only some shards are down; a shard briefly closed by a gateway resume still counts as up. Prometheus latency gauges print `+Inf` instead of `NaN` without a connection.
+- Every module that saves JSON in `DATA_DIR` uses one atomic write helper (`fileio.py`).
+
 ### Fixed
 
-- Clip page: at 320 px wide (and Cobalt at 360 px) the loop button of the transport row was clipped by the player block. The row now tightens its buttons and spacing on narrow phones; no control is hidden.
-### Added
+- Clip page: at 320 px wide (and Cobalt at 360 px) the loop button of the transport row was clipped. The row now tightens its buttons and spacing on narrow phones.
+- A flaky control-link rotation test.
 
-- End-to-end tests (`pytest -m e2e`, a new `e2e` CI job): the real FFmpeg playback chain on generated media (automix trim and loudness, crossfade, seek, volume) and the clip page in headless Chromium (sync, live updates, controls, view-only link, themes, lyrics, narrow screens). The contributing docs add a manual checklist for a real Discord server.
-### Added
+### Security
 
-- Queue commands that used to exist only on the clip page: `!remove <position>` and `!move <from> <to>` (positions as `!list` shows them, with a queue autocomplete on the slash versions), `!previous` and `!clear` (empties the upcoming queue, the current track keeps playing). `!move`, `!previous` and `!clear` need the DJ role when one is set; `!remove` also works on a track you queued yourself.
-- `!nowplaying` (alias `!np`): an embed with the linked title, requester, source, thumbnail, a progress bar with elapsed and total time, the loop, autoplay and volume state and the clip page link (the view-only one when control is limited).
-- `!history [count]`: the last tracks played in the session (default 10, max 25), newest first.
-### Added
-
-- Vote to skip: `/voteskip` (`!vs`) lets members in the voice channel vote to skip the current track when they cannot use `/next`. More than `VOTESKIP_PERCENT` (default 50) of the non-deafened humans in the channel must vote; DJs and the requester skip at once, votes are recounted when people join, leave or deafen and reset with each track. One message shows the count and is edited in place, then reads "Skipped by vote". `/voteskip threshold <1-100>` (DJs) sets it per server (`DATA_DIR/voteskip.json`). The `/next` refusal suggests `/voteskip`, the status panel shows the count, and `/api/{sid}/state` has `votes: {count, needed}` shown as a small badge on the page.
-### Added
-
-- Queue limits against abuse: `MAX_QUEUE_SIZE` (200), `MAX_TRACKS_PER_USER`, `MAX_TRACK_MINUTES` and `PLAY_COOLDOWN_SECONDS` (all off at 0) are the defaults of every server, and `/limits` (Manage Server to change, saved in `DATA_DIR/limits.json`) overrides them per server. They apply to `/play`, the clip page's add, saved playlist loads and autoplay (queue size only); the page counts as one "web" member. DJs and Manage Server members skip the per-member limit and the cooldown. Playlists queue up to the limit and report what was skipped and why.
-### Added
-
-- 24/7 mode: `!stay [on|off]` (DJ to set, saved in `DATA_DIR/stay.json`) keeps the bot in its voice channel: no idle disconnect, `!stop` no longer leaves, and it rejoins the saved channel after a restart without playing anything. Dropped by Discord, it rejoins once, then turns 24/7 off (no reconnect loop). Optional `STAY_247` default, a `stay` field in `/api/{sid}/state`, "24/7" in the status panel and a header badge on the clip page.
-### Added
-
-- `/playlist import <name> <link>` creates or replaces a saved playlist from a YouTube playlist, a SoundCloud set, a Bandcamp album or a Spotify, Deezer or Apple Music playlist or album (those are matched on YouTube at import time, with unmatched tracks counted), or from an attached JSON, M3U or TXT file (up to 256 KB, only allowed sources). `/playlist export <name> [json|m3u|txt]` sends a playlist, or `queue` the current queue, as a file. Saved playlists can no longer be named `queue`.
-### Added
-
-- Clip page: Media Session support. The lock screen, headsets and media keys show the current track (title, artist from an "Artist - Title" title, server and channel, artwork, position) and, with the control link, drive play, pause, next, previous and seeking (+/- 10 s). A silent audio element started on the first tap makes browsers show the controls; view-only links get metadata only.
-### Added
-
-- Installable clip page (PWA): a per-session web app manifest (`GET /{id}/manifest.webmanifest`, named and coloured after the server's theme, with its logo as icon or default DJ Snake icons), a service worker (`/sw.js`) that caches only the page shell and fonts and shows a localised "Session offline" page when the bot is unreachable, iOS home screen tags, and an "Install app" item in the palette menu. The API, live stream, media and lyrics are never cached; view-only links stay view-only. Needs HTTPS (or localhost) to install.
-### Added
-
-- Clip page: keyboard shortcuts (play/pause, seek, next/previous, shuffle, loop, mute, volume, fullscreen, lyrics, theme) and a localised help dialog opened with `?` or the header keyboard button. View-only links keep only the non-control keys.
-### Added
-
-- Spanish and German translations (`!language es|de`): command replies, errors, `!help`, the status message and the clip page, with informal "tú" / "du", and the page language menu lists Español and Deutsch (`es-*` and `de-*` browsers are detected). Spanish and German are best effort: a key they lack falls back to English, so new strings only need English and French. `scripts/i18n-missing.py` lists what each language is missing, and `/language` suggests the available languages.
-### Added
-
-- Optional `YTDLP_COOKIES` (Netscape `cookies.txt`) for age-restricted and members-only YouTube videos, used by every yt-dlp call. The file is validated at startup and copied to a private temp file, so a read-only mount works. Specific English and French messages for age-restricted, members-only, private and sign-in-required videos, suggesting cookies when not configured.
-### Added
-
-- Backup and restore of `DATA_DIR`: `python -m djsnake.backup create|restore|verify|list` writes and reads a checksummed `.tar.gz` (SQLite databases copied consistently while the bot runs, lyrics cache optional). `restore` refuses while the bot runs, verifies every checksum, keeps the old data in `.pre-restore-<date>/` and swaps atomically.
-- Automatic backups: `BACKUP_INTERVAL_HOURS` (0 = off) and `BACKUP_KEEP` (7) write rotated archives to `DATA_DIR/backups/` from a background task.
-### Added
-
-- Optional Last.fm scrobbling, off unless `LASTFM_API_KEY` and `LASTFM_API_SECRET` are set. `/lastfm link|unlink|status` lets each user link their own account (the authorisation link is sent privately); linked users in the voice channel get "now playing" and a scrobble after half the track or 4 minutes (tracks under 30 s are skipped). Scrobbles are sent in batches of 50 and retried without ever blocking playback. Session keys are stored in `DATA_DIR/lastfm.json` (mode 0600).
-### Added
-
-- Audio filters per session: `!filter [off|bassboost|nightcore|vaporwave|8d|karaoke|soft]` and `!filter eq <low> <mid> <high>` (-12 to 12 dB), a picker in the clip page's volume popover and a `filter` control action. A change restarts the playing track where it is, crossfade keeps working, and setting a filter needs the DJ role when there is one. Nightcore and vaporwave change the real playback speed: `/api/{sid}/state` exposes `filter`, `eq` and `rate`, and the page runs the video, progress bar and lyrics at that rate. The status panel shows the filter when it is on.
-### Added
-
-- Live streams: YouTube lives, Twitch channels and internet radios (Icecast, Shoutcast, HLS `.m3u8`, `.pls`, `.m3u`) play straight from the stream, without a download. The clip page shows a LIVE badge (and a radio's current song) instead of the progress bar; seek is refused, there is no crossfade, and the queue goes on when the stream ends. `LIVE_MAX_HOURS` (4) stops a forgotten live item.
-### Added
-
-- Sharding: the bot runs as `commands.AutoShardedBot` (single process), with an optional `SHARD_COUNT`. `/healthz` and `/metrics` report each shard; `/healthz` answers `degraded` (still 200) when only some shards are down and 503 when all are.
+- Internet radios cannot reach the bot's own network: the bot resolves a radio's host once, requires a public address and connects to that very address (no DNS rebinding), re-checks every redirect, reads the stream itself and pipes it to FFmpeg, which may open nothing else (`-protocol_whitelist pipe`). HLS radios are refused. YouTube and Twitch lives are read by FFmpeg with HTTP(S) and HLS protocols only, and their expiring URLs are refreshed just before playing.
+- The private copy of `YTDLP_COOKIES` is deleted on failure and at exit; `cookies.txt` files are ignored by git and Docker.
+- `backup restore` holds the data lock for the whole restore, refuses archive members whose size differs from the manifest and checks free space first.
+- Playlist import refuses deeply nested JSON instead of crashing.
 
 ## [1.4.0] - 2026-10-23
 

@@ -143,8 +143,12 @@ Module map, lowest layer first (each imports only the ones above it):
   module that persists JSON under `DATA_DIR`. Imports nothing from the package.
 - `state.py`: shared mutable state: the `bot` instance, `music_players`,
   `sessions`, `watch_ids`, `guild_perms`, `guild_themes`, `guild_languages`,
-  `guild_volumes`, `guild_stay`, `stay_retries`, `edit_tokens`, `viewers`, `streams` (open live update
-  streams per sid), `counters`, `background_tasks` and `clock()`.
+  `guild_volumes`, `guild_voteskip`, `guild_limits`, `play_times`,
+  `guild_stay`, `stay_retries`, `deliberate_leaves` (see Stay 24/7),
+  `importing` (guilds with a playlist import running), `edit_tokens`,
+  `viewers`, `streams` (open live update streams per sid), `lastfm_links`,
+  `lastfm_pending_auth`, `lastfm_queue`, `counters`, `background_tasks` and
+  `clock()`.
   Always use it as `state.music_players` (never `from .state import ...`), so
   every module and test sees the same objects.
 - `i18n.py`: translations (see Translations): `t()`, `lang_for()`,
@@ -277,7 +281,11 @@ Module map, lowest layer first (each imports only the ones above it):
   `on_voice_state_update`: one rejoin, then if it happens again within
   `STAY_RETRY_WINDOW` (120 s), or the channel is gone or off limits, or the
   connect fails, `give_up_stay()` turns it off and shows `action.stay_lost`.
-  No reconnect loop. The web session already never expires while the bot is in
+  No reconnect loop. A deliberate leave is not a drop: `!reset`,
+  `safe_voice_connect()` switching or cleaning up and
+  `disconnect_voice_client()` call `player.mark_deliberate_leave()` first, and
+  the handler skips `recover_stay()` when `left_deliberately()` (a mark under
+  `DELIBERATE_LEAVE_SECONDS`, `state.deliberate_leaves`, popped once). The web session already never expires while the bot is in
   voice (`_session_expired()`), so nothing special is needed: 24/7 keeps it
   alive. After a restart there is no session until the next `!play` (sessions
   are in memory). Autoplay is unchanged (it still needs a human in the
@@ -960,7 +968,8 @@ Module map, lowest layer first (each imports only the ones above it):
   session). `join_voice_channel()` wraps it. `!reset` forces a reconnect.
 - **Commands** (all hybrid, `!name` and `/name`; `/play` has one `query`
   option, a link or search text): `!play` (YouTube, SoundCloud, Bandcamp,
-  Spotify, Deezer or Apple Music link, or search text), `!list`, `!next`,
+  Spotify, Deezer or Apple Music link, a YouTube live, a Twitch channel, an
+  internet radio, or search text), `!list`, `!next`,
   `!pause`, `!resume`, `!seek` (position relative to the track's automix
   `start`, as the page shows it), `!crossfade on|off`, `!loop
   [off|track|queue]`, `!shuffle`, `!remove <position>`, `!move <from> <to>`, `!previous`,
@@ -972,8 +981,10 @@ Module map, lowest layer first (each imports only the ones above it):
   `push_history()`, cleared by `!stop`), `!volume [0-150]`, `!autoplay [on|off]`,
   `!stay [on|off]`, `!voteskip [threshold <1-100>]` (alias `!vs`), `!limits [setting] [value]`,
   `!filter [preset] [low mid high]`,
-  `!playlist save|add|load|show|delete <name>` and `!playlist list` (a
-  `hybrid_group`: `/playlist save`, ...), `!stop`, `!reset`, `!weblink` (see
+  `!playlist save|add|load|show|delete|export <name>`, `!playlist import
+  <name> <link>` and `!playlist list` (a `hybrid_group`: `/playlist save`,
+  ...), `!lastfm link|unlink|status` (a `hybrid_group`, only with the Last.fm
+  credentials), `!stop`, `!reset`, `!weblink` (see
   Permissions), and the Manage Server ones (`commands.has_guild_permissions`):
   `!theme [preset|reset|edit]`, `!djrole [role|off]` and `!language
   [code|reset]` (aliases `!lang`, `!langue`). `!help` is `HelpCommand`, one
@@ -981,9 +992,10 @@ Module map, lowest layer first (each imports only the ones above it):
 - **Translations** (`i18n.py`): every user-facing text is a key in
   `djsnake/locales/en.json` and `fr.json` (flat, same keys and same
   `{placeholders}` in both; `tests/test_i18n.py` checks it). `es.json` and
-  `de.json` are best effort: they may lack keys (never add keys absent from
-  English; placeholders must match) and a missing key falls back to English
-  per key, bot and page alike; `python3 scripts/i18n-missing.py` lists them.
+  `de.json` are kept complete too (add every new key there, with the same
+  placeholders), but the test only enforces no extra keys and matching
+  placeholders: a missing key falls back to English per key, bot and page
+  alike; `python3 scripts/i18n-missing.py` lists them.
   Plurals: one vs other for en, es and de, French also counts 0 as singular. `t(key, lang,
   **params)` formats it (`{prefix}` is always filled in; a `count` param picks
   `key.one` / `key.other`, French singular for 0 and 1), falling back to
@@ -1085,11 +1097,12 @@ Slash commands are synced in `app.sync_commands()`. `tests/fakes.py` has
 - **Adding a user-facing string**: never write the text inline. Add a key to
   `djsnake/locales/en.json` (English) and `fr.json` (French: neutral
   imperative, no "vous"/"tu", typographic apostrophe ’, U+00A0 before `:`,
-  U+202F before `; ! ?`, `…`), then call `t("area.key", lang, **params)`. A
+  U+202F before `; ! ?`, `…`), and to `es.json` and `de.json` (informal
+  "tú" / "du", same placeholders), then call `t("area.key", lang, **params)`. A
   new `ControlError` code gets its status in `ControlError.STATUS` and a
   `control.<code>` message; a new command gets a `help.cmd.<name>` line (and
-  a place in `HELP_ORDER`). Page strings go in both halves of the page's `I18N`
-  dictionary. Tests may assert English text: they run with `BOT_LANGUAGE=en`.
+  a place in `HELP_ORDER`). Page strings go in every language of the page's
+  `I18N` dictionary (en, fr, es, de). Tests may assert English text: they run with `BOT_LANGUAGE=en`.
 - Black formatting with its default 88-column limit (there is no
   `pyproject.toml`), so CI's `black --check` reformats anything longer. The 127
   in CI's flake8 call is a non-blocking warning pass.

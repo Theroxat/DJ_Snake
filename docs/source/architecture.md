@@ -9,9 +9,11 @@ Lowest layer first; each module imports only the ones above it.
 | Module | Role |
 | --- | --- |
 | `config.py` | Environment variables and constants, read once at import. |
+| `fileio.py` | `write_atomic()`: the temp file and `os.replace()` every JSON store in `DATA_DIR` uses. |
 | `state.py` | Shared mutable state: the `bot`, `music_players`, `sessions`, `watch_ids`, `guild_perms`, `guild_themes`, `guild_languages`, `guild_volumes`, `edit_tokens`, `viewers`, `streams`, `counters`, `background_tasks` and `clock()`. Always used as `state.music_players`, never imported by name, so every module and test sees the same objects. |
 | `i18n.py` | Translations: `t(key, lang, **params)` over the catalogs in `djsnake/locales/` (`en.json`, `fr.json`, `es.json`, `de.json`), and each server's language (`!language`, `languages.json`). |
 | `stats.py` | Listening stats in SQLite, written by one background thread. |
+| `cookies.py` | Optional YouTube cookies (`YTDLP_COOKIES`): validation and a private 0600 copy, deleted at exit. |
 | `playlists.py` | Saved playlists in SQLite (`playlists.db`). |
 | `playlist_io.py` | Playlist export (JSON, M3U, TXT) and validated file import. |
 | `backup.py` | Backup and restore of `DATA_DIR` (`python -m djsnake.backup`), plus the automatic backup task. |
@@ -20,11 +22,13 @@ Lowest layer first; each module imports only the ones above it.
 | `player.py` | `MusicPlayer` (per-server state), cleanup of files and history helpers. |
 | `themes.py` | Theme storage, logos and `!theme edit` tokens. |
 | `volume.py` | Per-server volume storage and the percent to gain mapping. |
+| `voteskip.py` | Vote to skip: per-server thresholds (`voteskip.json`) and the vote count of the listeners. |
 | `limits.py` | Anti-abuse queue limits: per-server settings (`limits.json`) over the `.env` defaults, the checks used wherever a track enters the queue, and the `/play` cooldown. |
+| `stay.py` | 24/7 mode storage (`stay.json`): on/off and the remembered voice channel per server. |
 | `filters.py` | Audio filter presets: the FFmpeg `-af` fragment and the playback rate of each. |
 | `permissions.py` | The DJ role (`permissions.json`), `WEB_CONTROL`, and the list of Discord commands reserved for DJs. |
 | `sessions.py` | Session expiry, control and view-only link ids, and the status panel. |
-| `media.py` | YouTube URL parsing, yt-dlp downloads, the SponsorBlock cut, audio analysis and FFmpeg options, YouTube search. |
+| `media.py` | URL parsing (YouTube, SoundCloud, Bandcamp, Twitch, internet radios), yt-dlp downloads, the SponsorBlock cut, audio analysis and FFmpeg options, YouTube search, and live streams: the radio probe and reader (connections pinned to a checked public address) and the YouTube/Twitch live URLs. |
 | `spotify.py` | Spotify link parsing, track lists, and matching to YouTube. |
 | `catalog.py` | Deezer and Apple Music link parsing and track lists (no credentials); entry point for every metadata link. |
 | `mixer.py` | `CrossfadeMixer`, the audio source wrapping FFmpeg. |
