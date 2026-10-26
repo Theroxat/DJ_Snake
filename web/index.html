@@ -970,6 +970,16 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
   button.synctoggle, button.ghost, a.ghub { min-height: 44px; min-width: 44px; }
   .offset input[type=range] { min-height: 40px; }
 }
+/* 320-380px phones: five transport buttons at 44/48/64px plus their gaps (and
+   Arcade's 4px ghost shadow, Cobalt's wider deck padding) outgrow the deck and
+   clip the loop button. Tighten sizes and let the row spread over what is left. */
+@media (max-width: 380px) {
+  [data-shape="cobalt"] .deck { padding-inline: 14px; }
+  .tcenter { width: 100%; justify-content: space-between; gap: 0; padding-right: 4px; }
+  .deck .tcenter button { min-width: 40px; min-height: 44px; padding-inline: 6px; }
+  .deck .tcenter button.tmode { min-width: 40px; padding-inline: 6px; }
+  .transport #pp { width: 56px; height: 56px; min-width: 56px; }
+}
 @media (max-width: 480px) {
   #volbadge { display: none; } /* the icon changes and the popover shows the value */
 }
