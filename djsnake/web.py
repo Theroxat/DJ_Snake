@@ -131,22 +131,37 @@ from .voteskip import web_status
 #   GET /icons/{name}          the default PNG icons (a fixed list of names)
 #   GET /healthz               200 {"status": "ok", ...} when the bot is connected
 #                              to Discord, else 503 {"status": "unavailable",
-#                              ...}; "degraded" (still 200) when some but not
-#                              all shards are down, with a "shards" list; no
+#                              ...}; status and discord "degraded" (still 200)
+#                              when some but not all shards are down, with a
+#                              "shards" list; no
 #                              ids, names or secrets
 #   GET /metrics               Prometheus text; 404 unless METRICS is on
 # Paths are never built from the request: tracks are looked up by id, themes
 # and logos by the session's guild id.
 
 
+# A gateway resume closes a shard's old websocket for a moment while its
+# heartbeat latency stays finite: such a shard is only counted down once its
+# websocket has stayed closed this long.
+SHARD_RESUME_GRACE = 30.0
+_shard_closed_since = {}
+
+
 def _shard_states():
     """[(shard id, latency in seconds, up)] for every gateway shard. A shard is
-    up when its websocket is open and answers heartbeats. Empty before the
-    first connection."""
+    up while its latency is finite (it answers heartbeats) and its websocket
+    is open, or closed for less than SHARD_RESUME_GRACE (a routine resume).
+    Empty before the first connection."""
     states = []
+    now = time.monotonic()
     for shard_id, shard in sorted(state.bot.shards.items()):
         latency = shard.latency
-        up = not shard.is_closed() and math.isfinite(latency)
+        if shard.is_closed():
+            closed_for = now - _shard_closed_since.setdefault(shard_id, now)
+        else:
+            _shard_closed_since.pop(shard_id, None)
+            closed_for = 0.0
+        up = math.isfinite(latency) and closed_for < SHARD_RESUME_GRACE
         states.append((shard_id, latency, up))
     return states
 
@@ -258,8 +273,8 @@ async def web_metrics(request):
         lines,
         "djsnake_discord_latency_seconds",
         "gauge",
-        "Discord gateway heartbeat latency (NaN without a connection).",
-        f"{latency:.6f}" if math.isfinite(latency) else "NaN",
+        "Discord gateway heartbeat latency (+Inf without a connection).",
+        f"{latency:.6f}" if math.isfinite(latency) else "+Inf",
     )
     _metric(
         lines,
@@ -272,10 +287,13 @@ async def web_metrics(request):
     lines.append("# TYPE djsnake_shard_up gauge")
     for shard_id, _, up in shards:
         lines.append(f'djsnake_shard_up{{shard="{shard_id}"}} {int(up)}')
-    lines.append("# HELP djsnake_shard_latency_seconds Per-shard heartbeat latency.")
+    lines.append(
+        "# HELP djsnake_shard_latency_seconds Per-shard heartbeat latency"
+        " (+Inf without a connection)."
+    )
     lines.append("# TYPE djsnake_shard_latency_seconds gauge")
     for shard_id, lat, _ in shards:
-        value = f"{lat:.6f}" if math.isfinite(lat) else "NaN"
+        value = f"{lat:.6f}" if math.isfinite(lat) else "+Inf"
         lines.append(f'djsnake_shard_latency_seconds{{shard="{shard_id}"}} {value}')
     _metric(
         lines,

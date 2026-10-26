@@ -128,7 +128,8 @@ async def test_metrics_per_shard(client, monkeypatch):
     assert 'djsnake_shard_up{shard="0"} 1\n' in text
     assert 'djsnake_shard_up{shard="1"} 0\n' in text
     assert 'djsnake_shard_latency_seconds{shard="0"} 0.030000\n' in text
-    assert 'djsnake_shard_latency_seconds{shard="1"} NaN\n' in text
+    assert 'djsnake_shard_latency_seconds{shard="1"} +Inf\n' in text
+    assert "NaN" not in text
     assert "djsnake_discord_latency_seconds 0.030000\n" in text
 
 
@@ -140,3 +141,18 @@ def test_parse_shard_count(raw, expected):
     from djsnake import config
 
     assert config.parse_shard_count(raw) == expected
+
+
+async def test_a_shard_resuming_is_not_down(client, monkeypatch):
+    """A resume closes the old websocket while the latency stays finite: the
+    shard stays up for SHARD_RESUME_GRACE, then counts down."""
+    web._shard_closed_since.clear()
+    fake_shards(monkeypatch, FakeShard(0.03), FakeShard(0.05, closed=True))
+    body = await (await client.get("/healthz")).json()
+    assert body["status"] == "ok"
+    assert [s["status"] for s in body["shards"]] == ["up", "up"]
+    web._shard_closed_since[1] -= web.SHARD_RESUME_GRACE + 1
+    body = await (await client.get("/healthz")).json()
+    assert body["status"] == "degraded" and body["discord"] == "degraded"
+    assert [s["status"] for s in body["shards"]] == ["up", "down"]
+    web._shard_closed_since.clear()

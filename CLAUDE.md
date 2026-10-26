@@ -716,7 +716,7 @@ Module map, lowest layer first (each imports only the ones above it):
   `POST|DELETE /api/{sid}/theme/logo`, `GET /theme-logo/{sid}` (see Themes).
   `GET /healthz` returns 200 `{status: "ok", discord: "connected", latency_ms,
   guilds, players, uptime_s, version}` when the bot is ready and at least one shard's websocket
-  answers (finite latency; `status: "degraded"`, still 200, when some shards are down; a `shards` list gives id, up/down and latency per shard), else 503 `{status: "unavailable", discord:
+  answers (finite latency; `status` and `discord` are `"degraded"`, still 200, when some shards are down; a shard whose websocket is closed with a finite latency stays up for `SHARD_RESUME_GRACE` 30 s, a routine resume; a `shards` list gives id, up/down and latency per shard), else 503 `{status: "unavailable", discord:
   "closed" | "not ready" | "websocket closed", uptime_s}`; it carries no ids,
   names or secrets. The Dockerfile `HEALTHCHECK` polls it (urllib, 60 s start
   period, 3 retries to ride out gateway resumes). `GET /metrics` (Prometheus

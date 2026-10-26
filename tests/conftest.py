@@ -76,6 +76,7 @@ def fresh_state(tmp_path, monkeypatch):
         state.lastfm_queue,
         stats._peaks,
         web._stats_cache,
+        web._shard_closed_since,
         lyrics._cache,
         lyrics._tasks,
     ):

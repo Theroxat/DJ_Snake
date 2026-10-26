@@ -45,7 +45,7 @@
 
 The web server answers `GET /healthz` on `WEB_PORT`. It returns `200` with a small JSON body when the bot is connected to Discord, and `503` with the reason otherwise (`not ready`, `websocket closed`, `closed`). It never contains tokens, server names or ids.
 
-The body lists each gateway shard (`shards`: id, `up` or `down`, latency). If only some shards are down, the status is `degraded` and the code stays `200`; `503` is returned only when every shard is down. `latency_ms` is the average of the shards that are up.
+The body lists each gateway shard (`shards`: id, `up` or `down`, latency). If only some shards are down, `status` and `discord` are both `degraded` and the code stays `200` (a shard briefly closed by a routine gateway resume still counts as up for 30 seconds); `503` is returned only when every shard is down. `latency_ms` is the average of the shards that are up.
 
 ```bash
 curl -s http://127.0.0.1:47823/healthz
