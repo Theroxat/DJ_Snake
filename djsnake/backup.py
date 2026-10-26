@@ -253,11 +253,28 @@ def verify_backup(archive):
     return _read_archive(archive, None)
 
 
+# Free space kept beyond the archive's total size when restoring.
+RESTORE_SPACE_MARGIN = 16 << 20
+
+
 def _read_archive(archive, dest):
     """Stream the archive, checking each file against the manifest, optionally
-    extracting into dest. Raises BackupError on any mismatch."""
+    extracting into dest. Raises BackupError on any mismatch. A member whose
+    size differs from the manifest is refused before anything is written, and
+    no more than the manifest's size is ever read from it."""
     manifest = read_manifest(archive)
     expected = {f["path"]: f for f in manifest["files"]}
+    if dest is not None:
+        total = sum(max(0, f["size"]) for f in manifest["files"])
+        try:
+            free = shutil.disk_usage(dest).free
+        except OSError:
+            free = None
+        if free is not None and free < total + RESTORE_SPACE_MARGIN:
+            raise BackupError(
+                f"Not enough free space to restore: {_human(total)} needed, "
+                f"{_human(free)} free."
+            )
     done = set()
     try:
         with tarfile.open(archive, "r:gz") as tar:
@@ -270,6 +287,8 @@ def _read_archive(archive, dest):
                 entry = expected.get(rel)
                 if entry is None or rel in done:
                     raise BackupError(f"File not in manifest: {rel}")
+                if member.size != entry["size"]:
+                    raise BackupError(f"Size mismatch: {rel}")
                 h = hashlib.sha256()
                 size = 0
                 out = None
@@ -279,9 +298,14 @@ def _read_archive(archive, dest):
                     out = open(target, "wb")
                 try:
                     src = tar.extractfile(member)
-                    for chunk in iter(lambda: src.read(1 << 20), b""):
+                    left = entry["size"]
+                    while left > 0:  # Never more than the manifest says
+                        chunk = src.read(min(1 << 20, left))
+                        if not chunk:
+                            break
                         h.update(chunk)
                         size += len(chunk)
+                        left -= len(chunk)
                         if out:
                             out.write(chunk)
                 finally:
@@ -343,15 +367,39 @@ def bot_running(data_dir=None):
     return False
 
 
-def restore_backup(archive, data_dir=None):
-    """Replace the data with the archive's. Returns the directory holding the
-    previous data."""
-    data_dir = data_dir or _data_dir()
-    if bot_running(data_dir):
+def _take_restore_lock(data_dir):
+    """Hold the bot lock for the whole restore, so a bot cannot start (or be
+    running) meanwhile. Returns the fd; raises BackupError when it is held or
+    locking is unavailable."""
+    if fcntl is None:
+        raise BackupError("Restore needs file locking (POSIX), not available here.")
+    os.makedirs(data_dir, exist_ok=True)
+    try:
+        fd = os.open(os.path.join(data_dir, LOCK_NAME), os.O_RDWR | os.O_CREAT, 0o600)
+    except OSError as e:
+        raise BackupError(f"Could not open the data lock: {e.strerror or e}")
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        os.close(fd)
         raise BackupError(
             "The bot is running: stop it first (docker compose stop dj-snake)."
         )
-    os.makedirs(data_dir, exist_ok=True)
+    return fd
+
+
+def restore_backup(archive, data_dir=None):
+    """Replace the data with the archive's. Returns the directory holding the
+    previous data. Holds the bot lock throughout: refused while a bot runs."""
+    data_dir = data_dir or _data_dir()
+    fd = _take_restore_lock(data_dir)
+    try:
+        return _restore_locked(archive, data_dir)
+    finally:
+        os.close(fd)  # Releases the lock
+
+
+def _restore_locked(archive, data_dir):
     stage = os.path.join(data_dir, f"{RESTORE_TMP_PREFIX}{_stamp()}")
     os.makedirs(stage)
     pre = os.path.join(data_dir, f"{PRE_RESTORE_PREFIX}{_stamp()}")

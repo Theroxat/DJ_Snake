@@ -6,6 +6,10 @@ A backup is one `.tar.gz` holding a `manifest.json` (format version, date, and t
 
 The lyrics cache (`lyrics/`) is left out by default, since the bot rebuilds it. The `backups/` folder and earlier `.pre-restore-*` copies are never included.
 
+```{warning}
+A backup holds everything in `DATA_DIR`, secrets included (for example the Last.fm session keys of members who linked their account). Archives are written with `0600` permissions; store and share them like a password. Keep `cookies.txt` **out of** `./data`: mount it separately and read-only as described in [Keeping YouTube working](youtube.md), or it ends up in every backup.
+```
+
 ## Create a backup
 
 ```bash
@@ -43,7 +47,7 @@ docker compose exec dj-snake python -m djsnake.backup list
 
 ## Restore
 
-Restoring replaces the data, so the bot must be stopped: `restore` refuses to run while the bot is up (the bot holds a lock on `DATA_DIR/.bot.lock`).
+Restoring replaces the data, so the bot must be stopped: `restore` refuses to run while the bot is up (the bot holds a lock on `DATA_DIR/.bot.lock`), and holds that lock itself until it is done, so a bot started meanwhile cannot take it. It also refuses an archive whose files do not match the sizes in its manifest, and checks that the disk has room for it first.
 
 ```bash
 docker compose stop dj-snake

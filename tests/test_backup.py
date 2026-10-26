@@ -182,3 +182,69 @@ def test_cli(data, tmp_path, monkeypatch):
     assert backup.main(["verify", str(out)]) == 0
     assert backup.main(["restore", str(tmp_path / "missing.tar.gz")]) == 1
     assert backup.main(["list"]) == 0
+
+
+def test_restore_holds_the_lock_throughout(data, tmp_path, monkeypatch):
+    """A bot starting mid-restore cannot take the lock."""
+    out = tmp_path / "o.tar.gz"
+    backup.create_backup(str(out), data_dir=str(data))
+    seen = []
+    real = backup._read_archive
+
+    def spying(archive, dest):
+        seen.append(backup.bot_running(str(data)))
+        assert not backup.acquire_bot_lock(str(data))
+        return real(archive, dest)
+
+    monkeypatch.setattr(backup, "_read_archive", spying)
+    backup.restore_backup(str(out), data_dir=str(data))
+    assert seen == [True]
+    assert not backup.bot_running(str(data))  # Released afterwards
+
+
+def test_member_size_must_match_the_manifest(data, tmp_path):
+    """A member bigger than the manifest says is refused before extraction:
+    no oversized file is ever written."""
+    out = tmp_path / "ok.tar.gz"
+    backup.create_backup(str(out), data_dir=str(data))
+    bad = tmp_path / "big.tar.gz"
+    with tarfile.open(out) as src, tarfile.open(bad, "w:gz") as dst:
+        for m in src:
+            f = src.extractfile(m)
+            if m.name == "data/themes.json":
+                content = b"x" * (1 << 20)
+                m.size = len(content)
+                dst.addfile(m, io.BytesIO(content))
+            else:
+                dst.addfile(m, f)
+    written = []
+    real_open = open
+
+    def tracking_open(path, mode="r", *args, **kwargs):
+        if "w" in mode and str(path).endswith("themes.json"):
+            written.append(path)
+        return real_open(path, mode, *args, **kwargs)
+
+    import builtins
+
+    builtins.open = tracking_open
+    try:
+        with pytest.raises(backup.BackupError, match="Size mismatch"):
+            backup.restore_backup(str(bad), data_dir=str(data))
+    finally:
+        builtins.open = real_open
+    assert written == []
+
+
+def test_restore_refused_without_free_space(data, tmp_path, monkeypatch):
+    out = tmp_path / "o.tar.gz"
+    backup.create_backup(str(out), data_dir=str(data))
+    before = (data / "themes.json").read_text()
+    monkeypatch.setattr(
+        backup.shutil,
+        "disk_usage",
+        lambda p: type("U", (), {"free": 1024, "total": 1, "used": 1})(),
+    )
+    with pytest.raises(backup.BackupError, match="free space"):
+        backup.restore_backup(str(out), data_dir=str(data))
+    assert (data / "themes.json").read_text() == before

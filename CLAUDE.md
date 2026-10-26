@@ -813,14 +813,19 @@ Module map, lowest layer first (each imports only the ones above it):
   fine; `-wal/-shm/-journal/.tmp` files, `backups/`, `.pre-restore-*`, the lock
   and (unless `--include-cache`) `lyrics/` are skipped. `main()` takes an
   exclusive `flock` on `DATA_DIR/.bot.lock` (`acquire_bot_lock()`); `restore`
-  refuses while `bot_running()` sees it held, verifies while extracting into
+  takes that lock itself for the whole restore (`_take_restore_lock()`,
+  refused while a bot holds it), checks free space against the manifest
+  total, refuses a member whose size differs from the manifest before
+  extracting (and never reads past it), verifies while extracting into
   `.restore-tmp-*`, moves the current top-level entries to
   `.pre-restore-<date>/`, renames the restored ones in, and rolls back on
   error. `backup_loop()` (started in `setup_hook`) calls `create_auto()` in an
   executor every `BACKUP_INTERVAL_HOURS`, writing `backups/djsnake-auto-*`
   and keeping `BACKUP_KEEP` of them (`rotate()`; manual files are never
   rotated). New persistent files under `DATA_DIR` are picked up
-  automatically. No Discord command. Tests: `tests/test_backup.py`.
+  automatically. No Discord command. Archives contain secrets (e.g. Last.fm
+  session keys), so they are 0600; `cookies.txt` belongs outside `DATA_DIR`.
+  Tests: `tests/test_backup.py`.
 - **Status panel**: each web session has one message in its text channel
   (`player.panel_message`), edited in place instead of announcing events:
   clip links (see Permissions), now playing / paused / idle, up next, loading progress and the

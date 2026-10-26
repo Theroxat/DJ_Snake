@@ -6,9 +6,7 @@ import os
 import discord
 
 from . import commands  # noqa: F401  (registers the commands)
-from . import cookies
-from . import state, stats
-from . import backup, state, stats
+from . import backup, cookies, state, stats
 from .config import COMMAND_PREFIX, SLASH_SYNC_GUILD
 from .controls import voteskip_update
 from .i18n import t
