@@ -2491,9 +2491,9 @@ html.demo-embedded .demo-ribbon { display: none; }
     msSet("pause", on ? () => { if (active() && !paused) send("pause"); } : null);
     msSet("nexttrack", on ? () => { if (active()) send("next"); } : null);
     msSet("previoustrack", on ? () => { if (active()) send("previous"); } : null);
-    msSet("seekto", on ? (d) => { if (d && Number.isFinite(d.seekTime) && state) seekTo(state.start + d.seekTime); } : null);
-    msSet("seekbackward", on ? (d) => { if (state) seekTo(curElapsed() - ((d && d.seekOffset) || MS_SEEK_STEP)); } : null);
-    msSet("seekforward", on ? (d) => { if (state) seekTo(curElapsed() + ((d && d.seekOffset) || MS_SEEK_STEP)); } : null);
+    msSet("seekto", on ? (d) => { if (d && Number.isFinite(d.seekTime) && state && active()) seekTo(state.start + d.seekTime); } : null);
+    msSet("seekbackward", on ? (d) => { if (state && active()) seekTo(curElapsed() - ((d && d.seekOffset) || MS_SEEK_STEP)); } : null);
+    msSet("seekforward", on ? (d) => { if (state && active()) seekTo(curElapsed() + ((d && d.seekOffset) || MS_SEEK_STEP)); } : null);
   }
   // "Artist - Title" titles give an artist; anything else has none.
   function msSplitTitle(title) {
@@ -3549,7 +3549,7 @@ html.demo-embedded .demo-ribbon { display: none; }
   document.addEventListener("keydown", (e) => {
     if (e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
     const tg = e.target instanceof Element ? e.target : document.body;
-    if (tg.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return;
+    if (tg.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], [contenteditable="plaintext-only"]')) return;
     if (kbDlg.open || !statsDlg.hidden) return; // a dialog is open: it owns the keyboard
     const ctl = active();
     const viaButton = !!tg.closest('button, a, summary, [role="button"], [role="switch"], [role="menuitem"]');
