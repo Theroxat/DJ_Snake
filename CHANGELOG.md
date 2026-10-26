@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - Clip page: at 320 px wide (and Cobalt at 360 px) the loop button of the transport row was clipped by the player block. The row now tightens its buttons and spacing on narrow phones; no control is hidden.
+### Added
+
+- End-to-end tests (`pytest -m e2e`, a new `e2e` CI job): the real FFmpeg playback chain on generated media (automix trim and loudness, crossfade, seek, volume) and the clip page in headless Chromium (sync, live updates, controls, view-only link, themes, lyrics, narrow screens). The contributing docs add a manual checklist for a real Discord server.
 
 ## [1.4.0] - 2026-10-23
 

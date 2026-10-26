@@ -5,3 +5,7 @@ pytest>=9.1.1
 pytest-asyncio>=1.4.0
 black>=26.10.1
 flake8>=7.4.1
+# End-to-end tests of the clip page (`pytest -m e2e`), then run
+# `python -m playwright install chromium` once. Its greenlet dependency has no
+# Python 3.15 build yet; the web e2e tests skip without it.
+playwright>=1.64.1; python_version < "3.15"

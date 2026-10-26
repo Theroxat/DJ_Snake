@@ -9,7 +9,7 @@ source_suffix = {".md": "markdown"}
 root_doc = "index"
 exclude_patterns = ["_build"]
 
-myst_enable_extensions = ["colon_fence", "deflist"]
+myst_enable_extensions = ["colon_fence", "deflist", "tasklist"]
 myst_heading_anchors = 3
 
 html_theme = "furo"
