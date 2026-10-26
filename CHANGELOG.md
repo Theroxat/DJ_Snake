@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - `/playlist import <name> <link>` creates or replaces a saved playlist from a YouTube playlist, a SoundCloud set, a Bandcamp album or a Spotify, Deezer or Apple Music playlist or album (those are matched on YouTube at import time, with unmatched tracks counted), or from an attached JSON, M3U or TXT file (up to 256 KB, only allowed sources). `/playlist export <name> [json|m3u|txt]` sends a playlist, or `queue` the current queue, as a file. Saved playlists can no longer be named `queue`.
+### Added
+
+- Clip page: Media Session support. The lock screen, headsets and media keys show the current track (title, artist from an "Artist - Title" title, server and channel, artwork, position) and, with the control link, drive play, pause, next, previous and seeking (+/- 10 s). A silent audio element started on the first tap makes browsers show the controls; view-only links get metadata only.
 
 ## [1.4.0] - 2026-10-23
 

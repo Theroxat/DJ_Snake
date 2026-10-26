@@ -663,6 +663,19 @@ Module map, lowest layer first (each imports only the ones above it):
   was. The demo shim replaces `EventSource` with a fake fed by the fake bot's
   change events. Tests: `tests/test_live_updates.py` (patch the `SSE_*`
   and `MAX_STREAMS_*` names on `web`).
+- **Media Session** (`web/index.html`, `ms*` functions, no server part): the
+  page sets `navigator.mediaSession` metadata (title/artist split from an
+  "Artist - Title" title, album = guild + channel, thumbnail artwork in five
+  sizes), `playbackState` and `setPositionState` (bar window `start`..`end`,
+  refreshed on each state and local seek). Action handlers (play, pause,
+  nexttrack, previoustrack, seekto, seekbackward/forward 10 s) call `send()` /
+  `seekTo()` only with `canControl`; a view-only page registers none
+  (`msBind(canControl)`). Because the clip `<video>` is muted, a silent looping
+  `<audio>` (WAV blob) starts on the first pointer/key/touch gesture so
+  browsers show the controls; `msClear()` runs when the session ends or goes
+  idle. Tests: `tests/test_media_session.py` (string checks plus a Chromium run
+  of the demo when playwright is installed). Support matrix in
+  `docs/source/clip-page.md`.
 - **Themes**: the page is fully token-driven: each preset is a `[data-skin]`
   block of CSS custom properties on `<html>` (Arcade is the original look;
   the presets are `THEME_PRESETS` in `config.py`: arcade, minimal, night,

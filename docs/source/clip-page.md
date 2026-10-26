@@ -36,6 +36,23 @@ Web actions are applied exactly like Discord commands and are reflected in the s
 
 The bot pushes every change to the page as it happens (a Server-Sent Events stream); if the stream cannot get through, the page polls every 2 seconds instead and tries the stream again later. The page keeps the muted video aligned with the audio position, including pauses and seeks. When crossfade is on, the page cross-dissolves its two videos during an overlap; skips are an instant swap.
 
+### Phone and headset controls (Media Session)
+
+While a track plays, the page publishes the title, an artist when the title reads "Artist - Title", the server and channel as the album, the thumbnail as artwork, the play/pause state and the position to the browser's Media Session API. Lock screens, notification shades, Bluetooth headsets and keyboard media keys can then show it. With the control link they also send play, pause, next, previous, seek and +/- 10 s to the bot, exactly like the page's buttons. With the view-only link only the metadata is shown: no handlers are registered, so the keys do nothing.
+
+Browsers only show media controls for a page that is playing audio, and the clip video is muted. So the page starts a silent, looping `<audio>` element (a one-second WAV built in the page, nothing to download) on your first tap or key press, since browsers refuse to start audio before a gesture. It plays no sound; it only makes the browser treat the tab as a media player. It stops when the session ends.
+
+What to expect (the API support is documented by browsers; the silent-audio trick is a widely used workaround, but it has not been verified on every device by the project):
+
+| Browser | Metadata and artwork | Lock screen / notification controls | Notes |
+| --- | --- | --- | --- |
+| Chrome, Android | yes | yes, after one tap on the page | Needs the tab to stay open; Chrome may freeze a long-backgrounded tab. |
+| Safari, iOS | yes | usually, after one tap | Starting audio can pause other apps' music. iOS suspends background web pages, so controls can stop working after a while. |
+| Chrome, desktop | yes | media keys and the media hub, after one click | |
+| Firefox, desktop | yes | media keys and OS media controls, after one click | Seek handlers and artwork support vary by version and OS. |
+
+Limits: the controls depend on the browser keeping the tab alive, which phones do not always allow; the artist comes from the title, so it is empty when the title has no "Artist - Title" shape; and the position shown is the bot's clock, so a Sync offset does not apply to it.
+
 ### Lyrics
 
 The Lyrics button (next to Sync) shows the words of the current track over the bottom of the clip, and follows the clip into fullscreen. With synced lyrics, the line being sung is highlighted and scrolled into place, with a thin bar under it that runs out when the next line starts. Lyrics follow the same clock as the video, your Sync offset included, so if the clip matches what you hear, so do the words. When only plain lyrics exist they appear in a scrollable sheet; when none are found the page says so quietly. Your choice is remembered in your browser.
