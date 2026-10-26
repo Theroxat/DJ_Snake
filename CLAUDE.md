@@ -113,7 +113,7 @@ which is no longer read), `TEMP_DIR`, `POT_BASE_URL`, `WEB_PORT` (47823),
 (0, default of the per-session autoplay), `VOTESKIP_PERCENT` (50, default vote-to-skip threshold, 1-100), `DATA_DIR` (`/app/data`, mounted from
 `./data` by Compose; the container's UID 1000 must be able to write it; it
 holds `themes.json`, `logos/`, `languages.json`, `volume.json`,
-`permissions.json`, `voteskip.json`, `playlists.db`, `stats.db` and `lyrics/`),
+`permissions.json`, `voteskip.json`, `limits.json`, `playlists.db`, `stats.db` and `lyrics/`),
 `SLASH_SYNC_GUILD` (empty: slash commands sync globally at startup; a server ID
 syncs to it only, at once, for development), `WEB_THEME` (`arcade`, the theme of
 guilds that never chose one), `WEB_CONTROL` (`everyone`, or `dj`: the control
@@ -123,7 +123,9 @@ link is never posted publicly, see Permissions; anything else falls back to
 (optional, both needed to use the Spotify Web API), `METRICS` (`0`; `1` enables
 `GET /metrics`), `APP_VERSION` (set by the Dockerfile build arg, `dev`
 otherwise; shown by `/healthz`), `LYRICS` (`1`; `0`, `false`, `no` or `off`
-turns the LRCLIB lyrics off), and `YTDLP_AUTO_UPDATE` (entrypoint only).
+turns the LRCLIB lyrics off), `MAX_QUEUE_SIZE` (200), `MAX_TRACKS_PER_USER` (0),
+`MAX_TRACK_MINUTES` (0) and `PLAY_COOLDOWN_SECONDS` (0) (defaults of the per-guild
+queue limits, see Queue limits; 0 = unlimited/off), and `YTDLP_AUTO_UPDATE` (entrypoint only).
 
 ## Architecture (`djsnake/`)
 
@@ -152,6 +154,8 @@ Module map, lowest layer first (each imports only the ones above it):
 - `themes.py`: theme storage, logos and `!theme edit` tokens.
 - `volume.py`: per-server volume storage (`{DATA_DIR}/volume.json`) and
   `percent_to_gain()`.
+- `limits.py`: the queue limits (see Queue limits). Imports `permissions`
+  and `themes`.
 - `permissions.py`: the DJ role (`load_perms()`, `set_dj_role()`,
   `dj_role()`), `is_dj()`, `web_control_restricted()` and the Discord gate
   (`DJ_COMMANDS`, `REQUESTER_COMMANDS`, `can_run_dj_command()`).
@@ -369,6 +373,30 @@ Module map, lowest layer first (each imports only the ones above it):
   delete <name>`, `!playlist list`. Web: `GET /api/{sid}/playlists` ->
   `{playlists: [{name, tracks, duration}]}`, control actions `save_playlist`
   and `load_playlist` (`name`; load answers 202). Tests: `tests/test_playlists.py`.
+- **Queue limits** (`limits.py`, `{DATA_DIR}/limits.json`, `{guild id: {field:
+  int}}` of overrides only, cleaned on load, written atomically; `state.guild_limits`):
+  fields `queue_size` (>= 1, whole queue), `per_user` (0 = unlimited),
+  `track_minutes` (0 = unlimited) and `cooldown` (seconds, 0 = off), defaults from
+  `config.MAX_QUEUE_SIZE` etc. read at call time by `limits_for()`. `/limits
+  [queue|user|minutes|cooldown] [number|default]` shows an embed (anyone) or sets
+  (Manage Server, checked in the command because the argument decides). Every
+  entry point goes through `playback.admission()` (`limits.check_enqueue()`): in
+  `_download_and_queue()` before the download (with the metadata `duration=` hint
+  when the caller has one: flat playlist entries and Spotify/Deezer/Apple tracks)
+  and again after it with the file's real duration (the file is discarded), and
+  in `queue_playlist()` before each entry so a refused one is neither searched nor
+  downloaded. Refusals say `limits.<reason>` to the channel (`refuse()`), or are
+  counted in the playlist's `skips` and reported once in its final line
+  (`load.skipped.<reason>`). Per member counts queued tracks by `requester_id`; a
+  track without one (the page's `WebContext`) is the `"web"` bucket, which
+  has the per-member limit but never a bypass or cooldown. `control_add()` refuses
+  an add up front with `queue_full` / `user_full` (409). `bypasses()` is
+  `is_dj(strict=True)`: DJ role or Manage Server, never everyone, and only for
+  the per-member limit and the cooldown. The cooldown (`state.play_times`, memory
+  only, `state.clock()`) is checked in `/play` after the request validates.
+  Autoplay only checks the queue size. The bot never plays live streams (it
+  downloads whole files), so there is no live exemption; an unknown duration
+  passes. Tests: `tests/test_limits.py`.
 - **Spotify links** (`spotify.py`): `check_url()` accepts only
   `open.spotify.com` (`play.spotify.com`) paths `[/intl-xx][/embed]/{playlist|album|track}/{id}`
   and `spotify:{kind}:{id}` URIs, with a 22-char base62 id; anything else on
@@ -716,7 +744,7 @@ Module map, lowest layer first (each imports only the ones above it):
   clip link is `sessions.public_link()`), `!history [count]` (reads
   `player.played`, the last `HISTORY_LOG_SIZE` 25 titles kept by
   `push_history()`, cleared by `!stop`), `!volume [0-150]`, `!autoplay [on|off]`,
-  `!voteskip [threshold <1-100>]` (alias `!vs`),
+  `!voteskip [threshold <1-100>]` (alias `!vs`), `!limits [setting] [value]`,
   `!playlist save|add|load|show|delete <name>` and `!playlist list` (a
   `hybrid_group`: `/playlist save`, ...), `!stop`, `!reset`, `!weblink` (see
   Permissions), and the Manage Server ones (`commands.has_guild_permissions`):

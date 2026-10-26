@@ -21,6 +21,7 @@ Every command works two ways: as a text message with the prefix, `!` by default 
 | `!shuffle` | Shuffle the upcoming queue once; the current track keeps playing. |
 | `!volume [0-150]` | Show the server's volume, or set it in percent (100 is the normal level). Saved across restarts. |
 | `!autoplay [on\|off]` | Keep playing related tracks when the queue runs out, or show the current setting (off by default, see `AUTOPLAY`). |
+| `!limits [queue\|user\|minutes\|cooldown] [number\|default]` | Show the queue limits, or change one (Manage Server): queue size, tracks per member, track length, /play cooldown. |
 | `!playlist save\|add\|load\|show\|delete <name>`, `!playlist list` | Saved playlists for the server: links and titles kept across restarts, downloaded again when loaded. |
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
@@ -132,6 +133,23 @@ Needs the **Manage Server** permission.
 
 See [Themes](clip-page.md#themes) for details. `!theme edit` needs your DMs open to server members; otherwise the bot tells you so.
 
+### Queue limits
+
+`!limits` (`/limits`) shows the server's limits in a small embed. `!limits <setting> <number>` changes one and `!limits <setting> default` goes back to the value from `.env`. Changing needs the **Manage Server** permission; showing is open to everyone. The settings are saved per server in `DATA_DIR/limits.json`.
+
+| Setting | `.env` default | Meaning |
+| --- | --- | --- |
+| `queue` | `MAX_QUEUE_SIZE` (200) | Tracks waiting in the queue (at least 1). |
+| `user` | `MAX_TRACKS_PER_USER` (0) | Tracks one member may have waiting; 0 is unlimited. |
+| `minutes` | `MAX_TRACK_MINUTES` (0) | Longest single track; 0 is unlimited. |
+| `cooldown` | `PLAY_COOLDOWN_SECONDS` (0) | Seconds between one member's `/play` calls; 0 is off. |
+
+The limits apply wherever tracks enter the queue: `/play` (links, playlists, Spotify, Deezer, Apple Music and text search), the clip page's add, `/playlist load` and the page's playlist load. Autoplay only obeys the queue size. The clip page has no identity, so everything added from it counts as one member (`web`) for the per-member limit; it is checked against the queue size and the track length like anyone else, and it has no cooldown.
+
+DJs (the DJ role) and members with Manage Server skip the per-member limit and the cooldown, never the queue size or the track length. Without a DJ role only Manage Server members skip them.
+
+The track length is read from the link's metadata before downloading when the source gives it (playlist entries, Spotify, Deezer and Apple Music tracks), otherwise after the download, and the file is then deleted. A playlist queues as many tracks as the limits allow, and one message at the end says how many were skipped and why, for example "12/30 tracks loaded (18 skipped: queue limit (12))". The bot only downloads whole files, so there are no live streams to exempt.
+
 ### `!djrole [role|off]`
 
 Needs the **Manage Server** permission. The setting is saved per server in `DATA_DIR/permissions.json`.
@@ -168,4 +186,4 @@ The language applies to command replies, errors, `!help`, the status message and
 
 ## Errors
 
-If you leave out a required argument the bot says so. Commands that need music playing answer "No music is currently playing." when there is none, and `!theme`, `!djrole` or `!language` without the permission is refused. A command reserved for DJs answers, for example, "Only DJs can use `!stop`: you need the **DJ** role or the **Manage Server** permission." Error messages follow the server's language.
+If you leave out a required argument the bot says so. Commands that need music playing answer "No music is currently playing." when there is none, and `!theme`, `!djrole`, `!language` or a `!limits` change without the permission is refused. A command reserved for DJs answers, for example, "Only DJs can use `!stop`: you need the **DJ** role or the **Manage Server** permission." Error messages follow the server's language.

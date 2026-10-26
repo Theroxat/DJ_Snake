@@ -7,7 +7,7 @@ import time
 
 import discord
 
-from . import lyrics, media, spotify, state, stats
+from . import limits, lyrics, media, spotify, state, stats
 from . import config
 from .config import CROSSFADE_SECONDS, FADE_OUT_SECONDS, FRAMES_PER_SECOND
 from .media import crossfade_eligible, playback_options
@@ -190,6 +190,30 @@ def pending_label(entry):
     return entry.get("title") or None, media.source_of(url)
 
 
+def admission(ctx, player, duration=None):
+    """Why the author of `ctx` may not queue a track now, or None (see
+    limits.py). A context without an author is the web page."""
+    author = getattr(ctx, "author", None)
+    guild_id = ctx.guild.id
+    return limits.check_enqueue(
+        player,
+        guild_id,
+        limits.bucket_of(getattr(author, "id", None)),
+        limits.bypasses(author, guild_id),
+        duration,
+    )
+
+
+async def refuse(ctx, refusal, skips=None):
+    """Report a limit refusal: counted in `skips` (a playlist reports once at
+    its end), else said to the channel."""
+    reason, params = refusal
+    if skips is not None:
+        skips[reason] = skips.get(reason, 0) + 1
+    else:
+        await ctx.send(t(f"limits.{reason}", ctx_lang(ctx), **params))
+
+
 async def download_and_queue_song(
     ctx,
     player,
@@ -199,18 +223,32 @@ async def download_and_queue_song(
     quiet=False,
     extra=None,
     pending_key=None,
+    duration=None,
+    skips=None,
 ):
     """Download one track and queue it. Returns the track, or None.
     `quiet` (playlist items) posts no message, not even on failure. `extra`
     adds fields to the track (the Spotify artist). `pending_key` is the
     caller's entry in player.pending_downloads; without one the link is
-    listed here, title unknown. Either way the entry goes when this returns."""
+    listed here, title unknown. Either way the entry goes when this returns.
+    `duration` is what the metadata says (seconds), checked against the
+    limits before downloading; `skips` collects limit refusals by reason
+    instead of posting them."""
     epoch = player.epoch
     if pending_key is None and not cancelled(player, epoch):
         pending_key = player.add_pending(None, media.source_of(url))
     try:
         return await _download_and_queue(
-            ctx, player, url, epoch, skip_voice_check, quiet, extra, pending_key
+            ctx,
+            player,
+            url,
+            epoch,
+            skip_voice_check,
+            quiet,
+            extra,
+            pending_key,
+            duration,
+            skips,
         )
     finally:
         if pending_key is not None:
@@ -235,10 +273,24 @@ def _title_reporter(player, key):
 
 
 async def _download_and_queue(
-    ctx, player, url, epoch, skip_voice_check, quiet, extra, pending_key
+    ctx,
+    player,
+    url,
+    epoch,
+    skip_voice_check,
+    quiet,
+    extra,
+    pending_key,
+    duration,
+    skips,
 ):
     try:
         if cancelled(player, epoch):
+            return None
+
+        refusal = admission(ctx, player, duration)
+        if refusal:
+            await refuse(ctx, refusal, skips)
             return None
 
         if not skip_voice_check:
@@ -268,6 +320,15 @@ async def _download_and_queue(
         if cancelled(player, epoch):
             discard_tracks([track])
             refresh_panel(player)
+            return None
+
+        # The real length is known now, and the queue may have filled up while
+        # this downloaded.
+        refusal = admission(ctx, player, track.get("duration"))
+        if refusal:
+            discard_tracks([track])
+            refresh_panel(player)
+            await refuse(ctx, refusal, skips)
             return None
 
         # For the stats: who asked (None from the web page, which has no author).
@@ -301,6 +362,16 @@ async def _download_and_queue(
         return None
 
 
+def skip_params(ctx):
+    """The limit values for the playlist skip report."""
+    limit = limits.limits_for(ctx.guild.id)
+    return {
+        "queue_max": limit["queue_size"],
+        "user_max": limit["per_user"],
+        "minutes_max": limit["track_minutes"],
+    }
+
+
 async def queue_playlist(ctx, player, entries, from_web=False):
     """Download playlist entries one by one into the queue while earlier
     ones play. `loading` keeps play_next from leaving voice meanwhile.
@@ -309,6 +380,7 @@ async def queue_playlist(ctx, player, entries, from_web=False):
     stopped = False
     loaded = 0
     not_found = 0  # Spotify tracks with no YouTube match
+    skips = {}  # Limit refusals by reason (limits.py)
     total = len(entries)
     loop = asyncio.get_running_loop()
 
@@ -334,6 +406,16 @@ async def queue_playlist(ctx, player, entries, from_web=False):
             if cancelled(player, epoch):
                 stopped = True
                 break
+
+            # Over a limit already: skip it without searching or downloading.
+            hint = (entry.get("spotify") or entry).get("duration")
+            refusal = admission(
+                ctx, player, hint if isinstance(hint, (int, float)) else None
+            )
+            if refusal:
+                player.drop_pending(key)
+                await refuse(ctx, refusal, skips)
+                continue
 
             extra = None
             if "spotify" in entry:
@@ -362,6 +444,7 @@ async def queue_playlist(ctx, player, entries, from_web=False):
                 quiet=True,
                 extra=extra,
                 pending_key=key,
+                skips=skips,
             )
             if track is not None and not cancelled(player, epoch):
                 loaded += 1
@@ -380,7 +463,17 @@ async def queue_playlist(ctx, player, entries, from_web=False):
     missing = []
     if not_found:
         missing.append(t("load.not_found", lang, count=not_found))
-    unavailable = total - loaded - not_found
+    for reason in (limits.QUEUE_FULL, limits.USER_FULL, limits.TOO_LONG):
+        if skips.get(reason):
+            missing.append(
+                t(
+                    f"load.skipped.{reason}",
+                    lang,
+                    count=skips[reason],
+                    **skip_params(ctx),
+                )
+            )
+    unavailable = total - loaded - not_found - sum(skips.values())
     if unavailable > 0:
         missing.append(t("load.unavailable", lang, count=unavailable))
     if missing:
@@ -435,6 +528,7 @@ async def queue_spotify(ctx, player, kind, tracks, from_web=False):
             from_web=from_web,
             extra=spotify_fields(track),
             pending_key=key,
+            duration=track.get("duration"),
         )
     finally:
         player.drop_pending(key)
@@ -670,6 +764,10 @@ async def _find_autoplay(player, seed, epoch):
         print(f"Autoplay: could not read related tracks: {e}")
         return None
     picks = media.choose_related(candidates, _autoplay_exclude(player))
+    if limits.check_enqueue(
+        player, guild_of(player), limits.AUTOPLAY_BUCKET
+    ):  # The queue is full (only its size limits autoplay)
+        return None
     for entry in picks[: config.AUTOPLAY_TRIES]:
         if cancelled(player, epoch):
             return None

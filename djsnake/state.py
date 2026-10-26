@@ -49,6 +49,10 @@ guild_volumes = {}
 # Guild id -> vote-to-skip threshold percent (see voteskip.py); absent means
 # config.VOTESKIP_PERCENT.
 guild_voteskip = {}
+# Guild id -> {field: value} limit overrides (see limits.py).
+guild_limits = {}
+# (guild id, member id) -> clock() of the last accepted /play (cooldown).
+play_times = {}
 # Guild id -> language code chosen with `!language` (see i18n.py).
 guild_languages = {}
 # `!theme edit` links: token -> (guild id, expiry on clock()). In memory only.

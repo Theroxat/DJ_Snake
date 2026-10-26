@@ -95,6 +95,7 @@ Every command is both a `!` command and a slash command (`/play`, `/playlist sav
 | `!shuffle` | Shuffle the upcoming queue once; the current track keeps playing. |
 | `!volume [0-150]` | Show the server's volume, or set it in percent (100 is the normal level). Saved across restarts. |
 | `!autoplay [on\|off]` | Keep playing related tracks when the queue runs out, or show the current setting (off by default, see `AUTOPLAY`). |
+| `!limits [queue\|user\|minutes\|cooldown] [number\|default]` | Show the queue limits, or change one (Manage Server): queue size, tracks per member, track length, /play cooldown. |
 | `!playlist save\|add\|load\|show\|delete <name>`, `!playlist list` | Saved playlists for the server: links and titles kept across restarts, downloaded again when loaded. |
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
@@ -212,6 +213,10 @@ Set these in `.env` (see `.env.example`).
 | `DISCORD_TOKEN` | none (required) | Bot token. A `token` file is a fallback. |
 | `COMMAND_PREFIX` | `!` | Prefix for text commands. |
 | `MAX_PLAYLIST_SIZE` | `30` | Maximum tracks loaded from a playlist. |
+| `MAX_QUEUE_SIZE` | `200` | Maximum tracks waiting in a server's queue; `/limits` overrides these four per server (Manage Server). |
+| `MAX_TRACKS_PER_USER` | `0` | Maximum tracks one member may have waiting (`0` = unlimited). The clip page counts as one member. |
+| `MAX_TRACK_MINUTES` | `0` | Longest single track accepted, in minutes (`0` = unlimited). |
+| `PLAY_COOLDOWN_SECONDS` | `0` | Seconds a member must wait between two `/play` calls (`0` = none). |
 | `IDLE_DISCONNECT_SECONDS` | `300` | Seconds the bot stays in voice once the queue runs out, before leaving (30 s when no human is left). |
 | `MEDIA_FORMAT` | max 720p H.264 + m4a | yt-dlp format selector. |
 | `TEMP_DIR` | fresh temp directory | Where downloaded tracks are stored. |
@@ -223,7 +228,7 @@ Set these in `.env` (see `.env.example`).
 | `AUTOPLAY` | `0` | Default of the per-session autoplay setting (`1` to start with it on). |
 | `VOTESKIP_PERCENT` | `50` | Default vote-to-skip threshold, 1 to 100: more than this share of the listeners must vote. Change it per server with `/voteskip threshold`. |
 | `SLASH_SYNC_GUILD` | empty | Server ID to publish slash commands to instantly (development). Empty: global sync. |
-| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), languages (`languages.json`), volumes (`volume.json`), vote-skip thresholds (`voteskip.json`), DJ roles (`permissions.json`), saved playlists (`playlists.db`), logos (`logos/`), listening stats (`stats.db`) and cached lyrics (`lyrics/`). Compose mounts `./data` there. |
+| `DATA_DIR` | `/app/data` | Persistent data: per-server themes (`themes.json`), languages (`languages.json`), volumes (`volume.json`), vote-skip thresholds (`voteskip.json`), DJ roles (`permissions.json`), queue limits (`limits.json`), saved playlists (`playlists.db`), logos (`logos/`), listening stats (`stats.db`) and cached lyrics (`lyrics/`). Compose mounts `./data` there. |
 | `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`. |
 | `LYRICS` | `1` | Synced lyrics on the clip page, from lrclib.net (`0` turns them off: no lookups, no button). |
 | `WEB_CONTROL` | `everyone` | `everyone`: the status message shows the control link and the view-only link. `dj`: only the view-only link; DJs get the control link with `!weblink`. A server with a DJ role always behaves as `dj`. |

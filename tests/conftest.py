@@ -24,6 +24,7 @@ from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 
 from djsnake import (  # noqa: E402
     i18n,
+    limits,
     lyrics,
     media,
     permissions,
@@ -58,6 +59,8 @@ def fresh_state(tmp_path, monkeypatch):
         state.guild_themes,
         state.guild_volumes,
         state.guild_voteskip,
+        state.guild_limits,
+        state.play_times,
         state.guild_languages,
         state.edit_tokens,
         state.viewers,
@@ -75,6 +78,7 @@ def fresh_state(tmp_path, monkeypatch):
     monkeypatch.setattr(themes, "LOGO_DIR", str(data_dir / "logos"))
     monkeypatch.setattr(volume, "VOLUME_FILE", str(data_dir / "volume.json"))
     monkeypatch.setattr(voteskip, "VOTESKIP_FILE", str(data_dir / "voteskip.json"))
+    monkeypatch.setattr(limits.config, "LIMITS_FILE", str(data_dir / "limits.json"))
     monkeypatch.setattr(lyrics, "LYRICS_DIR", str(data_dir / "lyrics"))
     monkeypatch.setattr(lyrics, "ENABLED", True)
 
