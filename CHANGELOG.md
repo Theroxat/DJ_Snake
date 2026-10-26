@@ -39,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Clip page: keyboard shortcuts (play/pause, seek, next/previous, shuffle, loop, mute, volume, fullscreen, lyrics, theme) and a localised help dialog opened with `?` or the header keyboard button. View-only links keep only the non-control keys.
+### Added
+
+- Spanish and German translations (`!language es|de`): command replies, errors, `!help`, the status message and the clip page, with informal "tú" / "du", and the page language menu lists Español and Deutsch (`es-*` and `de-*` browsers are detected). Spanish and German are best effort: a key they lack falls back to English, so new strings only need English and French. `scripts/i18n-missing.py` lists what each language is missing, and `/language` suggests the available languages.
 
 ## [1.4.0] - 2026-10-23
 

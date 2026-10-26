@@ -27,7 +27,7 @@ DJ Snake is configured through environment variables. With Docker Compose, put t
 | `WEB_CONTROL` | `everyone` | Who gets the clip page's control link. `everyone`: the status message shows it next to the view-only link. `dj`: it shows only the view-only link, and DJs get the control link by DM with `!weblink`. A server with a DJ role always behaves as `dj`. See [Who controls the music](clip-page.md#who-controls-the-music). |
 | `WEB_THEME` | `arcade` | Default clip page theme for servers that never ran `!theme`: `arcade`, `minimal`, `night`, `vinyl`, `club`, `terminal`, `space` or `cobalt`. |
 | `LYRICS` | `1` | Synced lyrics on the clip page, from [LRCLIB](https://lrclib.net). `0` turns them off: the bot sends no lookups and the page hides the Lyrics button. See [Lyrics](clip-page.md#lyrics). |
-| `BOT_LANGUAGE` | `en` | Language of the bot's messages and of the clip page for servers that never ran `!language`: `en` (English) or `fr` (French). |
+| `BOT_LANGUAGE` | `en` | Language of the bot's messages and of the clip page for servers that never ran `!language`: `en` (English), `fr` (French), `es` (Spanish) or `de` (German). |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | empty | Optional Spotify Web API credentials, for playlists over 100 tracks. Both are needed. See [Spotify](spotify.md). |
 | `YTDLP_AUTO_UPDATE` | `1` | Upgrade yt-dlp on container start (`0` to skip). Used by the container entrypoint only. |
 | `METRICS` | `0` | Set to `1` to serve Prometheus metrics on `GET /metrics` (same port as the clip page). Off, the route answers 404. See [Troubleshooting](troubleshooting.md#health-check-and-metrics). |

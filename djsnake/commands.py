@@ -1082,7 +1082,9 @@ def _language_list():
 )
 @commands.guild_only()
 @commands.has_guild_permissions(manage_guild=True)
-@app_commands.describe(choice="A language code (en, fr), or reset")
+@app_commands.describe(
+    choice=f"A language code ({', '.join(i18n.LANGUAGES)}), or reset"
+)
 async def language(ctx, choice: str = None):
     """Show or set the language of the bot and the clip page here."""
     guild_id = ctx.guild.id
@@ -1232,6 +1234,18 @@ async def theme_autocomplete(interaction, current):
     options = THEME_PRESETS + ("reset", "edit")
     current = current.strip().lower()
     return [app_commands.Choice(name=o, value=o) for o in options if current in o][:25]
+
+
+@language.autocomplete("choice")
+async def language_autocomplete(interaction, current):
+    current = current.strip().lower()
+    options = [(f"{language_name(code)} ({code})", code) for code in i18n.LANGUAGES]
+    options.append(("reset", "reset"))
+    return [
+        app_commands.Choice(name=name, value=code)
+        for name, code in options
+        if current in code or current in name.lower()
+    ][:25]
 
 
 # --- Saved playlists ------------------------------------------------------------

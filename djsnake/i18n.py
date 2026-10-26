@@ -1,7 +1,9 @@
 """User-facing text in several languages, with no dependency.
 
-Every message lives in `locales/{code}.json` (a flat `{key: text}` map, the
-same keys in every file) and is looked up with `t(key, lang, **params)`.
+Every message lives in `locales/{code}.json` (a flat `{key: text}` map) and is
+looked up with `t(key, lang, **params)`. `en` and `fr` hold every key; the
+other languages (`es`, `de`) are best effort: a key they lack falls back to
+English, key by key.
 Texts are `str.format` templates; `{prefix}` is always the command prefix.
 A `count` parameter picks the plural form when the catalog has `key.one`
 and `key.other`. The language of a guild is set with `!language` and
@@ -49,7 +51,8 @@ if DEFAULT_LANGUAGE is None:
 
 
 def _plural_one(lang, count):
-    """True when `count` takes the singular form in `lang`."""
+    """True when `count` takes the singular form in `lang`: `count == 1`
+    (en, es, de: "one" vs "other"), except French where 0 and 1 are singular."""
     if lang == "fr":
         return abs(count) < 2  # 0 and 1 are singular in French
     return count == 1

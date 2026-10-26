@@ -10,7 +10,7 @@ Lowest layer first; each module imports only the ones above it.
 | --- | --- |
 | `config.py` | Environment variables and constants, read once at import. |
 | `state.py` | Shared mutable state: the `bot`, `music_players`, `sessions`, `watch_ids`, `guild_perms`, `guild_themes`, `guild_languages`, `guild_volumes`, `edit_tokens`, `viewers`, `streams`, `counters`, `background_tasks` and `clock()`. Always used as `state.music_players`, never imported by name, so every module and test sees the same objects. |
-| `i18n.py` | Translations: `t(key, lang, **params)` over the catalogs in `djsnake/locales/` (`en.json`, `fr.json`), and each server's language (`!language`, `languages.json`). |
+| `i18n.py` | Translations: `t(key, lang, **params)` over the catalogs in `djsnake/locales/` (`en.json`, `fr.json`, `es.json`, `de.json`), and each server's language (`!language`, `languages.json`). |
 | `stats.py` | Listening stats in SQLite, written by one background thread. |
 | `playlists.py` | Saved playlists in SQLite (`playlists.db`). |
 | `playlist_io.py` | Playlist export (JSON, M3U, TXT) and validated file import. |

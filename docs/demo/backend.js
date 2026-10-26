@@ -111,10 +111,11 @@
     opts = opts || {};
     const standalone = !!opts.standalone;
     const base = opts.baseURI || document.baseURI;
-    // The guild's bot language ("en" or "fr"), as the real state sends it;
-    // `?lang=fr` on the demo's URL shows the French page.
-    let lang = opts.lang === "fr" ? "fr" : "en";
-    try { if (new URLSearchParams(location.search).get("lang") === "fr") lang = "fr"; } catch (e) {}
+    // The guild's bot language ("en", "fr", "es" or "de"), as the real state
+    // sends it; `?lang=de` on the demo's URL shows the German page.
+    const LANGS = ["en", "fr", "es", "de"];
+    let lang = LANGS.includes(opts.lang) ? opts.lang : "en";
+    try { const q = new URLSearchParams(location.search).get("lang"); if (LANGS.includes(q)) lang = q; } catch (e) {}
     const now = () => performance.now() / 1000;
     const media = (k) => new URL("media/clip" + (k + 1) + ".webm", base).href;
     const thumb = (k) => new URL("media/thumb" + (k + 1) + ".jpg", base).href;
