@@ -625,19 +625,22 @@ def _find_download(info):
     raise RuntimeError("File not found after download")
 
 
-def playback_options(track, offset, fade_in=None, fade_out=FADE_OUT_SECONDS):
+def playback_options(
+    track, offset, fade_in=None, fade_out=FADE_OUT_SECONDS, extra_filters=""
+):
     """FFmpeg options to play `track` from `offset` (file time, seconds).
 
     Returns (offset, kwargs for FFmpegPCMAudio); the offset is clamped to the
     automix window [start, end - 1]. Input -ss/-t keep FFmpeg in file time
     while the filters see a timeline starting at 0, so the fade-out is placed
     relative to the seek point. `fade_in` (None: automatic) and `fade_out`
-    are overridden by the crossfade.
+    are overridden by the crossfade (both in file seconds). `extra_filters`
+    (filters.chain(): the session's audio filter) goes after the fades.
     """
     # The file carries video for the web page; Discord only needs audio.
     end = track.get("end")
     if end is None:  # Not analysed: play the whole file, untouched
-        kwargs = {"options": "-vn"}
+        kwargs = {"options": f"-vn -af {extra_filters}" if extra_filters else "-vn"}
         if offset > 0:
             kwargs["before_options"] = f"-ss {offset:.3f}"
         return offset, kwargs
@@ -663,6 +666,8 @@ def playback_options(track, offset, fade_in=None, fade_out=FADE_OUT_SECONDS):
     fade_out = min(fade_out, remaining)
     filters.append(f"afade=t=in:st=0:d={fade_in:.3f}")
     filters.append(f"afade=t=out:st={remaining - fade_out:.3f}:d={fade_out:.3f}")
+    if extra_filters:
+        filters.append(extra_filters)
 
     before = f"-ss {offset:.3f} " if offset > 0 else ""
     return offset, {

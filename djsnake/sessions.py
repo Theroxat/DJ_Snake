@@ -217,6 +217,15 @@ def _link_lines(player, lang=None):
     return lines
 
 
+def filter_label(player, lang):
+    """The session's audio filter as the panel and replies name it."""
+    name = t(f"filter.name.{player.filter}", lang)
+    if player.filter != "eq":
+        return name
+    gains = {band: f"{value:+d}" for band, value in player.eq.items()}
+    return t("filter.eq_label", lang, **gains)
+
+
 def render_panel(player):
     lang = player_lang(player)
     if player.expired:
@@ -258,6 +267,8 @@ def render_panel(player):
     votes = web_status(player, state.sessions.get(player.sid))
     if votes:
         lines.append(t("panel.votes", lang, **votes))
+    if player.filter != "off":
+        lines.append(t("panel.filter", lang, filter=filter_label(player, lang)))
     if player.load_line:
         lines.append(player.load_line)
     elif len(player.pending_downloads) > 1:

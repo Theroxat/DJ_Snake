@@ -24,6 +24,7 @@ The page shows the current video, the queue ("Up next"), a "Now playing" row, tr
 - shuffle the queue once and cycle the loop mode (off, track, queue) with the two buttons around the transport controls;
 - toggle crossfade;
 - change the server's volume with the speaker button next to Sync (a slider from 0 to 150%, keyboard accessible; the change is sent after you stop dragging);
+- pick an audio filter (bass boost, nightcore, vaporwave, 8D, karaoke, soft, or a 3-band equaliser with one slider per band) in the same popover as the volume; the speaker button is highlighted and names the filter while one is on (see `!filter` in [Commands](commands.md));
 - toggle autoplay (a switch in the "Up next" header; tracks it picks carry a small "Autoplay" badge in "Now playing");
 - save the current track and queue as a playlist, or load a saved one (see `!playlist` in [Commands](commands.md));
 - show the lyrics of the current track.
@@ -34,7 +35,7 @@ Web actions are applied exactly like Discord commands and are reflected in the s
 
 ### Sync
 
-The bot pushes every change to the page as it happens (a Server-Sent Events stream); if the stream cannot get through, the page polls every 2 seconds instead and tries the stream again later. The page keeps the muted video aligned with the audio position, including pauses and seeks. When crossfade is on, the page cross-dissolves its two videos during an overlap; skips are an instant swap.
+The bot pushes every change to the page as it happens (a Server-Sent Events stream); if the stream cannot get through, the page polls every 2 seconds instead and tries the stream again later. The page keeps the muted video aligned with the audio position, including pauses and seeks. When crossfade is on, the page cross-dissolves its two videos during an overlap; skips are an instant swap. With a speed filter (nightcore, vaporwave) the video, the progress bar and the lyrics run at the same speed as the audio.
 
 ### Phone and headset controls (Media Session)
 

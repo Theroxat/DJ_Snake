@@ -52,6 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Optional Last.fm scrobbling, off unless `LASTFM_API_KEY` and `LASTFM_API_SECRET` are set. `/lastfm link|unlink|status` lets each user link their own account (the authorisation link is sent privately); linked users in the voice channel get "now playing" and a scrobble after half the track or 4 minutes (tracks under 30 s are skipped). Scrobbles are sent in batches of 50 and retried without ever blocking playback. Session keys are stored in `DATA_DIR/lastfm.json` (mode 0600).
+### Added
+
+- Audio filters per session: `!filter [off|bassboost|nightcore|vaporwave|8d|karaoke|soft]` and `!filter eq <low> <mid> <high>` (-12 to 12 dB), a picker in the clip page's volume popover and a `filter` control action. A change restarts the playing track where it is, crossfade keeps working, and setting a filter needs the DJ role when there is one. Nightcore and vaporwave change the real playback speed: `/api/{sid}/state` exposes `filter`, `eq` and `rate`, and the page runs the video, progress bar and lyrics at that rate. The status panel shows the filter when it is on.
 
 ## [1.4.0] - 2026-10-23
 

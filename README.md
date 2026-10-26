@@ -37,6 +37,7 @@
 - Loop (track or queue) and one-shot queue shuffle.
 - Optional autoplay ("radio"): when the queue runs out, a related YouTube track plays on.
 - 24/7 mode (`!stay on`): the bot stays in its voice channel, even when idle, and rejoins it after a restart.
+- Audio filters per session: bass boost, nightcore, vaporwave, 8D, karaoke, soft, or a 3-band equaliser, switched mid-track without starting over.
 - Listening stats per server on the clip page: top tracks and artists, the most skipped track, hours played, sessions, peak listeners and a day-by-hour heatmap, for the last week, month or all time.
 - Live viewer count in the clip page header.
 - Lock screen, headset and media key controls through the browser's Media Session API (see the clip page docs for browser support).
@@ -100,6 +101,7 @@ Every command is both a `!` command and a slash command (`/play`, `/playlist sav
 | `!autoplay [on\|off]` | Keep playing related tracks when the queue runs out, or show the current setting (off by default, see `AUTOPLAY`). |
 | `!limits [queue\|user\|minutes\|cooldown] [number\|default]` | Show the queue limits, or change one (Manage Server): queue size, tracks per member, track length, /play cooldown. |
 | `!stay [on\|off]` | 24/7 mode: the bot never leaves its voice channel (no idle disconnect) and rejoins it after a restart; with no argument, shows the setting. Setting it needs the DJ role or Manage Server. See `STAY_247`. |
+| `!filter [preset]` | Show or set the session's audio filter: `off`, `bassboost`, `nightcore`, `vaporwave`, `8d`, `karaoke`, `soft`, or `eq <low> <mid> <high>` (-12 to 12 dB). The track goes on from where it is. |
 | `!playlist save\|add\|load\|show\|delete\|export <name>`, `!playlist import <name> <link>`, `!playlist list` | Saved playlists for the server: links and titles kept across restarts, downloaded again when loaded. Import from a playlist link or a file, export as a file. |
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
@@ -110,7 +112,7 @@ Every command is both a `!` command and a slash command (`/play`, `/playlist sav
 
 | `!language [code\|reset]` | Show or set the language of the bot and the clip page for the server (`en`, `fr`, `es`, `de`). Needs the Manage Server permission. |
 
-When a server has a DJ role, `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!previous`, `!move`, `!clear`, `!volume`, `!autoplay`, `!stay`, `!stop` and `!reset` need that role or the Manage Server permission; whoever queued the playing track may still skip it with `!next`, and remove their own queued tracks with `!remove` (anyone else needs the role for that). Anyone in the voice channel can `!voteskip`. `!play`, `!list`, `!nowplaying` and `!history` stay open to everyone. See [Who controls the music](#who-controls-the-music).
+When a server has a DJ role, `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!previous`, `!move`, `!clear`, `!volume`, `!autoplay`, `!stay`, `!filter`, `!stop` and `!reset` need that role or the Manage Server permission; whoever queued the playing track may still skip it with `!next`, and remove their own queued tracks with `!remove` (anyone else needs the role for that). Anyone in the voice channel can `!voteskip`. `!play`, `!list`, `!nowplaying` and `!history` stay open to everyone. See [Who controls the music](#who-controls-the-music).
 
 ## Language
 

@@ -23,6 +23,7 @@ Every command works two ways: as a text message with the prefix, `!` by default 
 | `!autoplay [on\|off]` | Keep playing related tracks when the queue runs out, or show the current setting (off by default, see `AUTOPLAY`). |
 | `!limits [queue\|user\|minutes\|cooldown] [number\|default]` | Show the queue limits, or change one (Manage Server): queue size, tracks per member, track length, /play cooldown. |
 | `!stay [on\|off]` | 24/7 mode: the bot never leaves its voice channel (no idle disconnect) and rejoins it after a restart; with no argument, shows the setting. Setting it needs the DJ role or Manage Server. See `STAY_247`. |
+| `!filter [preset]` | Show or set the session's audio filter: `off`, `bassboost`, `nightcore`, `vaporwave`, `8d`, `karaoke`, `soft`, or `eq <low> <mid> <high>` (-12 to 12 dB). The track goes on from where it is. |
 | `!playlist save\|add\|load\|show\|delete\|export <name>`, `!playlist import <name> <link>`, `!playlist list` | Saved playlists for the server: links and titles kept across restarts, downloaded again when loaded. Import from a playlist link or a file, export as a file. |
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
@@ -104,6 +105,25 @@ Keeps the music going when the queue runs out. With autoplay on, the bot picks a
 
 24/7 mode. With it on, the bot never leaves its voice channel on its own: the idle linger (`IDLE_DISCONNECT_SECONDS`, and the 30 seconds after the last human leaves) is skipped, and `!stop` clears the queue without leaving. It stays silent unless something plays; autoplay, if on, keeps going as usual. If the bot is not in voice, `!stay on` joins your channel. The setting and the channel are saved in `DATA_DIR/stay.json`, and after a restart the bot rejoins that channel (nothing starts playing; a deleted channel or a missing Connect permission is skipped). If Discord drops the bot, or someone disconnects it, it rejoins once; dropped again within two minutes, or if the channel is gone, 24/7 turns itself off and the status message says so. Without an argument, shows the setting. Setting it needs the DJ role or Manage Server. Off by default; `STAY_247=1` changes the default for servers that never chose. The status message shows "🌙 24/7" and the clip page a small "24/7" badge in its header.
 
+### `!filter [preset]`
+
+Without an argument, shows the session's audio filter. With a preset, sets it for everyone in the channel:
+
+| Preset | Effect |
+| --- | --- |
+| `off` | No filter (the default). |
+| `bassboost` | Stronger bass, with a limiter so it does not clip. |
+| `nightcore` | 1.25× faster, pitch up. |
+| `vaporwave` | 0.8× slower, pitch down, slightly darker. |
+| `8d` | The sound slowly circles from one ear to the other. |
+| `karaoke` | Removes what is mixed in the centre above 150 Hz, usually the lead vocal; the bass stays. It only works on stereo tracks and is never perfect. |
+| `soft` | A gentle low-pass filter, for background listening. |
+| `eq` | A 3-band equaliser: `!filter eq <low> <mid> <high>`, each from -12 to 12 dB (`/filter` has one option per band; a band left out keeps its value). |
+
+The playing track restarts at the same position with the new filter (a short fade softens the switch) and stays paused if it was; out of voice, the filter applies to the next track. The filter belongs to the session (it survives `!reset`, not a session expiry) and the status message shows it when it is not `off`. Setting it needs the DJ role when the server has one; showing it does not.
+
+With `nightcore` and `vaporwave` the track really plays faster or slower: the clip page runs the video, the progress bar and the lyrics at the same speed, and positions (`!seek`, the progress bar) stay in the track's own time. A 3-minute track takes 2:24 in nightcore. The listening stats count the time actually listened.
+
 ### `!playlist`
 
 Saved playlists belong to the server and survive restarts. Only the YouTube link, title and duration of each track are stored, never the media: loading a playlist downloads its tracks again. Names are case-insensitive, up to 32 characters (letters, digits, spaces and `. ' & ! + ( ) -`). A server holds up to 50 playlists of up to 200 tracks each.
@@ -174,7 +194,7 @@ Needs the **Manage Server** permission. The setting is saved per server in `DATA
 
 With a DJ role set:
 
-- `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!previous`, `!move`, `!clear`, `!volume`, `!autoplay`, `!stay`, `!stop` and `!reset` need the DJ role or the Manage Server permission. The member who queued the playing track may still skip it with `!next`, `!remove` is open to whoever queued the track being removed, and everyone can use `!voteskip`. `!play`, `!list`, `!nowplaying` and `!history` stay open to everyone.
+- `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!previous`, `!move`, `!clear`, `!volume`, `!autoplay`, `!stay`, `!filter`, `!stop` and `!reset` need the DJ role or the Manage Server permission. The member who queued the playing track may still skip it with `!next`, `!remove` is open to whoever queued the track being removed, and everyone can use `!voteskip`. `!play`, `!list`, `!nowplaying` and `!history` stay open to everyone.
 - `!play` and `!list` stay open to everyone: adding a track never interrupts what plays, and DJs can still skip or remove it.
 - The status message shows only the clip page's view-only link, and the control link posted before stops working (every change of the role gives a live session a new one and retires the server's `!theme edit` links). See [Who controls the music](clip-page.md#who-controls-the-music).
 

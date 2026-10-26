@@ -10,7 +10,7 @@ import time
 
 from aiohttp import web
 
-from . import lyrics, state, stats
+from . import filters, lyrics, state, stats
 from .config import (
     COMMAND_PREFIX,
     APP_VERSION,
@@ -41,6 +41,7 @@ from .controls import (
     ControlError,
     control_add,
     control_autoplay,
+    control_filter,
     control_crossfade,
     control_jump,
     control_loop,
@@ -61,6 +62,7 @@ from .controls import (
 from .i18n import lang_for, t
 from .player import notify_state
 from .sessions import (
+    filter_label,
     refresh_panel,
     resolve_link,
     session_player,
@@ -108,7 +110,9 @@ from .voteskip import web_status
 #                              seek, jump, crossfade and autoplay ({"enabled": bool}),
 #                              loop ({"mode": off|track|queue}, none cycles),
 #                              shuffle,
-#                              volume ({"value": int 0-150, percent})
+#                              volume ({"value": int 0-150, percent}),
+#                              filter ({"preset": a FILTER_PRESETS name,
+#                              "eq"?: {low, mid, high} dB -12..12})
 #                              plus save_playlist ({"name"}: the current track
 #                              and the queue) and load_playlist ({"name"}, 202)
 #   GET /api/{sid}/playlists   the guild's saved playlists, {"playlists":
@@ -342,6 +346,11 @@ def state_body(link, sid, player, viewers, can_control):
         # Skip votes {count, needed} while any are active, else null.
         "votes": web_status(player, state.sessions[sid]),
         "stay": stay_on(state.sessions[sid]),
+        # Audio filter (see filters.py) and the speed it plays at: the page
+        # runs its video and clock at `rate` (elapsed/start/end are file time).
+        "filter": player.filter,
+        "eq": dict(player.eq),
+        "rate": player.rate if now_playing is not None else filters.rate(player.filter),
         # True while the previous track still drains under this one.
         "crossfading": now_playing is not None
         and player.mixer is not None
@@ -713,6 +722,7 @@ CONTROL_ACTIONS = frozenset(
         "shuffle",
         "volume",
         "autoplay",
+        "filter",
         "save_playlist",
         "load_playlist",
     }
@@ -769,6 +779,11 @@ async def web_control(request):
         return _fail(request, 400, "control.bad_loop")
     if action == "volume" and not valid_volume(data.get("value")):
         return _fail(request, 400, "control.bad_volume")
+    if action == "filter" and not (
+        isinstance(data.get("preset"), str)
+        and (data.get("eq") is None or isinstance(data.get("eq"), dict))
+    ):
+        return _fail(request, 400, "control.bad_filter")
 
     touch(player)
     if player.sid != sid:  # Expired just now
@@ -813,6 +828,10 @@ async def web_control(request):
             _announce_volume(player, guild_id, data["value"])
         elif action == "autoplay":
             control_autoplay(player, data["enabled"])
+        elif action == "filter":
+            await control_filter(player, data["preset"], data.get("eq"))
+            label = filter_label(player, lang)
+            set_action(player, t("action.web_filter", lang, filter=label))
         elif action == "jump":
             track = await control_jump(player, guild_id, track_id)
             title = short(track["title"])

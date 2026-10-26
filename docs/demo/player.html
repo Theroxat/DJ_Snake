@@ -466,6 +466,8 @@ main {
   padding: 28px 24px 48px; max-width: 1560px; margin: 0 auto; overflow-x: clip;
 }
 .stage { position: relative; min-width: 0; isolation: isolate; }
+/* An open popover (volume and filter, sync) must stay above the queue column */
+.stage:has(.offset:not([hidden])) { z-index: 2; }
 
 /* Ambient glow: the playing track's artwork, blurred behind the player */
 .ambient {
@@ -592,6 +594,20 @@ a.ghub:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 /* Volume popover: the Sync panel's look, narrower */
 .offset.volpanel { width: min(380px, calc(100% - 24px)); }
 .offset.volpanel output { min-width: 4.5ch; }
+/* Audio filter, under the volume in the same popover */
+.fxrow { flex: 1 1 100%; display: flex; align-items: center; gap: 12px; border-top: var(--bw) solid var(--hair); padding-top: 12px; min-width: 0; }
+.fxrow select {
+  flex: 1 1 auto; min-width: 0; min-height: 40px; background: var(--bg); color: var(--text);
+  border: var(--bw) solid var(--border); border-radius: var(--radius-btn); padding: 6px 10px; font: 400 14px var(--font-body);
+}
+.fxrow select option { background: var(--surface); color: var(--text); }
+.fxrow select:disabled { opacity: .4; }
+.fxeq { flex: 1 1 100%; display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; align-items: center; gap: 4px 12px; min-width: 0; }
+.fxeq[hidden] { display: none; }
+.fxeq label { color: var(--muted); font-size: 13px; }
+.fxeq input[type=range] { width: 100%; min-width: 0; accent-color: var(--accent); }
+.fxeq output { min-width: 6ch; }
+button.synctoggle.fxon { color: var(--accent-3); border-color: var(--accent-3); }
 
 /* Theme menu (viewer's own choice) */
 .menu {
@@ -1042,7 +1058,7 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
   .transport #pp { width: 56px; height: 56px; min-width: 56px; }
 }
 @media (max-width: 480px) {
-  #volbadge { display: none; } /* the icon changes and the popover shows the value */
+  #volbadge, #fxbadge { display: none; } /* the icon changes and the popover shows the value */
 }
 @media (max-width: 370px) {
   .tside .lbl { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -1143,7 +1159,7 @@ html.demo-embedded .demo-ribbon { display: none; }
             <button id="loop" class="tmode" type="button" data-mode="off" aria-label="Loop: off. Switch to loop track" title="Loop: off" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v3l4-4-4-4v3H5v6h2zM17 17H7v-3l-4 4 4 4v-3h12v-6h-2z"/><path class="one" d="M11 9.5h1.6V15h-1.4v-4l-.9.5-.4-1.1z"/></svg></button>
           </div>
           <div class="tside end">
-            <button id="voltoggle" class="synctoggle" type="button" aria-expanded="false" aria-controls="volpanel" title="Volume (for everyone in the channel)" data-i18n-title="vol_title"><svg id="volicon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9zm11.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"/></svg><span class="lbl" data-i18n="volume">Volume</span><b id="volbadge" hidden></b></button>
+            <button id="voltoggle" class="synctoggle" type="button" aria-expanded="false" aria-controls="volpanel" title="Volume and filter (for everyone in the channel)" data-i18n-title="vol_title"><svg id="volicon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9zm11.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"/></svg><span class="lbl" data-i18n="volume">Volume</span><b id="volbadge" hidden></b><b id="fxbadge" hidden></b></button>
             <button id="synctoggle" class="synctoggle" type="button" aria-expanded="false" aria-controls="syncpanel" title="Video / audio offset" data-i18n-title="sync_title"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h9.2a3 3 0 0 1 5.6 0H20v2h-1.2a3 3 0 0 1-5.6 0H4zm12 2a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM4 16h1.2a3 3 0 0 1 5.6 0H20v2h-9.2a3 3 0 0 1-5.6 0H4zm4 2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg><span class="lbl" data-i18n="sync">Sync</span><b id="syncbadge" hidden></b></button>
             <button id="lyrbtn" class="synctoggle" type="button" aria-pressed="false" aria-controls="lyrics" title="Show lyrics" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h14v2H3zm0 4h10v2H3zm0 4h7v2H3zm14-3.6 4-1.4v2.2l-2 .7v6.6a2.6 2.6 0 1 1-2-2.5z"/></svg><span class="lbl" data-i18n="lyr">Lyrics</span></button>
             <button id="fs" class="synctoggle" type="button" aria-label="Fullscreen" title="Fullscreen" data-i18n-aria="fullscreen" data-i18n-title="fullscreen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v2H6v4H4zm10 0h6v6h-2V6h-4zM4 14h2v4h4v2H4zm14 0h2v6h-6v-2h4z"/></svg></button>
@@ -1155,6 +1171,25 @@ html.demo-embedded .demo-ribbon { display: none; }
           <output id="volval" for="volume">100%</output>
           <button id="volreset" type="button" aria-label="Reset volume to 100 percent" data-i18n-aria="vol_reset">100</button>
           <p class="hint" data-i18n="vol_hint">Volume of the bot for everyone in the channel, saved for this server. 100% is the normal level; above it, loud tracks are softly limited.</p>
+          <div class="fxrow">
+            <label class="hud" for="fxpick" style="color:var(--accent-3)" data-i18n="fx">Filter</label>
+            <select id="fxpick" aria-describedby="fxhint">
+              <option value="off" data-i18n="fx_off">Off</option>
+              <option value="bassboost" data-i18n="fx_bassboost">Bass boost</option>
+              <option value="nightcore" data-i18n="fx_nightcore_opt">Nightcore (1.25×)</option>
+              <option value="vaporwave" data-i18n="fx_vaporwave_opt">Vaporwave (0.8×)</option>
+              <option value="8d" data-i18n="fx_8d">8D</option>
+              <option value="karaoke" data-i18n="fx_karaoke">Karaoke</option>
+              <option value="soft" data-i18n="fx_soft">Soft</option>
+              <option value="eq" data-i18n="fx_eq">Equaliser</option>
+            </select>
+          </div>
+          <div class="fxeq" id="fxeq" role="group" aria-label="Equaliser" data-i18n-aria="fx_eq" hidden>
+            <label for="eqlow" data-i18n="eq_low">Low</label><input id="eqlow" type="range" min="-12" max="12" step="1" value="0"><output id="eqlowval" for="eqlow">0 dB</output>
+            <label for="eqmid" data-i18n="eq_mid">Mid</label><input id="eqmid" type="range" min="-12" max="12" step="1" value="0"><output id="eqmidval" for="eqmid">0 dB</output>
+            <label for="eqhigh" data-i18n="eq_high">High</label><input id="eqhigh" type="range" min="-12" max="12" step="1" value="0"><output id="eqhighval" for="eqhigh">0 dB</output>
+          </div>
+          <p class="hint" id="fxhint">Changes the sound for everyone in the channel; the track goes on from where it is.</p>
         </div>
         <div class="offset" id="syncpanel" role="group" aria-label="Sync offset" data-i18n-aria="sync_panel" hidden>
           <span class="hud" style="color:var(--accent-3)" data-i18n="offset">Offset</span>
@@ -1443,13 +1478,30 @@ html.demo-embedded .demo-ribbon { display: none; }
       loop_aria_track: "Loop: track. Switch to loop queue",
       loop_aria_queue: "Loop: queue. Switch to loop off",
       volume: "Volume",
-      vol_title: "Volume (for everyone in the channel)",
+      vol_title: "Volume and filter (for everyone in the channel)",
       vol_aria: "Volume in percent",
       vol_muted: "Muted",
       vol_normal: "100 percent, normal level",
       vol_pct: "{n} percent",
       vol_reset: "Reset volume to 100 percent",
       vol_hint: "Volume of the bot for everyone in the channel, saved for this server. 100% is the normal level; above it, loud tracks are softly limited.",
+      fx: "Filter",
+      fx_off: "Off",
+      fx_bassboost: "Bass boost",
+      fx_nightcore: "Nightcore",
+      fx_nightcore_opt: "Nightcore (1.25×)",
+      fx_vaporwave: "Vaporwave",
+      fx_vaporwave_opt: "Vaporwave (0.8×)",
+      fx_8d: "8D",
+      fx_karaoke: "Karaoke",
+      fx_soft: "Soft",
+      fx_eq: "Equaliser",
+      eq_low: "Low",
+      eq_mid: "Mid",
+      eq_high: "High",
+      eq_db: "{n} dB",
+      fx_hint: "Changes the sound for everyone in the channel; the track goes on from where it is.",
+      fx_hint_speed: "Plays {r}× as fast, pitch included, for everyone in the channel. The video, the progress bar and the lyrics follow.",
       autoplay: "Autoplay",
       autoplay_title: "Keep playing related tracks when the queue runs out (for everyone in the channel)",
       ap_badge: "📻 Autoplay",
@@ -1656,13 +1708,30 @@ html.demo-embedded .demo-ribbon { display: none; }
       loop_aria_track: "Boucle : titre. Passer à la boucle sur la file d’attente",
       loop_aria_queue: "Boucle : file d’attente. Désactiver la boucle",
       volume: "Volume",
-      vol_title: "Volume (pour tout le salon)",
+      vol_title: "Volume et filtre (pour tout le salon)",
       vol_aria: "Volume en pourcentage",
       vol_muted: "Coupé",
       vol_normal: "100 pour cent, niveau normal",
       vol_pct: "{n} pour cent",
       vol_reset: "Remettre le volume à 100 pour cent",
       vol_hint: "Volume du bot pour tout le salon, enregistré pour ce serveur. 100 % est le niveau normal ; au-delà, les titres forts sont légèrement limités.",
+      fx: "Filtre",
+      fx_off: "Aucun",
+      fx_bassboost: "Basses renforcées",
+      fx_nightcore: "Nightcore",
+      fx_nightcore_opt: "Nightcore (×1,25)",
+      fx_vaporwave: "Vaporwave",
+      fx_vaporwave_opt: "Vaporwave (×0,8)",
+      fx_8d: "8D",
+      fx_karaoke: "Karaoké",
+      fx_soft: "Doux",
+      fx_eq: "Égaliseur",
+      eq_low: "Graves",
+      eq_mid: "Médiums",
+      eq_high: "Aigus",
+      eq_db: "{n} dB",
+      fx_hint: "Change le son pour tout le salon ; le titre continue là où il en est.",
+      fx_hint_speed: "Lecture ×{r}, hauteur comprise, pour tout le salon. La vidéo, la barre de progression et les paroles suivent.",
       autoplay: "Lecture automatique",
       autoplay_title: "Continuer avec des titres similaires quand la file d’attente est vide (pour tout le salon)",
       ap_badge: "📻 Lecture automatique",
@@ -2165,6 +2234,9 @@ html.demo-embedded .demo-ribbon { display: none; }
   let lastQueueSig = "";
   let inVoice = true, paused = false, canPrev = false, xfade = false, loopMode = "off", queueLen = 0, autoplay = false;
   let vol = 100, volHold = 0, volTimer = null, volAgain = false;
+  // Audio filter: a speed preset plays the file `rate` times as fast, so
+  // the clock (file time) runs at that rate and the video plays at it too.
+  let fx = "off", eq = { low: 0, mid: 0, high: 0 }, rate = 1, fxHold = 0, eqTimer = null, fxAgain = false;
   // False on a view-only link (state `can_control`): controls are hidden and
   // never sent (the server would refuse them with 403 anyway).
   let canControl = true;
@@ -2264,6 +2336,58 @@ html.demo-embedded .demo-ribbon { display: none; }
   });
   showVolume();
   langListeners.push(showVolume);
+
+  // ---- audio filter (server-wide; the track restarts where it is, so EQ
+  // drags are debounced into one request)
+  const FX = ["off", "bassboost", "nightcore", "vaporwave", "8d", "karaoke", "soft", "eq"];
+  const FX_RATE = { nightcore: 1.25, vaporwave: 0.8 };
+  const BANDS = ["low", "mid", "high"];
+  const signed = (v) => (v > 0 ? "+" : v < 0 ? "\u2212" : "") + nf(Math.abs(v));
+  function showFilter() {
+    const pick = $("fxpick");
+    if (pick.value !== fx) pick.value = fx;
+    pick.disabled = !canControl;
+    $("fxeq").hidden = fx !== "eq";
+    for (const b of BANDS) {
+      const el = $("eq" + b), v = eq[b];
+      if (+el.value !== v) el.value = v;
+      const txt = t("eq_db", { n: signed(v) });
+      $("eq" + b + "val").textContent = txt;
+      el.setAttribute("aria-valuetext", txt);
+    }
+    const on = fx !== "off";
+    $("fxbadge").textContent = on ? " " + t("fx_" + fx) : "";
+    $("fxbadge").hidden = !on;
+    $("voltoggle").classList.toggle("fxon", on);
+    const r = FX_RATE[fx] || 1;
+    $("fxhint").textContent = r !== 1 ? t("fx_hint_speed", { r: nf(r) }) : t("fx_hint");
+  }
+  async function flushFilter() {
+    eqTimer = null;
+    if (pending.has("filter")) { fxAgain = true; return; } // one request at a time
+    const body = { preset: fx };
+    if (fx === "eq") body.eq = Object.assign({}, eq);
+    const ok = await send("filter", body);
+    if (!ok) fxHold = 0; // let the server's value come back
+    if (fxAgain) { fxAgain = false; flushFilter(); }
+  }
+  function setFilter(name, delay) {
+    if (!canControl || !FX.includes(name)) return;
+    fx = name;
+    fxHold = Date.now() + VOL_HOLD_MS; // polls must not fight the picker
+    showFilter();
+    clearTimeout(eqTimer);
+    eqTimer = setTimeout(flushFilter, delay);
+  }
+  $("fxpick").addEventListener("change", (e) => setFilter(e.target.value, 0));
+  for (const b of BANDS) {
+    $("eq" + b).addEventListener("input", (e) => {
+      eq[b] = Math.max(-12, Math.min(12, Math.round(parseFloat(e.target.value) || 0)));
+      setFilter("eq", 400);
+    });
+  }
+  showFilter();
+  langListeners.push(showFilter);
 
   // ---- fullscreen
   $("fs").addEventListener("click", () => {
@@ -2595,7 +2719,7 @@ html.demo-embedded .demo-ribbon { display: none; }
   // ---- sync
   function targetPos() {
     if (!state) return 0;
-    let pos = baseElapsed + (paused ? 0 : (performance.now() - anchor) / 1000 + offset);
+    let pos = baseElapsed + (paused ? 0 : ((performance.now() - anchor) / 1000 + offset) * rate);
     if (state.end) pos = Math.min(pos, state.end);
     return Math.max(0, pos);
   }
@@ -2665,7 +2789,8 @@ html.demo-embedded .demo-ribbon { display: none; }
     if (video.dataset.dissolve) {
       delete video.dataset.dissolve;
       // What is left of the audio overlap (the page may learn of it late).
-      const left = Math.max(0.4, XFADE_S - Math.max(0, targetPos() - (state ? state.start : 0)));
+      // Both are file time; the dissolve runs in wall time.
+      const left = Math.max(0.4, (XFADE_S - Math.max(0, targetPos() - (state ? state.start : 0))) / rate);
       void video.offsetWidth; // commit opacity 0 before animating
       video.style.transition = "opacity " + left.toFixed(2) + "s linear";
       video.classList.remove("dissolving");
@@ -2698,7 +2823,7 @@ html.demo-embedded .demo-ribbon { display: none; }
     if (paused) {
       if (dissolveTimer) endDissolve(); // a pause cuts the crossfade short
       if (!video.paused) video.pause();
-      video.playbackRate = 1;
+      video.playbackRate = rate;
       if (Math.abs(video.currentTime - targetPos()) > 0.3) { try { video.currentTime = targetPos(); } catch (e) {} }
       setLive(false, "live_pause");
       return;
@@ -2709,11 +2834,11 @@ html.demo-embedded .demo-ribbon { display: none; }
     const abs = Math.abs(drift);
     if (abs > HARD_SEEK) {
       try { video.currentTime = target; } catch (e) {}
-      video.playbackRate = 1;
+      video.playbackRate = rate;
     } else if (abs > NUDGE_MIN) {
-      video.playbackRate = drift > 0 ? 0.95 : 1.05;
-    } else if (abs <= NUDGE_STOP || video.playbackRate === 1) {
-      video.playbackRate = 1;
+      video.playbackRate = rate * (drift > 0 ? 0.95 : 1.05);
+    } else if (abs <= NUDGE_STOP || video.playbackRate === rate) {
+      video.playbackRate = rate;
     }
     setLive(abs <= HARD_SEEK && !video.paused);
   }
@@ -2740,7 +2865,7 @@ html.demo-embedded .demo-ribbon { display: none; }
     }
   }
   function curElapsed() {
-    return Math.min(state.end || Infinity, baseElapsed + (paused ? 0 : (performance.now() - anchor) / 1000));
+    return Math.min(state.end || Infinity, baseElapsed + (paused ? 0 : (performance.now() - anchor) / 1000 * rate));
   }
 
   // ---- seek bar (click, drag, touch, keyboard)
@@ -3399,6 +3524,13 @@ html.demo-embedded .demo-ribbon { display: none; }
       showVolume();
     }
     if (!pending.has("autoplay")) autoplay = !!d.autoplay;
+    if (FX.includes(d.filter) && !eqTimer && !pending.has("filter") && Date.now() > fxHold) {
+      fx = d.filter;
+      if (d.eq) for (const b of BANDS) if (Number.isInteger(d.eq[b])) eq[b] = d.eq[b];
+    }
+    showFilter();
+    // Older servers send no rate: 1x.
+    rate = typeof d.rate === "number" && isFinite(d.rate) && d.rate > 0 ? Math.min(4, Math.max(0.25, d.rate)) : 1;
     showEmptyQueue();
     lyrAvail = d.lyrics === true; // false when the bot runs with LYRICS=0
     $("lyrbtn").hidden = !lyrAvail;
@@ -3456,7 +3588,7 @@ html.demo-embedded .demo-ribbon { display: none; }
     state = { duration: np.duration, start: start, end: end };
     $("tdur").textContent = fmt(end ? end - start : null);
     $("progline").hidden = false;
-    baseElapsed = (np.elapsed || 0) + (paused ? 0 : latency);
+    baseElapsed = (np.elapsed || 0) + (paused ? 0 : latency * rate);
     anchor = performance.now();
     updateNow();
     if (np.id !== curId) loadTrack(np, !!d.crossfading);

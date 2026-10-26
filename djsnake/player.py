@@ -45,6 +45,13 @@ class MusicPlayer:
         self.crossfade = False  # Session setting, shared by everyone
         self.loop = "off"  # Session setting: "off", "track" or "queue"
         self.mixer = None  # CrossfadeMixer handed to the voice client
+        # Audio filter (session setting, see filters.py): a FILTER_PRESETS
+        # name and the band gains of the `eq` preset. `rate` is the speed of
+        # the playing segment (file seconds per wall second; 1.0 unless a
+        # speed preset played it): elapsed() scales by it.
+        self.filter = "off"
+        self.eq = {band: 0 for band in config.EQ_BANDS}
+        self.rate = 1.0
         # Status panel: the one message of the session that is edited in place.
         self.panel_message = None
         self.panel_text = None  # What the message currently shows
@@ -123,16 +130,29 @@ class MusicPlayer:
     def in_voice(self):
         return bool(self.voice_client and self.voice_client.is_connected())
 
-    def elapsed(self):
+    def _raw_elapsed(self):
+        """Wall seconds since started_at (= now - start offset), pauses
+        excluded: the file time at rate 1."""
         if self.started_at is None:
             return None
         end = self.paused_at if self.paused_at is not None else time.monotonic()
-        return max(0.0, end - self.started_at - self.paused_total)
+        return end - self.started_at - self.paused_total
+
+    def elapsed(self):
+        """Position in the file (seconds). The segment started at file time
+        `play_offset` and runs at `rate` file seconds per wall second."""
+        raw = self._raw_elapsed()
+        if raw is None:
+            return None
+        if self.rate != 1.0:
+            raw = self.play_offset + (raw - self.play_offset) * self.rate
+        return max(0.0, raw)
 
     def played_seconds(self):
-        """How long now_playing has really played, across seeks."""
-        elapsed = self.elapsed()
-        segment = 0.0 if elapsed is None else max(0.0, elapsed - self.play_offset)
+        """How long now_playing has really played (wall time), across seeks
+        and filter changes."""
+        raw = self._raw_elapsed()
+        segment = 0.0 if raw is None else max(0.0, raw - self.play_offset)
         return self.play_accum + segment
 
     def mark_started(self, offset, same_track):
