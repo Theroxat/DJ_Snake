@@ -30,7 +30,7 @@
 - **SoundCloud, Bandcamp, Deezer and Apple Music links.** SoundCloud and Bandcamp tracks and sets play directly (the page shows the artwork); Deezer and Apple Music tracks, albums and playlists are matched on YouTube like Spotify, with no account or API key (see [More sources](docs/source/sources.md)).
 - **Spotify playlists, albums and tracks.** Paste a link and the bot finds every song on YouTube, preferring the official music video, with no Spotify account or API key needed (see [Spotify links](#spotify-links)).
 - YouTube URLs and playlists. Tracks are fully downloaded before they play (no streaming).
-- **Live streams**: YouTube lives, Twitch channels and internet radios (Icecast, Shoutcast, `.m3u8`, `.pls`, `.m3u`) play as they come, with a LIVE badge on the clip page (see [Live streams](docs/source/sources.md#live-streams)).
+- **Live streams**: YouTube lives, Twitch channels and internet radios (Icecast, Shoutcast, `.pls`, `.m3u`) play as they come, with a LIVE badge on the clip page (see [Live streams](docs/source/sources.md#live-streams)).
 - Independent queue per server.
 - Live clip page: muted video synced with the audio, plus web controls (next, previous, pause, resume, seek, jump, remove, reorder, add, shuffle, loop).
 - Automix, always on: SponsorBlock `music_offtopic` segments are cut, loudness is normalised to -14 LUFS, leading and trailing silence is trimmed, and tracks fade in and out.

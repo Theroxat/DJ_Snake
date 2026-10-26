@@ -4,7 +4,6 @@ without a download (media.live_*, probe_stream, playback's live path)."""
 import io
 import sqlite3
 import types
-import urllib.error
 
 import pytest
 
@@ -201,8 +200,9 @@ def test_download_media_still_downloads_what_is_not_live(monkeypatch):
 
 
 class FakeResponse(io.BytesIO):
-    def __init__(self, body=b"", ctype="audio/mpeg", **headers):
+    def __init__(self, body=b"", ctype="audio/mpeg", status=200, **headers):
         super().__init__(body)
+        self.status = status
         message = types.SimpleNamespace()
         values = {
             "content-type": ctype,
@@ -218,7 +218,7 @@ def web_of(monkeypatch):
     """Fake the HTTP side of the radio probe: url -> response or exception."""
     pages = {}
 
-    def fake_open(url):
+    def fake_open(url, **kwargs):
         media._check_public(url)
         answer = pages[url]
         if isinstance(answer, Exception):
@@ -228,7 +228,7 @@ def web_of(monkeypatch):
     monkeypatch.setattr(
         media.socket,
         "getaddrinfo",
-        lambda host, port: [
+        lambda host, port=None: [
             (2, 1, 6, "", ("10.1.2.3" if "lan" in host else "93.184.216.34", 0))
         ],
     )
@@ -243,13 +243,26 @@ def test_probe_icecast_stream(web_of):
     assert track["title"] == "FIP" and track["source"] == "radio"
 
 
-def test_probe_hls_and_pls(web_of):
+def test_probe_refuses_hls_and_reads_pls(web_of):
+    """HLS radios are refused: FFmpeg would fetch their segments from any
+    host named in the playlist."""
     hls = "https://radio.example/live.m3u8"
     web_of[hls] = FakeResponse(
         b"#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1\nchunk.m3u8\n",
         ctype="application/vnd.apple.mpegurl",
     )
-    assert media.probe_stream(hls)["stream_url"] == hls
+    with pytest.raises(media.StreamError) as e:
+        media.probe_stream(hls)
+    assert e.value.code == "radio_hls"
+    assert ControlError("radio_hls").status == 400
+    disguised = "https://radio.example/list.m3u"
+    web_of[disguised] = FakeResponse(
+        b"#EXTM3U\n#EXT-X-TARGETDURATION:6\nhttp://10.0.0.1/seg.ts\n",
+        ctype="audio/x-mpegurl",
+    )
+    with pytest.raises(media.StreamError) as e:
+        media.probe_stream(disguised)
+    assert e.value.code == "radio_hls"
     pls = "https://radio.example/station.pls"
     web_of[pls] = FakeResponse(
         b"[playlist]\nFile1=https://cdn.example/a\nTitle1=Groove Salad\n",
@@ -268,9 +281,7 @@ def test_probe_refuses_pages_and_private_hops(web_of):
         media.probe_stream(page)
     assert e.value.code == "not_a_stream"
     hop = "https://radio.example/hop.mp3"
-    web_of[hop] = urllib.error.HTTPError(
-        hop, 302, "Found", {"Location": "http://lan.example/admin"}, None
-    )
+    web_of[hop] = FakeResponse(status=302, location="http://lan.example/admin")
     with pytest.raises(media.StreamError) as e:
         media.probe_stream(hop)
     assert e.value.code == "bad_url"
@@ -295,13 +306,38 @@ def test_icy_title(web_of):
 # --- Playback ---------------------------------------------------------------------
 
 
+async def test_radio_is_piped_and_ffmpeg_may_open_nothing_else(
+    ctx, player, ffmpeg, monkeypatch
+):
+    made = []
+
+    class Spy(media.RadioStream):
+        def __init__(self, url):
+            super().__init__(url)
+            made.append(self)
+
+    monkeypatch.setattr(media, "RadioStream", Spy)
+    await start(ctx, player, live())
+    assert player.voice_client.played == ["fip.mp3"]
+    call = ffmpeg.last
+    assert call["pipe"] is True
+    assert call["before_options"] == "-protocol_whitelist pipe"
+    assert "-reconnect" not in call["before_options"]
+    reader = made[-1]
+    assert reader.name == STREAM and not reader._closed
+    player.mixer.cleanup()
+    assert reader._closed  # The connection goes with the source
+
+
 async def test_live_pipeline_args(ctx, player, ffmpeg):
-    track = live(http_headers={"User-Agent": "Mozilla/5.0 (X11)"})
+    track = live(source="twitch", http_headers={"User-Agent": "Mozilla/5.0 (X11)"})
     await start(ctx, player, track)
     assert player.voice_client.played == ["fip.mp3"]
     before, options = ffmpeg.last["before_options"], ffmpeg.last["options"]
     assert before.startswith(config.LIVE_RECONNECT)
     assert "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5" in before
+    assert "-protocol_whitelist http,https,tcp,tls,crypto" in before
+    assert "pipe" not in before and "file" not in before
     assert "-user_agent 'Mozilla/5.0 (X11)'" in before
     assert "-ss" not in before and "-t " not in before
     assert options.startswith("-vn -af loudnorm=I=-14:TP=-1.5:LRA=11,afade=t=in")
@@ -403,20 +439,20 @@ async def test_radio_title_is_read_while_it_plays(ctx, player, monkeypatch):
     assert player.live_task is None
 
 
-async def test_live_listening_time_is_recorded(ctx, player, media_dir):
+async def test_live_plays_are_not_in_the_stats(ctx, player, media_dir):
+    """Hours of radio would top the charts and inflate the listening time."""
     await start(ctx, player, live(), make_track(media_dir, "B"))
     player.started_at -= 1800  # Half an hour of radio
     player.voice_client.finish()
     await settle()
+    player.voice_client.finish()  # B ends too: the database has a row
+    await settle()
     stats.flush()
     with sqlite3.connect(stats.DB_PATH) as conn:
-        row = conn.execute(
-            "SELECT title, duration, played_seconds, skipped FROM plays"
-        ).fetchone()
-    assert row[0] == "FIP" and row[1] is None and row[2] >= 1800 and row[3] == 0
+        titles_in_db = [r[0] for r in conn.execute("SELECT title FROM plays")]
+    assert "FIP" not in titles_in_db
     summary = stats.summary(1, "week")
-    assert summary["totals"]["hours"] > 0
-    assert summary["top_tracks"][0]["title"] == "FIP"
+    assert all(t["title"] != "FIP" for t in summary["top_tracks"])
 
 
 # --- Adding ---------------------------------------------------------------------
@@ -480,3 +516,206 @@ async def test_autoplay_never_seeds_from_a_live(ctx, player):
     await start(ctx, player, live(video_id="dQw4w9WgXcQ"))
     assert _autoplay_seed(player) is None
     assert state.music_players[1] is player
+
+
+# --- SSRF hardening ---------------------------------------------------------------
+
+
+def addrinfo(*ips):
+    return [(2, 1, 6, "", (ip, 0)) for ip in ips]
+
+
+@pytest.mark.parametrize(
+    "ips",
+    [
+        ("127.0.0.1",),
+        ("10.0.0.7",),
+        ("169.254.169.254",),
+        ("172.18.0.3",),  # A Compose network (pot-provider)
+        ("93.184.216.34", "192.168.1.10"),  # One private answer is enough
+        ("::1",),
+        ("fd00::1",),
+    ],
+)
+def test_private_resolutions_are_refused(monkeypatch, ips):
+    monkeypatch.setattr(media.socket, "getaddrinfo", lambda h, p=None: addrinfo(*ips))
+    with pytest.raises(media.StreamError) as e:
+        media._resolve_public("radio.example", 443)
+    assert e.value.code == "bad_url"
+
+
+def test_connection_is_pinned_to_the_checked_address(monkeypatch):
+    """DNS rebinding: the name resolves to a public address for the check and
+    to a private one afterwards. The bot resolves once and connects to the
+    address it checked, so the second answer is never used."""
+    answers = [addrinfo("93.184.216.34"), addrinfo("127.0.0.1")]
+    lookups, connects = [], []
+
+    def getaddrinfo(host, port=None):
+        lookups.append(host)
+        return answers[min(len(lookups) - 1, 1)]
+
+    def create_connection(address, timeout=None):
+        connects.append(address)
+        raise OSError("stop here")
+
+    monkeypatch.setattr(media.socket, "getaddrinfo", getaddrinfo)
+    monkeypatch.setattr(media.socket, "create_connection", create_connection)
+    with pytest.raises(OSError):
+        media._request("http://rebind.example/stream.mp3")
+    assert lookups == ["rebind.example"]
+    assert connects == [("93.184.216.34", 80)]
+
+
+def test_redirects_to_private_hosts_are_refused(web_of):
+    for location in (
+        "http://169.254.169.254/latest/meta-data",
+        "http://127.0.0.1:47823/",
+        "file:///etc/passwd",
+    ):
+        hop = "https://radio.example/hop.mp3"
+        web_of[hop] = FakeResponse(status=302, location=location)
+        with pytest.raises(media.StreamError) as e:
+            media.probe_stream(hop)
+        assert e.value.code in ("bad_url", "stream_unreachable"), location
+
+
+def test_pot_provider_name_resolving_privately_is_refused(monkeypatch):
+    monkeypatch.setattr(
+        media.socket, "getaddrinfo", lambda h, p=None: addrinfo("172.18.0.2")
+    )
+    with pytest.raises(media.StreamError) as e:
+        media._check_public("http://pot-provider:4416/x.mp3")
+    assert e.value.code == "bad_url"
+
+
+def test_yt_dlp_live_urls_on_private_ips_are_refused():
+    with pytest.raises(RuntimeError):
+        media.check_live_url("http://10.0.0.1/live.m3u8")
+    with pytest.raises(RuntimeError):
+        media.check_live_url("file:///etc/passwd")
+    assert media.check_live_url("https://cdn.example/a.m3u8")
+
+
+class FakeSock:
+    def __init__(self, chunks=()):
+        self.chunks, self.sent, self.closed = list(chunks), b"", False
+
+    def settimeout(self, value):
+        self.timeout = value
+
+    def recv(self, size):
+        return self.chunks.pop(0) if self.chunks else b""
+
+    def sendall(self, data):
+        self.sent += data
+
+    def shutdown(self, how):
+        pass
+
+    def close(self):
+        self.closed = True
+
+
+def test_request_speaks_http_1_0_and_reads_icy(monkeypatch):
+    monkeypatch.setattr(
+        media.socket, "getaddrinfo", lambda h, p=None: addrinfo("93.184.216.34")
+    )
+    sock = FakeSock(
+        [b"ICY 200 OK\r\nicy-name: FIP\r\ncontent-type: audio/mpeg\r\n\r\nabc"]
+    )
+    monkeypatch.setattr(media.socket, "create_connection", lambda a, timeout=None: sock)
+    response = media._request("http://radio.example:8000/;", icy=True)
+    assert response.status == 200 and response.headers.get("icy-name") == "FIP"
+    assert response.read(10) == b"abc"
+    assert sock.sent.startswith(b"GET /; HTTP/1.0\r\nHost: radio.example:8000\r\n")
+    assert b"Icy-MetaData: 1" in sock.sent
+
+
+def test_reads_stop_at_the_deadline():
+    response = media._Response(FakeSock([b"x"] * 100), 200, None, b"", deadline=0.0)
+    with pytest.raises(TimeoutError):
+        response.read(10)
+
+
+def test_icy_title_has_an_overall_deadline(monkeypatch):
+    calls = []
+
+    def slow_follow(url, icy=True, deadline=None, opener=None):
+        calls.append(deadline)
+        raise TimeoutError("radio request deadline")
+
+    monkeypatch.setattr(media, "_follow", slow_follow)
+    assert media.read_icy_title(STREAM) is None
+    assert calls and calls[0] is not None
+
+
+def test_radio_stream_reconnects_then_gives_up(monkeypatch):
+    monkeypatch.setattr(media.time, "sleep", lambda s: None)
+    monkeypatch.setattr(media, "LIVE_STREAM_RECONNECTS", 2)
+    opened = []
+
+    def stream_open(url, icy=False, deadline=None):
+        opened.append((url, icy))
+        if len(opened) == 1:
+            return FakeResponse(b"audio")
+        raise OSError("down")
+
+    monkeypatch.setattr(media, "_stream_open", stream_open)
+    reader = media.RadioStream(STREAM)
+    assert reader.read(5) == b"audio"
+    assert reader.read(5) == b""  # Ended, reconnects failed
+    assert opened[0] == (STREAM, False)  # No ICY metadata in the audio
+    assert len(opened) == 3
+
+
+def test_radio_stream_redirect_is_checked_again(monkeypatch):
+    monkeypatch.setattr(media.time, "sleep", lambda s: None)
+    monkeypatch.setattr(media, "LIVE_STREAM_RECONNECTS", 0)
+    monkeypatch.setattr(
+        media,
+        "_stream_open",
+        lambda url, **kw: FakeResponse(status=301, location="http://10.0.0.1/a.mp3"),
+    )
+    assert media.RadioStream(STREAM).read(5) == b""
+
+
+async def test_expired_live_url_is_extracted_again(ctx, player, ffmpeg, monkeypatch):
+    seen = []
+
+    def resolve(url):
+        seen.append(url)
+        return media.live_track(url, "https://cdn.example/fresh.m3u8", "T", "twitch")
+
+    monkeypatch.setattr(media, "resolve_live", resolve)
+    track = live(source="twitch")
+    track["url"] = "https://www.twitch.tv/somechannel"
+    track["resolved_at"] -= config.LIVE_REFRESH_SECONDS + 1
+    await start(ctx, player, track)
+    assert seen == ["https://www.twitch.tv/somechannel"]
+    assert ffmpeg.calls and track["stream_url"] == "https://cdn.example/fresh.m3u8"
+
+
+async def test_fresh_live_and_radio_urls_are_not_extracted_again(
+    ctx, player, monkeypatch
+):
+    seen = []
+    monkeypatch.setattr(media, "resolve_live", lambda url: seen.append(url))
+    old_radio = live()
+    old_radio["resolved_at"] -= 3600
+    await start(ctx, player, live(source="twitch"))
+    await controls.control_next(player)
+    player.queue.append(old_radio)
+    await settle()
+    assert seen == []
+
+
+async def test_live_limit_does_not_count_pauses(ctx, player, media_dir, monkeypatch):
+    monkeypatch.setattr(config, "LIVE_MAX_HOURS", 0.3 / 3600)
+    await start(ctx, player, live(source="twitch"), make_track(media_dir, "B"))
+    await controls.control_pause(player)
+    await settle(0.5)  # Longer than the limit, but paused
+    assert player.now_playing["live"]
+    await controls.control_resume(player)
+    await settle(0.6)
+    assert player.now_playing["title"] == "B"

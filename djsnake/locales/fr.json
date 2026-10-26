@@ -235,6 +235,7 @@
   "action.live_limit": "⏹️ Direct arrêté au bout de {hours} h",
   "control.live_no_seek": "Impossible de se déplacer dans un direct.",
   "control.not_a_stream": "Ce lien n’est pas un flux audio lisible par le bot.",
+  "control.radio_hls": "Les radios en HLS (.m3u8) ne sont pas prises en charge : utiliser le lien direct MP3, AAC ou Ogg de la station.",
   "control.stream_unreachable": "Impossible de joindre ce flux.",
   "filter.name.off": "aucun",
   "filter.name.bassboost": "Basses renforcées",

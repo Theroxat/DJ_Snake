@@ -235,6 +235,7 @@
   "action.live_limit": "⏹️ Live stream stopped after {hours} h",
   "control.live_no_seek": "A live stream has no position to seek to.",
   "control.not_a_stream": "This link is not an audio stream the bot can play.",
+  "control.radio_hls": "HLS radio streams (.m3u8) are not supported: use the station's direct MP3, AAC or Ogg stream link.",
   "control.stream_unreachable": "Could not reach this stream.",
   "filter.name.off": "off",
   "filter.name.bassboost": "Bass boost",

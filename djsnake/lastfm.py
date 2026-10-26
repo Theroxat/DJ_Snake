@@ -251,6 +251,9 @@ def track_started(player):
     try:
         if not enabled():
             return
+        if (player.now_playing or {}).get("live"):
+            player.lastfm_listeners = set()  # A live stream is not scrobbled
+            return
         player.lastfm_listeners = listeners(player)
         info = track_info(player.now_playing)
         if not info or not player.lastfm_listeners:

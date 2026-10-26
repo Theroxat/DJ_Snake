@@ -1,7 +1,6 @@
 """YouTube media: URL parsing, yt-dlp search and download, automix analysis
 and FFmpeg playback options. Everything blocking here runs in an executor."""
 
-import http.client
 import ipaddress
 import json
 import math
@@ -12,8 +11,6 @@ import shlex
 import socket
 import subprocess
 import time
-import urllib.error
-import urllib.request
 from urllib.parse import parse_qs, urljoin, urlparse, urlsplit
 
 import yt_dlp
@@ -29,10 +26,15 @@ from .config import (
     EXTRACTOR_ARGS,
     FADE_IN_SECONDS,
     FADE_OUT_SECONDS,
+    LIVE_ICY_DEADLINE,
     LIVE_ICY_MAX_METAINT,
     LIVE_PLAYLIST_MAX_BYTES,
+    LIVE_PROBE_DEADLINE,
     LIVE_PROBE_TIMEOUT,
+    LIVE_PROTOCOLS,
     LIVE_RECONNECT,
+    LIVE_STREAM_RECONNECTS,
+    LIVE_STREAM_TIMEOUT,
     LOUDNORM_KEYS,
     LOUDNORM_TARGET,
     MAX_LEADING_TRIM,
@@ -907,6 +909,9 @@ def live_track(url, stream_url, title, source, **fields):
         "channel": None,
         "source": source,
         "live_title": None,  # A radio's current ICY StreamTitle
+        # When stream_url was read (YouTube/Twitch URLs expire, see
+        # playback.refresh_live_url)
+        "resolved_at": time.monotonic(),
     }
     track.update(fields)
     return track
@@ -922,7 +927,7 @@ def live_from_info(info, url):
         raise RuntimeError("No playable format for this live stream")
     return live_track(
         info.get("webpage_url") or url,
-        fmt["url"],
+        check_live_url(fmt["url"]),
         info.get("fulltitle") or info.get("title"),
         source_of(url),
         http_headers=dict(fmt.get("http_headers") or info.get("http_headers") or {}),
@@ -933,15 +938,124 @@ def live_from_info(info, url):
 
 
 def live_options(track):
-    """FFmpeg options for a live item: reconnect on network errors, audio
-    only, a one-pass loudnorm (no measurement is possible) and a short
-    fade-in. No -ss/-t: it plays until it ends or is skipped."""
-    before = LIVE_RECONNECT
+    """FFmpeg options for a live item: audio only, a one-pass loudnorm (no
+    measurement is possible) and a short fade-in. No -ss/-t: it plays until
+    it ends or is skipped. A radio comes through a pipe (RadioStream) and
+    FFmpeg may open nothing but that pipe; a YouTube/Twitch live is read by
+    FFmpeg itself, reconnecting on errors, restricted to HTTP(S) and HLS."""
+    filters = f"loudnorm={LOUDNORM_TARGET},afade=t=in:st=0:d={FADE_IN_SECONDS:.3f}"
+    options = f"-vn -af {filters}"
+    if track.get("source") == "radio":
+        return {"before_options": "-protocol_whitelist pipe", "options": options}
+    before = f"{LIVE_RECONNECT} -protocol_whitelist {LIVE_PROTOCOLS}"
     agent = (track.get("http_headers") or {}).get("User-Agent")
     if agent:
         before += f" -user_agent {shlex.quote(str(agent))}"
-    filters = f"loudnorm={LOUDNORM_TARGET},afade=t=in:st=0:d={FADE_IN_SECONDS:.3f}"
-    return {"before_options": before, "options": f"-vn -af {filters}"}
+    return {"before_options": before, "options": options}
+
+
+def check_live_url(url):
+    """A yt-dlp stream URL FFmpeg may open: http(s), and not an IP literal
+    outside the public internet. Raises RuntimeError."""
+    parsed = urlparse(str(url or ""))
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise RuntimeError("Unexpected live stream URL")
+    try:
+        if not ipaddress.ip_address(parsed.hostname.strip("[]")).is_global:
+            raise RuntimeError("Live stream URL on a private address")
+    except ValueError:
+        pass  # A host name (the platform's CDN)
+    return url
+
+
+def resolve_live(url):
+    """Extract a YouTube live or Twitch channel again (no download): its
+    stream URL expires, so it is read just before it plays. Returns a fresh
+    live item; raises when it is not live (any more) or cannot be read.
+    Blocking: run it in an executor."""
+    ydl_opts = {
+        "format": "bestaudio/best",
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "remote_components": REMOTE_COMPONENTS,
+        "extractor_args": EXTRACTOR_ARGS,
+        **cookies.options(),
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+    if not info or not is_live_info(info):
+        raise RuntimeError("Not live any more")
+    return live_from_info(info, url)
+
+
+class RadioStream:
+    """File-like reader of an internet radio, handed to FFmpeg's stdin
+    (`FFmpegPCMAudio(..., pipe=True)`). It connects on the first read (on
+    discord.py's pipe thread, never on the event loop), each connection
+    pinned to an address checked by _resolve_public() and each redirect
+    checked again, asks no ICY metadata (the audio stays clean), and
+    reconnects after an error or a silent LIVE_STREAM_TIMEOUT, giving up
+    (end of stream) after LIVE_STREAM_RECONNECTS failures in a row."""
+
+    def __init__(self, url):
+        self.name = url  # What logs and tests show
+        self._url = url
+        self._response = None
+        self._closed = False
+        self._failures = 0
+
+    def _connect(self):
+        _, response = _follow(self._url, icy=False, opener=_stream_open)
+        return response
+
+    def read(self, size=-1):
+        size = 65536 if size is None or size < 0 else size
+        while not self._closed:
+            if self._response is None:
+                try:
+                    self._response = self._connect()
+                except Exception as e:
+                    if not self._retry(e):
+                        return b""
+                    continue
+            try:
+                data = self._response.read(size)
+            except Exception as e:
+                data, error = b"", e
+            else:
+                error = None
+            if data:
+                self._failures = 0
+                return data
+            response, self._response = self._response, None
+            if response is not None:
+                response.close()
+            if not self._retry(error or "stream ended"):
+                return b""
+        return b""
+
+    def _retry(self, reason):
+        """Count a failure; False once the stream should end."""
+        if self._closed:
+            return False
+        self._failures += 1
+        if self._failures > LIVE_STREAM_RECONNECTS:
+            print(f"Radio stream gave up after {self._failures - 1} reconnects")
+            return False
+        print(f"Radio stream: reconnecting ({type(reason).__name__})")
+        time.sleep(min(5, self._failures))
+        return not self._closed
+
+    def close(self):
+        self._closed = True
+        response, self._response = self._response, None
+        if response is not None:
+            response.close()
+
+
+def _stream_open(url, icy=False, deadline=None):
+    return _request(url, icy=icy, deadline=deadline, timeout=LIVE_STREAM_TIMEOUT)
 
 
 # --- Internet radio links ----------------------------------------------------
@@ -987,8 +1101,8 @@ _RADIO_PATH_RE = re.compile(
 
 
 def parse_radio_url(url, check_path=True):
-    """A link that may be an internet radio (Icecast, Shoutcast, HLS, .pls or
-    .m3u): http(s), no credentials, not a host with its own parser, not a
+    """A link that may be an internet radio (Icecast, Shoutcast, .pls or
+    .m3u; an HLS .m3u8 is accepted here and refused by probe_stream): http(s), no credentials, not a host with its own parser, not a
     private IP, and a path that looks like a stream (_RADIO_PATH_RE). Returns
     the cleaned URL or None. probe_stream() then checks the content type and
     refuses hosts that resolve to private addresses. Redirects and playlist
@@ -1020,34 +1134,209 @@ def parse_radio_url(url, check_path=True):
     return url
 
 
-def _check_public(url):
-    """Refuse a host that resolves to a private, loopback or reserved
-    address: the bot must not be used to reach its own network."""
-    host = urlparse(url).hostname or ""
+def _resolve_public(host, port):
+    """The address to connect to for `host`: every address it resolves to
+    must be public (global), else StreamError("bad_url"): the bot must not be
+    used to reach its own network (pot-provider, cloud metadata, the LAN).
+    The caller then connects to that very address (no second resolution, so
+    a DNS rebinding between the check and the connection cannot happen)."""
+    host = (host or "").strip("[]")
     try:
-        infos = socket.getaddrinfo(host, None)
+        infos = socket.getaddrinfo(host, port)
     except OSError:
         raise StreamError("stream_unreachable")
+    addresses = []
     for info in infos:
-        address = ipaddress.ip_address(str(info[4][0]).split("%")[0])
+        try:
+            address = ipaddress.ip_address(str(info[4][0]).split("%")[0])
+        except ValueError:
+            raise StreamError("bad_url")
         if not address.is_global:
             raise StreamError("bad_url")
+        addresses.append(str(address))
+    if not addresses:
+        raise StreamError("stream_unreachable")
+    return addresses[0]
 
 
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, *args, **kwargs):
-        return None  # Each hop is checked by probe_stream itself
+def _check_public(url):
+    """Refuse a URL whose host resolves to a non-public address. Returns the
+    checked address."""
+    parsed = urlparse(url)
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    return _resolve_public(parsed.hostname, port)
 
 
-_radio_opener = urllib.request.build_opener(_NoRedirect)
+class _Headers:
+    """The response headers (lower-case names, the first value wins)."""
+
+    def __init__(self, pairs):
+        self._values = {}
+        for name, value in pairs:
+            self._values.setdefault(name.lower(), value)
+
+    def get(self, name, default=None):
+        return self._values.get(name.lower(), default)
+
+    def get_content_type(self):
+        value = self.get("content-type") or ""
+        return value.split(";")[0].strip().lower() or "application/octet-stream"
 
 
-def _open(url):
-    """GET `url` after the address check. Returns the response; a redirect
-    raises urllib.error.HTTPError (3xx)."""
-    _check_public(url)
-    request = urllib.request.Request(url, headers=_RADIO_HEADERS)
-    return _radio_opener.open(request, timeout=LIVE_PROBE_TIMEOUT)
+_STATUS_RE = re.compile(rb"^(?:HTTP/\d(?:\.\d)?|ICY)\s+(\d{3})")
+_MAX_HEADER_BYTES = 32 * 1024
+
+
+class _Response:
+    """A minimal HTTP/1.0 (or Shoutcast "ICY") response read from a socket
+    connected to an address checked by _resolve_public(). `deadline` (a
+    time.monotonic() value, or None) bounds every read."""
+
+    def __init__(self, sock, status, headers, buffered, deadline=None, timeout=None):
+        self._sock, self.status, self.headers = sock, status, headers
+        self._buffer, self._deadline = buffered, deadline
+        self._timeout = timeout or LIVE_PROBE_TIMEOUT
+
+    def _recv(self, size):
+        timeout = self._timeout
+        if self._deadline is not None:
+            left = self._deadline - time.monotonic()
+            if left <= 0:
+                raise TimeoutError("radio request deadline")
+            timeout = min(timeout, left)
+        self._sock.settimeout(timeout)
+        return self._sock.recv(size)
+
+    def read(self, size=-1):
+        """Up to `size` bytes (all of it with -1: only for small bodies)."""
+        if size is None or size < 0:
+            chunks = [self._buffer]
+            self._buffer = b""
+            while True:
+                chunk = self._recv(65536)
+                if not chunk:
+                    return b"".join(chunks)
+                chunks.append(chunk)
+        if self._buffer:
+            data, self._buffer = self._buffer[:size], self._buffer[size:]
+            return data
+        return self._recv(size)
+
+    def close(self):
+        sock, self._sock = self._sock, None
+        if sock is not None:
+            try:
+                sock.shutdown(socket.SHUT_RDWR)  # Wakes a reader thread
+            except OSError:
+                pass
+            sock.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+        return False
+
+
+def _request(url, icy=False, deadline=None, timeout=None):
+    """GET `url` with the connection pinned to its checked public address:
+    HTTP/1.0 (no chunked body), TLS with SNI and certificate checks for
+    https, no redirect followed (a 3xx comes back as is). Returns a
+    _Response; raises StreamError or OSError."""
+    import ssl
+
+    parsed = urlsplit(url)
+    host = parsed.hostname or ""
+    https = parsed.scheme == "https"
+    port = parsed.port or (443 if https else 80)
+    address = _resolve_public(host, port)
+    connect_timeout = timeout or LIVE_PROBE_TIMEOUT
+    if deadline is not None:
+        connect_timeout = max(0.1, min(connect_timeout, deadline - time.monotonic()))
+    sock = socket.create_connection((address, port), timeout=connect_timeout)
+    try:
+        if https:
+            context = ssl.create_default_context()
+            sock = context.wrap_socket(sock, server_hostname=host)
+        target = parsed.path or "/"
+        if parsed.query:
+            target += "?" + parsed.query
+        hostport = host if parsed.port is None else f"{host}:{parsed.port}"
+        if ":" in host:
+            hostport = f"[{host}]" if parsed.port is None else f"[{host}]:{port}"
+        lines = [f"GET {target} HTTP/1.0", f"Host: {hostport}"]
+        lines += [f"{k}: {v}" for k, v in _RADIO_HEADERS.items()]
+        if icy:
+            lines.append("Icy-MetaData: 1")
+        lines.append("Connection: close")
+        request = ("\r\n".join(lines) + "\r\n\r\n").encode("latin-1")
+        if any(c in target for c in "\r\n"):
+            raise StreamError("bad_url")
+        sock.sendall(request)
+        response = _Response(sock, 0, None, b"", deadline, timeout)
+        head = b""
+        while b"\r\n\r\n" not in head and b"\n\n" not in head:
+            chunk = response._recv(4096)
+            if not chunk:
+                break
+            head += chunk
+            if len(head) > _MAX_HEADER_BYTES:
+                raise StreamError("not_a_stream")
+        split = head.find(b"\r\n\r\n")
+        cut = split + 4 if split >= 0 else head.find(b"\n\n") + 2
+        if cut < 2:
+            raise StreamError("stream_unreachable")
+        lines = head[:cut].decode("latin-1").splitlines()
+        match = _STATUS_RE.match(lines[0].encode("latin-1")) if lines else None
+        if match is None:
+            raise StreamError("stream_unreachable")
+        pairs = []
+        for line in lines[1:]:
+            name, sep, value = line.partition(":")
+            if sep:
+                pairs.append((name.strip(), value.strip()))
+        response.status = int(match.group(1))
+        response.headers = _Headers(pairs)
+        response._buffer = head[cut:]
+        return response
+    except BaseException:
+        sock.close()
+        raise
+
+
+def _open(url, icy=True, deadline=None):
+    """Open `url` for the radio probe (tests replace this function)."""
+    return _request(url, icy=icy, deadline=deadline)
+
+
+def _follow(url, icy=True, deadline=None, opener=None):
+    """GET `url`, following up to 3 redirects. Every hop is checked again
+    (parse_radio_url and a pinned public address), so a redirect can never
+    lead to a private address. Returns (final url, a 200 response)."""
+    opener = opener or _open
+    current = url
+    for _ in range(4):
+        try:
+            response = opener(current, icy=icy, deadline=deadline)
+        except StreamError:
+            raise
+        except Exception:
+            raise StreamError("stream_unreachable")
+        if 300 <= response.status < 400:
+            location = response.headers.get("location")
+            response.close()
+            if not location:
+                raise StreamError("stream_unreachable")
+            current = parse_radio_url(urljoin(current, location), check_path=False)
+            if current is None:
+                raise StreamError("bad_url")
+            continue
+        if response.status != 200:
+            response.close()
+            raise StreamError("stream_unreachable")
+        return current, response
+    raise StreamError("stream_unreachable")
 
 
 def _clean_name(value):
@@ -1082,56 +1371,43 @@ def parse_playlist_file(body):
     return url, _clean_name(title)
 
 
-def probe_stream(url, depth=0):
+_HLS_TYPES = {"application/vnd.apple.mpegurl", "application/x-mpegurl"}
+
+
+def probe_stream(url, depth=0, deadline=None):
     """Check that `url` is an audio stream and build its live item: an
-    Icecast/Shoutcast stream (content-type audio/*), an HLS playlist, or a
-    .pls/.m3u file pointing to one (followed once). Redirects are followed
-    up to 3 times, each hop checked again. Blocking: run it in an executor.
-    Raises StreamError."""
+    Icecast/Shoutcast stream (content-type audio/*), or a .pls/.m3u file
+    pointing to one (followed once). HLS (.m3u8) radios are refused: FFmpeg
+    would fetch their segments from any host. Redirects are followed up to 3
+    times, each hop checked again, and the whole probe ends within
+    LIVE_PROBE_DEADLINE. Blocking: run it in an executor. Raises
+    StreamError."""
     if depth > 1:
         raise StreamError("not_a_stream")
-    current = url
-    for _ in range(4):
-        try:
-            response = _open(current)
-        except urllib.error.HTTPError as e:
-            location = e.headers.get("Location") if 300 <= e.code < 400 else None
-            e.close()
-            if not location:
-                raise StreamError("stream_unreachable")
-            current = parse_radio_url(urljoin(current, location), check_path=False)
-            if current is None:
-                raise StreamError("bad_url")
-            continue
-        except http.client.BadStatusLine as e:
-            if "ICY" in str(e):  # Shoutcast v1 answers "ICY 200 OK"
-                return live_track(url, current, urlparse(current).hostname, "radio")
-            raise StreamError("stream_unreachable")
-        except StreamError:
-            raise
-        except Exception:
-            raise StreamError("stream_unreachable")
-        break
-    else:
-        raise StreamError("stream_unreachable")
-
+    if deadline is None:
+        deadline = time.monotonic() + LIVE_PROBE_DEADLINE
+    current, response = _follow(url, deadline=deadline)
     with response:
         ctype = response.headers.get_content_type()
         name = _clean_name(response.headers.get("icy-name"))
         path = urlparse(current).path.lower()
         playlist_ext = path.endswith((".m3u", ".m3u8", ".pls"))
         if ctype in _PLAYLIST_TYPES or (ctype in _GENERIC_TYPES and playlist_ext):
-            body = response.read(LIVE_PLAYLIST_MAX_BYTES + 1)
+            try:
+                body = _read_capped(response, LIVE_PLAYLIST_MAX_BYTES + 1)
+            except StreamError:
+                raise
+            except Exception:
+                raise StreamError("stream_unreachable")
             if len(body) > LIVE_PLAYLIST_MAX_BYTES:
                 raise StreamError("not_a_stream")
-            if b"#EXT-X-" in body:  # HLS: FFmpeg reads the playlist itself
-                title = name or urlparse(current).hostname
-                return live_track(url, current, title, "radio")
+            if b"#EXT-X-" in body or (ctype in _HLS_TYPES and b"#EXTM3U" in body):
+                raise StreamError("radio_hls")
             entry, title = parse_playlist_file(body)
             entry = parse_radio_url(urljoin(current, entry or ""), check_path=False)
             if not entry or entry == current:
                 raise StreamError("not_a_stream")
-            track = probe_stream(entry, depth + 1)
+            track = probe_stream(entry, depth + 1, deadline)
             track["url"] = url
             if title and track["title"] == urlparse(entry).hostname:
                 track["title"] = title
@@ -1140,6 +1416,16 @@ def probe_stream(url, depth=0):
             title = name or urlparse(current).hostname
             return live_track(url, current, title, "radio")
     raise StreamError("not_a_stream")
+
+
+def _read_capped(response, limit):
+    data = b""
+    while len(data) < limit:
+        chunk = response.read(min(65536, limit - len(data)))
+        if not chunk:
+            break
+        data += chunk
+    return data
 
 
 _STREAM_TITLE_RE = re.compile(rb"StreamTitle='(.*?)';", re.DOTALL)
@@ -1172,8 +1458,10 @@ def read_icy_title(stream_url):
     """What a radio plays now (ICY "StreamTitle"), or None: one request that
     reads up to `icy-metaint` audio bytes and the metadata block after them.
     Blocking, never raises."""
+    deadline = time.monotonic() + LIVE_ICY_DEADLINE
     try:
-        with _open(stream_url) as response:
+        _, response = _follow(stream_url, icy=True, deadline=deadline)
+        with response:
             metaint = int(response.headers.get("icy-metaint") or 0)
             if not 0 < metaint <= LIVE_ICY_MAX_METAINT:
                 return None

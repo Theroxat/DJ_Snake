@@ -159,10 +159,7 @@ def open_track_source(player, track, offset, fade_in=None):
     live item always starts at 0, with no known length, no crossfade and no
     filter."""
     if track.get("live"):
-        source = discord.FFmpegPCMAudio(
-            track["stream_url"], **media.live_options(track)
-        )
-        return 0.0, source, None, 0
+        return 0.0, _open_live_source(track), None, 0
     name, eq = getattr(player, "filter", "off"), getattr(player, "eq", None)
     rate = filters.rate(name)
     eligible = crossfade_eligible(track)
@@ -749,6 +746,8 @@ async def _advance(ctx, player):
                 _start_crossfade(player, source_mixer, tail_gen, ctx), loop
             )
 
+    if next_track.get("live"):
+        await refresh_live_url(next_track)  # Its URL may have expired
     player.cancel_idle()  # Something plays again: no more leaving
     player.note_played(next_track)
     player.now_playing = next_track
@@ -769,7 +768,8 @@ async def _advance(ctx, player):
         discard_tracks([next_track])
         raise
     now = time.monotonic()
-    player.rate = filters.rate(player.filter)
+    # A live item plays unfiltered (see open_track_source): real time.
+    player.rate = 1.0 if next_track.get("live") else filters.rate(player.filter)
     player.started_at = now - offset
     # A loop replay is a new play; only a restart or seek continues one
     player.mark_started(
@@ -785,6 +785,47 @@ async def _advance(ctx, player):
     refresh_panel(player)
 
 
+def _open_live_source(track):
+    """FFmpeg for a live item. A radio is read by media.RadioStream (pinned,
+    checked connections) and piped in; FFmpeg may open nothing else. A
+    YouTube/Twitch live is read by FFmpeg from the URL yt-dlp gave."""
+    options = media.live_options(track)
+    if track.get("source") != "radio":
+        return discord.FFmpegPCMAudio(track["stream_url"], **options)
+    reader = media.RadioStream(track["stream_url"])
+    source = discord.FFmpegPCMAudio(reader, pipe=True, **options)
+    cleanup = source.cleanup
+
+    def close_then_cleanup():
+        reader.close()  # Ends discord.py's pipe thread and the connection
+        cleanup()
+
+    source.cleanup = close_then_cleanup
+    return source
+
+
+async def refresh_live_url(track):
+    """Read a YouTube/Twitch live's stream URL again when it is older than
+    LIVE_REFRESH_SECONDS (they expire). Best effort: on failure the old URL
+    is tried, and FFmpeg ending at once moves the queue on."""
+    if not track.get("live") or track.get("source") == "radio":
+        return
+    if time.monotonic() - track.get("resolved_at", 0.0) < config.LIVE_REFRESH_SECONDS:
+        return
+    loop = asyncio.get_running_loop()
+    try:
+        fresh = await asyncio.wait_for(
+            loop.run_in_executor(None, media.resolve_live, track["url"]),
+            config.LIVE_REFRESH_TIMEOUT,
+        )
+    except Exception as e:
+        print(f"Live: could not refresh the stream URL: {e}")
+        return
+    track["stream_url"] = fresh["stream_url"]
+    track["http_headers"] = fresh.get("http_headers") or {}
+    track["resolved_at"] = time.monotonic()
+
+
 def watch_live(player, gen, track):
     """Start the playing live item's watcher (player.live_task): it ends the
     item after LIVE_MAX_HOURS and keeps a radio's ICY title up to date."""
@@ -797,25 +838,29 @@ def watch_live(player, gen, track):
 
 
 async def _watch_live(player, gen, track):
+    # The limit counts the time it really played (played_seconds): a pause
+    # does not count. A radio's ICY title is read at once, then every
+    # LIVE_META_SECONDS.
     limit = config.LIVE_MAX_HOURS * 3600
-    deadline = time.monotonic() + limit if limit > 0 else None
     radio = track.get("source") == "radio"
     loop = asyncio.get_running_loop()
-    wait = 0.0 if radio else None  # A radio's title is read at once
+    title_at = time.monotonic() if radio else None
     while True:
-        if deadline is not None:
-            left = max(0.0, deadline - time.monotonic())
-            wait = left if wait is None else min(wait, left)
-        if wait is None:
+        waits = []
+        if title_at is not None:
+            waits.append(max(0.0, title_at - time.monotonic()))
+        if limit > 0:
+            waits.append(max(0.0, limit - player.played_seconds()))
+        if not waits:
             return  # No limit and nothing to read
-        await asyncio.sleep(wait)
-        wait = config.LIVE_META_SECONDS if radio else None
+        await asyncio.sleep(min(waits))
         if gen != player.play_gen or player.now_playing is not track:
             return
-        if deadline is not None and time.monotonic() >= deadline:
+        if limit > 0 and player.played_seconds() >= limit:
             await _end_live(player, gen, track)
             return
-        if radio:
+        if title_at is not None and time.monotonic() >= title_at:
+            title_at = time.monotonic() + config.LIVE_META_SECONDS
             title = await loop.run_in_executor(
                 None, media.read_icy_title, track["stream_url"]
             )

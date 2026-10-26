@@ -65,7 +65,8 @@ the real `ffmpeg` binary are marked `ffmpeg` and skipped without it. Patch
 `sessions.PANEL_MIN_INTERVAL` on their module: callers look them up there.
 `conftest.py` also points `stats.DB_PATH`, the theme files and
 `permissions.PERMISSIONS_FILE` at the test's own directory, replaces
-`media._open` (the radio probe's HTTP) with a function raising `StreamError`, and
+`media._open` and `media._stream_open` (the radio HTTP) with a function raising
+`StreamError` and `media.resolve_live` with one raising `RuntimeError`, and
 calls `stats.flush()` at teardown; call `stats.flush()` before reading the
 database in a test.
 End-to-end tests live in `tests/e2e/`, marked `e2e`: `pytest.ini`'s `addopts`
@@ -553,25 +554,44 @@ Module map, lowest layer first (each imports only the ones above it):
   `parse_play_url()` refuse a link (http(s), no credentials, not a known
   host, no private IP literal, last path segment a stream/playlist file or
   `/stream`, `/listen`, `/live`, `/;`), then `probe_stream()` in an executor
-  (`playback.read_radio()`, `controls.read_radio_link()`) before answering:
-  every hop resolved to public addresses only (`_check_public()`), no
-  automatic redirects (3 followed by hand, re-checked), content type
-  `audio/*`/ogg, HLS (`#EXT-X-`), or a `.pls`/`.m3u` followed once; codes
-  `not_a_stream` 400, `stream_unreachable` 502, `bad_url`.
-  `queue_live_track()` queues it. Playback: `open_track_source()` opens
-  `stream_url` with `media.live_options()` (`LIVE_RECONNECT` before the
-  input, `-user_agent` from the format headers, `-vn -af
-  loudnorm=<target>,afade` single pass, no `-ss`/`-t`); frames None, so no
-  crossfade either way. `_advance()` skips the file check for live items,
+  (`playback.read_radio()`, `controls.read_radio_link()`) before answering,
+  within `LIVE_PROBE_DEADLINE`. **SSRF rule**: the bot never lets a
+  resolver run twice for one connection. `_request()` resolves the host
+  once (`_resolve_public()`: every answer must be a global address, else
+  `bad_url`), connects to that very address (TLS with SNI and certificate
+  checks for https), speaks HTTP/1.0 (ICY status lines accepted) and follows
+  no redirect; `_follow()` takes up to 3 hops, each re-checked by
+  `parse_radio_url()` and a fresh pinned connection. Content type
+  `audio/*`/ogg, or a `.pls`/`.m3u` followed once; HLS radios (`#EXT-X-`)
+  are refused (`radio_hls` 400: FFmpeg would fetch their segments from any
+  host); codes `not_a_stream` 400, `stream_unreachable` 502, `bad_url`.
+  `queue_live_track()` queues it. Playback (`open_track_source()` ->
+  `_open_live_source()`, `media.live_options()`): a radio is read by
+  `media.RadioStream` (lazy connect on discord.py's pipe thread, pinned
+  connections via `_stream_open()`, no ICY metadata, reconnects after
+  `LIVE_STREAM_TIMEOUT`, ends after `LIVE_STREAM_RECONNECTS` failures; closed
+  by the source's `cleanup()`) and piped to FFmpeg (`pipe=True`,
+  `-protocol_whitelist pipe`: FFmpeg opens nothing itself). A YouTube/Twitch
+  live is opened by FFmpeg from the yt-dlp URL (`check_live_url()`: http(s),
+  no private IP literal) with `LIVE_RECONNECT` and `-protocol_whitelist
+  LIVE_PROTOCOLS` (http, https, tcp, tls, crypto: HLS segments, never
+  local files), `-user_agent` from the format headers; its URL expires, so
+  `_advance()` calls `refresh_live_url()` (`media.resolve_live()` in an
+  executor, `LIVE_REFRESH_TIMEOUT`) when it is older than
+  `LIVE_REFRESH_SECONDS` (`resolved_at`). Both: `-vn -af
+  loudnorm=<target>,afade` single pass, no `-ss`/`-t`, no audio filter
+  (`player.rate` 1); frames None, so no crossfade either way. `_advance()` skips the file check for live items,
   never replays an ended live under loop track nor re-queues it under loop
   queue (a skipped one is), and sets `action.live_ended`. After a live
   start `watch_live()` runs `player.live_task` (cancelled by `_advance()`,
   `stop_and_clear()`, expiry, `!reset`, a kick): every `LIVE_META_SECONDS`
-  it reads a radio's title (`read_icy_title()`, executor) and at
-  `LIVE_MAX_HOURS` `_end_live()` acts as a "next" (`action.live_limit`).
+  it reads a radio's title (`read_icy_title()`, executor, `LIVE_ICY_DEADLINE`)
+  and once it has played `LIVE_MAX_HOURS` (`played_seconds()`: pauses do not
+  count) `_end_live()` acts as a "next" (`action.live_limit`).
   `control_seek()` raises `live_no_seek` (409). Lyrics (`prefetch`, `get`,
   the route) and autoplay seeds skip live items; `/media` 404s (no file).
-  Stats record the play with `duration` NULL and its listening time.
+  `retire_play()` records no stats and no Last.fm scrobble for a live item
+  (hours of radio would top the charts).
 - **Pending downloads** (`player.pending_downloads`, the page's "Downloading"): an ordered list of `{key, title, source}` (`source`
   `youtube`, `spotify`, `deezer`, `apple`, `soundcloud` or `bandcamp`; `title` None until known, the page then shows "Reading
   link…") for every track asked for but not queued yet. `add_pending()`

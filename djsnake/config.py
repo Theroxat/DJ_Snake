@@ -233,6 +233,19 @@ LIVE_META_SECONDS = 30  # A radio's ICY "StreamTitle" is read this often
 LIVE_PROBE_TIMEOUT = 8  # Seconds per HTTP request reading a radio link
 LIVE_PLAYLIST_MAX_BYTES = 64 * 1024  # .pls / .m3u files larger are refused
 LIVE_ICY_MAX_METAINT = 256 * 1024  # Audio bytes read before ICY metadata
+LIVE_PROBE_DEADLINE = 20  # Seconds for a whole radio probe (redirects included)
+LIVE_ICY_DEADLINE = 15  # Seconds for one ICY title read
+# A radio is read by the bot itself (media.RadioStream, connections pinned to
+# a checked public address) and piped to FFmpeg, which may read nothing else.
+LIVE_STREAM_TIMEOUT = 30  # Seconds without data before a radio reconnects
+LIVE_STREAM_RECONNECTS = 5  # Consecutive failed reconnects before it ends
+# FFmpeg protocols for yt-dlp-resolved lives (YouTube, Twitch): HTTP(S) and
+# HLS segments only; never file, pipe or other local protocols.
+LIVE_PROTOCOLS = "http,https,tcp,tls,crypto"
+# YouTube/Twitch stream URLs expire: one older than this is extracted again
+# just before it plays (at most LIVE_REFRESH_TIMEOUT seconds).
+LIVE_REFRESH_SECONDS = 60
+LIVE_REFRESH_TIMEOUT = 20
 # Automix, always on. At download, SponsorBlock "music_offtopic" segments
 # (skits, talking intros) are cut out of the file. One ffmpeg pass then
 # measures loudness (loudnorm, first pass) and leading/trailing silence.

@@ -326,10 +326,14 @@ def retire_play(player, guild_id, action):
     if not track or guild_id is None or player.started_at is None:
         return
     played = player.played_seconds()
+    player.play_accum = 0.0
+    if track.get("live"):
+        # A live stream (radio, Twitch, YouTube live) is no track: hours of
+        # radio would top the charts and inflate the listening time.
+        return
     state.counters["tracks_played"] += 1
     stats.record_play(guild_id, track, player.play_wall, played, action)
     lastfm.track_ended(player, track, played, player.play_wall)
-    player.play_accum = 0.0
 
 
 def push_history(player, track):

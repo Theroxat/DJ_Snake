@@ -33,7 +33,7 @@ Like Spotify, these links are only used to read the track list (title, artists, 
 
 ## Live streams
 
-YouTube lives, Twitch channels and internet radios cannot be downloaded, so they are played as they come: FFmpeg reads the stream and reconnects by itself after a network hiccup.
+YouTube lives, Twitch channels and internet radios cannot be downloaded, so they are played as they come, reconnecting by themselves after a network hiccup.
 
 ```text
 !play https://www.youtube.com/watch?v=jfKfPfyJRdk
@@ -44,8 +44,8 @@ YouTube lives, Twitch channels and internet radios cannot be downloaded, so they
 
 - **YouTube**: any video link that is live right now (also `youtube.com/live/<id>`). A live that has not started yet is refused; a finished one is a normal video.
 - **Twitch**: a channel link, `twitch.tv/<channel>`, while the channel is live. Videos and clips are not accepted.
-- **Internet radios**: an Icecast or Shoutcast stream, an HLS `.m3u8` playlist, or a `.pls` / `.m3u` file pointing to one. The link must end in a stream or playlist file (`.mp3`, `.aac`, `.ogg`, `.opus`, `.flac`, `.m3u8`, `.m3u`, `.pls`, or a name like `groovesalad-128-mp3`) or a usual mount point (`/stream`, `/listen`, `/live`, `/;`). The bot checks it before queueing it: it must answer with an audio content type, and its address must be public (links to private or local addresses are refused). The station name comes from the stream's `icy-name`, and the song playing now (`StreamTitle`) is read every 30 seconds and shown on the clip page and in the status message.
-- A live item plays until it is skipped, `!stop` is used, the stream ends or `LIVE_MAX_HOURS` (4 by default) is reached; then the queue goes on.
+- **Internet radios**: an Icecast or Shoutcast stream, or a `.pls` / `.m3u` file pointing to one. The link must end in a stream or playlist file (`.mp3`, `.aac`, `.ogg`, `.opus`, `.flac`, `.m3u`, `.pls`, or a name like `groovesalad-128-mp3`) or a usual mount point (`/stream`, `/listen`, `/live`, `/;`). The bot checks it before queueing it: it must answer with an audio content type, and its address must be public (links to private or local addresses are refused, and so are redirects to them). HLS radios (`.m3u8`) are not supported: use the station's direct MP3, AAC or Ogg link. The bot reads the radio itself, connected to the address it checked, and hands the audio to FFmpeg. The station name comes from the stream's `icy-name`, and the song playing now (`StreamTitle`) is read every 30 seconds and shown on the clip page and in the status message.
+- A live item plays until it is skipped, `!stop` is used, the stream ends or it has played for `LIVE_MAX_HOURS` (4 by default, pauses not counted); then the queue goes on. Live streams are not counted in the listening stats or scrobbled to Last.fm.
 - There is nothing to seek in: the clip page shows a LIVE badge instead of the progress bar, and `!seek` or the page's seek answer that a live stream has no position. Loop track does not replay a stream that ended, and no crossfade is made into or out of a live item.
 - Loudness is evened out on the fly (one-pass normalisation) instead of the measured automix; there is no SponsorBlock cut and no silence trimming.
 - The clip page shows the stream's artwork (the YouTube or Twitch thumbnail) or an "On air" card, never the live video. Lyrics are not looked up.

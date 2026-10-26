@@ -133,6 +133,7 @@ class ControlError(Exception):
         "import_busy": 409,
         "live_no_seek": 409,
         "not_a_stream": 400,
+        "radio_hls": 400,
         "stream_unreachable": 502,
     }
 
