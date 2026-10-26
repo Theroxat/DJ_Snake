@@ -7,7 +7,7 @@ import types
 
 import discord
 
-from . import catalog, limits, media, playlists, spotify, state
+from . import catalog, limits, media, playlist_io, playlists, spotify, state
 from .config import (
     LOOP_MODES,
     MAX_PLAYLIST_SIZE,
@@ -17,7 +17,7 @@ from .config import (
     PREVIOUS_RESTART_SECONDS,
     SAVED_PLAYLIST_NAME_MAX,
 )
-from .media import looks_like_url, parse_media_url, parse_youtube_url
+from .media import looks_like_url, parse_media_url
 from .playback import (
     cancelled,
     download_and_queue_song,
@@ -121,6 +121,11 @@ class ControlError(Exception):
         "playlist_unavailable": 500,
         "queue_full": 409,
         "user_full": 409,
+        "export_bad_format": 400,
+        "import_bad_file": 400,
+        "import_too_big": 413,
+        "import_nothing": 400,
+        "import_not_list": 400,
     }
 
     def __init__(self, code, **params):
@@ -137,6 +142,8 @@ class ControlError(Exception):
             name_max=SAVED_PLAYLIST_NAME_MAX,
             playlists_max=MAX_SAVED_PLAYLISTS,
             tracks_max=MAX_SAVED_TRACKS,
+            max_kb=playlist_io.MAX_FILE_BYTES // 1024,
+            formats=", ".join(playlist_io.FORMATS),
             **self.params,
         )
 
@@ -486,13 +493,14 @@ async def control_add(player, guild_id, url):
     _background(_add_from_web(player, guild_id, kind, clean_url))
 
 
-async def read_spotify(kind, ref, provider="spotify"):
-    """Track list of a Spotify, Deezer or Apple Music link (up to
-    MAX_PLAYLIST_SIZE). Raises ControlError with the reason it cannot be read."""
+async def read_spotify(kind, ref, provider="spotify", limit=None):
+    """Track list of a Spotify, Deezer or Apple Music link (up to `limit`,
+    MAX_PLAYLIST_SIZE by default). Raises ControlError with the reason it cannot be read.
+    """
     loop = asyncio.get_running_loop()
     try:
         return await loop.run_in_executor(
-            None, catalog.get_tracks, provider, kind, ref, MAX_PLAYLIST_SIZE
+            None, catalog.get_tracks, provider, kind, ref, limit or MAX_PLAYLIST_SIZE
         )
     except spotify.SpotifyError as e:
         print(f"{provider} {kind} {ref}: {e}")
@@ -619,13 +627,152 @@ async def control_playlist_delete(guild_id, name, author_id=None, is_admin=False
 
 def playlist_entries(playlist):
     """A saved playlist as the entries queue_playlist() takes. Links are
-    checked again: only YouTube videos are downloaded."""
+    checked again: only YouTube, SoundCloud and Bandcamp tracks download."""
     entries = []
     for track in playlist["tracks"]:
-        parsed = parse_youtube_url(track["url"])
+        parsed = parse_media_url(track["url"])
         if parsed is not None and parsed[0] == "single":
             entries.append({"url": parsed[1], "title": track["title"]})
     return entries
+
+
+# --- Export and import ------------------------------------------------------
+
+
+async def control_playlist_export(guild_id, name, fmt="json", player=None):
+    """(filename, bytes, track count) of a saved playlist, or of the live queue
+    when `name` is the reserved word "queue". Raises ControlError."""
+    fmt = (fmt or "json").strip().lower()
+    if fmt not in playlist_io.FORMATS:
+        raise ControlError("export_bad_format")
+    if " ".join(str(name or "").split()).casefold() == "queue":
+        tracks = []
+        for track in _current_and_queue(player) if player else []:
+            clean = playlists.clean_track(track)
+            if clean:
+                tracks.append(clean)
+        if not tracks:
+            raise ControlError("playlist_empty")
+        return (*playlist_io.export_bytes("queue", None, tracks, fmt), len(tracks))
+    saved = await control_playlist_get(guild_id, name)
+    if not saved["tracks"]:
+        raise ControlError("playlist_empty")
+    creator = saved["creator_id"]
+    created_by = None if creator is None else str(creator)
+    file = playlist_io.export_bytes(saved["name"], created_by, saved["tracks"], fmt)
+    return (*file, len(saved["tracks"]))
+
+
+async def _import_save(guild_id, name, tracks, skipped, truncated, author, admin):
+    result = await _playlist_call(
+        playlists.save, guild_id, name, tracks, creator_id=author, is_admin=admin
+    )
+    result["skipped"] = skipped
+    result["truncated"] = truncated
+    return result
+
+
+async def control_playlist_import_file(
+    guild_id, name, data, filename="", author_id=None, is_admin=False
+):
+    """Create or replace a playlist from an uploaded JSON, M3U or TXT file.
+    Returns {name, count, skipped, truncated}."""
+    await _playlist_call(playlists.check_writable, guild_id, name, author_id, is_admin)
+    try:
+        tracks, skipped, truncated = playlist_io.parse_import(data, filename)
+    except playlist_io.ImportFileError as e:
+        raise ControlError(e.code)
+    return await _import_save(
+        guild_id, name, tracks, skipped, truncated, author_id, is_admin
+    )
+
+
+async def _match_tracks(tracks, progress):
+    """YouTube matches of metadata tracks, one search at a time. Returns
+    (entries, unmatched)."""
+    loop = asyncio.get_running_loop()
+    entries, unmatched = [], 0
+    for i, track in enumerate(tracks):
+        if progress is not None:
+            await progress(i, len(tracks))
+        try:
+            url = await loop.run_in_executor(None, spotify.find_youtube_match, track)
+        except Exception as e:
+            print(f"Import match failed: {e}")
+            url = None
+        if url:
+            title = (
+                " – ".join([", ".join(track["artists"]), track["title"]])
+                if (track.get("artists"))
+                else track["title"]
+            )
+            entries.append(
+                {"url": url, "title": title, "duration": track.get("duration")}
+            )
+        else:
+            unmatched += 1
+    return entries, unmatched
+
+
+async def control_playlist_import_url(
+    guild_id, name, url, author_id=None, is_admin=False, progress=None
+):
+    """Create or replace a playlist from a link: a YouTube, SoundCloud or
+    Bandcamp playlist or album, or a Spotify, Deezer or Apple Music playlist
+    or album. Metadata-only sources are matched on YouTube *now* (the
+    playlist stores ordinary links, so loading it later needs no matching);
+    `progress(done, total)` is awaited before each match. Returns {name,
+    count, skipped, truncated}."""
+    await _playlist_call(playlists.check_writable, guild_id, name, author_id, is_admin)
+    try:
+        link = catalog.check_link(url)
+    except spotify.SpotifyError as e:
+        raise ControlError(e.code)
+    loop = asyncio.get_running_loop()
+    if link is not None:
+        if link[0] == "track":
+            raise ControlError("import_not_list")
+        found = await read_spotify(*link, limit=MAX_SAVED_TRACKS)
+        tracks, skipped = await _match_tracks(found, progress)
+        if not tracks:
+            raise ControlError("import_nothing")
+        return await _import_save(
+            guild_id, name, tracks, skipped, False, author_id, is_admin
+        )
+    parsed = parse_media_url(url)
+    if parsed is None:
+        raise ControlError("bad_url")
+    if parsed[0] != "playlist":
+        raise ControlError("import_not_list")
+    entries = await loop.run_in_executor(
+        None, lambda: media.get_playlist_info(parsed[1], limit=MAX_SAVED_TRACKS + 1)
+    )
+    tracks, seen, skipped = [], set(), 0
+    for entry in entries or []:
+        entry_link = media.entry_url(entry)
+        checked = parse_media_url(entry_link) if entry_link else None
+        if checked is None or checked[0] != "single" or checked[1] in seen:
+            skipped += 1
+            continue
+        seen.add(checked[1])
+        clean = playlists.clean_track(
+            {
+                "url": checked[1],
+                "title": entry.get("title"),
+                "duration": entry.get("duration"),
+            }
+        )
+        if clean is None:
+            skipped += 1
+        else:
+            tracks.append(clean)
+    truncated = len(tracks) > MAX_SAVED_TRACKS
+    tracks = tracks[:MAX_SAVED_TRACKS]
+    if not tracks:
+        raise ControlError("import_nothing")
+    return await _import_save(
+        guild_id, name, tracks, skipped, truncated, author_id, is_admin
+    )
 
 
 async def control_playlist_load(player, guild_id, name):

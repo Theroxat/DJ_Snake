@@ -98,7 +98,7 @@ Every command is both a `!` command and a slash command (`/play`, `/playlist sav
 | `!autoplay [on\|off]` | Keep playing related tracks when the queue runs out, or show the current setting (off by default, see `AUTOPLAY`). |
 | `!limits [queue\|user\|minutes\|cooldown] [number\|default]` | Show the queue limits, or change one (Manage Server): queue size, tracks per member, track length, /play cooldown. |
 | `!stay [on\|off]` | 24/7 mode: the bot never leaves its voice channel (no idle disconnect) and rejoins it after a restart; with no argument, shows the setting. Setting it needs the DJ role or Manage Server. See `STAY_247`. |
-| `!playlist save\|add\|load\|show\|delete <name>`, `!playlist list` | Saved playlists for the server: links and titles kept across restarts, downloaded again when loaded. |
+| `!playlist save\|add\|load\|show\|delete\|export <name>`, `!playlist import <name> <link>`, `!playlist list` | Saved playlists for the server: links and titles kept across restarts, downloaded again when loaded. Import from a playlist link or a file, export as a file. |
 | `!stop` | Stop, clear the queue, delete the downloaded files and leave voice. |
 | `!reset` | Force a clean voice reconnect. |
 | `!theme [preset\|reset\|edit]` | Show or set the clip page's default theme for the server. `edit` DMs you a private editor link. Needs the Manage Server permission. |

@@ -13,6 +13,7 @@ Lowest layer first; each module imports only the ones above it.
 | `i18n.py` | Translations: `t(key, lang, **params)` over the catalogs in `djsnake/locales/` (`en.json`, `fr.json`), and each server's language (`!language`, `languages.json`). |
 | `stats.py` | Listening stats in SQLite, written by one background thread. |
 | `playlists.py` | Saved playlists in SQLite (`playlists.db`). |
+| `playlist_io.py` | Playlist export (JSON, M3U, TXT) and validated file import. |
 | `lyrics.py` | Lyrics from LRCLIB: LRC and YouTube title parsing, the lookup run in the background when a track is queued, and its memory and disk cache. |
 | `player.py` | `MusicPlayer` (per-server state), cleanup of files and history helpers. |
 | `themes.py` | Theme storage, logos and `!theme edit` tokens. |

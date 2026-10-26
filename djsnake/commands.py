@@ -1,18 +1,20 @@
 """Discord commands and command hooks."""
 
 import asyncio
+import io
 import math
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from . import catalog, i18n, limits, media, spotify, state
+from . import catalog, i18n, limits, media, playlist_io, spotify, state
 from .config import (
     COMMAND_PREFIX,
     HISTORY_LOG_SIZE,
     LOOP_MODES,
     MAX_PLAYLIST_SIZE,
+    MAX_SAVED_TRACKS,
     MAX_SEARCH_LENGTH,
     PUBLIC_BASE_URL,
     THEME_EDIT_SECONDS,
@@ -32,7 +34,10 @@ from .controls import (
     control_pause,
     control_playlist_add,
     control_playlist_delete,
+    control_playlist_export,
     control_playlist_get,
+    control_playlist_import_file,
+    control_playlist_import_url,
     control_playlist_list,
     control_playlist_save,
     control_previous,
@@ -1412,6 +1417,127 @@ async def playlist_delete(ctx, *, name: str = None):
     )
     if result is not _FAILED:
         await ack(ctx)
+
+
+@playlist.command(name="export", description="Send a playlist or the queue as a file")
+@app_commands.describe(
+    name='Playlist name, or "queue" for the current queue',
+    format="File format: json (default), m3u or txt",
+)
+@app_commands.choices(
+    format=[app_commands.Choice(name=f, value=f) for f in playlist_io.FORMATS]
+)
+async def playlist_export(ctx, name: str = None, format: str = "json"):
+    """Send a saved playlist (or the queue) as a JSON, M3U or TXT file."""
+    if name is None:
+        await fail_t(ctx, "cmd.playlist_usage_name", sub="export")
+        return
+    result = await _playlist_reply(
+        ctx,
+        control_playlist_export(
+            ctx.guild.id, name, format, state.music_players.get(ctx.guild.id)
+        ),
+    )
+    if result is _FAILED:
+        return
+    filename, data, count = result
+    text = t(
+        "cmd.export_done",
+        ctx_lang(ctx),
+        name=" ".join(name.split()),
+        count=count,
+        format=filename.rsplit(".", 1)[-1],
+    )
+    await ctx.send(
+        text,
+        file=discord.File(io.BytesIO(data), filename=filename),
+        allowed_mentions=_NO_MENTIONS,
+    )
+
+
+def _import_summary(result, lang):
+    text = t("cmd.import_done", lang, name=result["name"], count=result["count"])
+    if result["skipped"]:
+        text += " " + t("cmd.import_skipped", lang, skipped=result["skipped"])
+    if result["truncated"]:
+        text += " " + t("cmd.import_truncated", lang, tracks_max=MAX_SAVED_TRACKS)
+    return text
+
+
+@playlist.command(
+    name="import", description="Create a playlist from a link or an uploaded file"
+)
+@app_commands.describe(
+    name="Playlist name",
+    url="A YouTube, SoundCloud, Bandcamp, Spotify, Deezer or Apple Music playlist",
+    file="Or a JSON, M3U or TXT file (up to 256 KB)",
+)
+async def playlist_import(
+    ctx, name: str = None, url: str = None, file: discord.Attachment = None
+):
+    """Create or replace a saved playlist from a playlist link or a file."""
+    if file is None and ctx.message is not None:
+        attachments = getattr(ctx.message, "attachments", None) or []
+        file = attachments[0] if attachments else None
+    if name is None or (url is None and file is None):
+        await fail_t(ctx, "cmd.playlist_import_usage")
+        return
+    lang = ctx_lang(ctx)
+    await defer(ctx)
+    if url is None:
+        if file.size > playlist_io.MAX_FILE_BYTES:
+            await fail(ctx, ControlError("import_too_big").text(lang))
+            return
+        data = await file.read()
+        result = await _playlist_reply(
+            ctx,
+            control_playlist_import_file(
+                ctx.guild.id,
+                name,
+                data,
+                file.filename,
+                ctx.author.id,
+                _can_manage(ctx),
+            ),
+        )
+        if result is not _FAILED:
+            await ack(ctx)
+            await ctx.send(_import_summary(result, lang), allowed_mentions=_NO_MENTIONS)
+        return
+    # Matching a Spotify-like list takes minutes: report through the channel,
+    # which outlives a slash command's 15-minute reply token.
+    channel = ChannelContext(ctx)
+    progress_msg = None
+
+    async def progress(done, total):
+        nonlocal progress_msg
+        if progress_msg is not None and done % 5:
+            return
+        text = t("cmd.import_progress", lang, done=done, total=total)
+        try:
+            if progress_msg is None:
+                progress_msg = await channel.send(text)
+            else:
+                await progress_msg.edit(content=text)
+        except Exception as e:
+            print(f"Import progress failed: {e}")
+
+    try:
+        result = await control_playlist_import_url(
+            ctx.guild.id, name, url, ctx.author.id, _can_manage(ctx), progress
+        )
+    except ControlError as e:
+        await fail(ctx, e.text(lang))
+        return
+    summary = _import_summary(result, lang)
+    try:
+        if progress_msg is not None:
+            await progress_msg.edit(content=summary, allowed_mentions=_NO_MENTIONS)
+        else:
+            await channel.send(summary, allowed_mentions=_NO_MENTIONS)
+        await ack(ctx)
+    except Exception as e:
+        print(f"Import reply failed: {e}")
 
 
 # Errors with their own message (anything else is also logged).

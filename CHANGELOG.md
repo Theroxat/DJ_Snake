@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - 24/7 mode: `!stay [on|off]` (DJ to set, saved in `DATA_DIR/stay.json`) keeps the bot in its voice channel: no idle disconnect, `!stop` no longer leaves, and it rejoins the saved channel after a restart without playing anything. Dropped by Discord, it rejoins once, then turns 24/7 off (no reconnect loop). Optional `STAY_247` default, a `stay` field in `/api/{sid}/state`, "24/7" in the status panel and a header badge on the clip page.
+### Added
+
+- `/playlist import <name> <link>` creates or replaces a saved playlist from a YouTube playlist, a SoundCloud set, a Bandcamp album or a Spotify, Deezer or Apple Music playlist or album (those are matched on YouTube at import time, with unmatched tracks counted), or from an attached JSON, M3U or TXT file (up to 256 KB, only allowed sources). `/playlist export <name> [json|m3u|txt]` sends a playlist, or `queue` the current queue, as a file. Saved playlists can no longer be named `queue`.
 
 ## [1.4.0] - 2026-10-23
 
