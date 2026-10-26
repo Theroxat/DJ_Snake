@@ -10,6 +10,7 @@ from discord.ext import commands
 from . import catalog, i18n, media, spotify, state
 from .config import (
     COMMAND_PREFIX,
+    HISTORY_LOG_SIZE,
     LOOP_MODES,
     MAX_PLAYLIST_SIZE,
     MAX_SEARCH_LENGTH,
@@ -23,8 +24,10 @@ from .controls import (
     ChannelContext,
     ControlError,
     control_autoplay,
+    control_clear,
     control_crossfade,
     control_loop,
+    control_move,
     control_next,
     control_pause,
     control_playlist_add,
@@ -32,6 +35,8 @@ from .controls import (
     control_playlist_get,
     control_playlist_list,
     control_playlist_save,
+    control_previous,
+    control_remove,
     control_resume,
     control_seek,
     control_shuffle,
@@ -54,17 +59,21 @@ from .sessions import (
     ack,
     open_session,
     player_lang,
+    public_link,
     refresh_panel,
     rotate_control_link,
     session_player,
     set_action,
+    short,
     touch,
 )
 from .permissions import (
+    OWN_TRACK_COMMANDS,
     REQUESTER_COMMANDS,
     can_run_dj_command,
     dj_role,
     is_dj,
+    owns_track,
     set_dj_role,
     web_control_restricted,
 )
@@ -74,7 +83,7 @@ from .volume import parse_volume, volume_for
 bot = state.bot
 
 
-def hybrid(name, description):
+def hybrid(name, description, **kwargs):
     """Register a command that works as `!name` and as `/name`.
 
     Every command goes through this decorator (see "Adding a command" in
@@ -84,7 +93,7 @@ def hybrid(name, description):
     """
 
     def decorate(func):
-        command = bot.hybrid_command(name=name, description=description)(func)
+        command = bot.hybrid_command(name=name, description=description, **kwargs)(func)
         return commands.guild_only()(command)
 
     return decorate
@@ -119,7 +128,11 @@ def error_message(error, command=None, slash=False, guild=None):
         error = error.original
     if isinstance(error, NotDJ):
         name = getattr(command, "name", command) or ""
-        extra = t("cmd.not_dj_requester", lang) if name in REQUESTER_COMMANDS else ""
+        extra = ""
+        if name in REQUESTER_COMMANDS:
+            extra = t("cmd.not_dj_requester", lang)
+        elif name in OWN_TRACK_COMMANDS:
+            extra = t("cmd.not_dj_owner", lang)
         need = _dj_requirement(guild, lang)
         return t("cmd.not_dj", lang, prefix=prefix, name=name, need=need, extra=extra)
     if isinstance(error, (commands.CommandNotFound, app_commands.CommandNotFound)):
@@ -205,6 +218,15 @@ def require_dj(ctx):
     """For DJ_WHEN_SETTING commands: raise NotDJ unless the author may change
     the value (showing it stays open to everyone)."""
     if ctx.guild is not None and not is_dj(ctx.author, ctx.guild.id):
+        raise NotDJ()
+
+
+def require_dj_or_owner(ctx, track):
+    """For OWN_TRACK_COMMANDS: raise NotDJ unless the author is a DJ or queued
+    `track` themselves."""
+    if ctx.guild is None or is_dj(ctx.author, ctx.guild.id):
+        return
+    if not owns_track(ctx.author, track):
         raise NotDJ()
 
 
@@ -506,6 +528,180 @@ async def seek(ctx, position: str):
     if applied is not _FAILED:
         player = state.music_players[ctx.guild.id]
         set_action(player, seek_label(player, applied))
+
+
+def _queue_position(player, position):
+    """The queued track at the 1-based `position` (as /list shows it)."""
+    if not player.queue:
+        raise ControlError("queue_empty")
+    if position is None or not 1 <= position <= len(player.queue):
+        raise ControlError("bad_index")
+    return player.queue[position - 1]
+
+
+async def _queue_autocomplete(interaction, current):
+    """Queued tracks as "position. title", for /remove and /move."""
+    player = (
+        state.music_players.get(interaction.guild.id) if interaction.guild else None
+    )
+    current = (current or "").strip().lower()
+    choices = []
+    for i, track in enumerate(player.queue if player else [], 1):
+        label = f"{i}. {track['title']}"
+        if current and current not in label.lower():
+            continue
+        choices.append(app_commands.Choice(name=short(label), value=i))
+        if len(choices) == 25:
+            break
+    return choices
+
+
+@hybrid("remove", "Remove a track from the queue (position shown by /list)")
+@app_commands.describe(position="Position in the queue, as /list shows it (1 = next)")
+async def remove(ctx, position: int):
+    lang = ctx_lang(ctx)
+    player = state.music_players.get(ctx.guild.id)
+    if not player:
+        await fail(ctx, ControlError("nothing_playing").text(lang))
+        return
+    try:
+        track = _queue_position(player, position)
+        require_dj_or_owner(ctx, track)
+        removed = await control_remove(player, track["id"])
+    except ControlError as e:
+        await fail(ctx, e.text(lang))
+        return
+    await ack(ctx)
+    set_action(player, t("action.web_removed", lang, title=short(removed["title"])))
+
+
+@remove.autocomplete("position")
+async def remove_autocomplete(interaction, current):
+    return await _queue_autocomplete(interaction, current)
+
+
+@hybrid("move", "Move a queued track to another position")
+@app_commands.describe(
+    from_position="Current position of the track, as /list shows it",
+    to_position="New position in the queue (1 = next)",
+)
+async def move(ctx, from_position: int, to_position: int):
+    lang = ctx_lang(ctx)
+    player = state.music_players.get(ctx.guild.id)
+    if not player:
+        await fail(ctx, ControlError("nothing_playing").text(lang))
+        return
+    try:
+        track = _queue_position(player, from_position)
+        _queue_position(player, to_position)
+        await control_move(player, track["id"], to_position - 1)
+    except ControlError as e:
+        await fail(ctx, e.text(lang))
+        return
+    await ack(ctx)
+    set_action(player, t("action.web_reordered", lang))
+
+
+@move.autocomplete("from_position")
+async def move_from_autocomplete(interaction, current):
+    return await _queue_autocomplete(interaction, current)
+
+
+@move.autocomplete("to_position")
+async def move_to_autocomplete(interaction, current):
+    return await _queue_autocomplete(interaction, current)
+
+
+@hybrid("previous", "Go back to the previous track (or restart this one)")
+async def previous(ctx):
+    action = await _run_command_control(ctx, control_previous)
+    if action is not _FAILED:
+        player = state.music_players[ctx.guild.id]
+        key = "action.restarted" if action == "restart" else "action.previous"
+        set_action(player, t(key, player_lang(player)))
+
+
+@hybrid("clear", "Empty the upcoming queue (the current track keeps playing)")
+async def clear(ctx):
+    removed = await _run_command_control(ctx, control_clear)
+    if removed is not _FAILED:
+        player = state.music_players[ctx.guild.id]
+        set_action(player, t("action.cleared", player_lang(player), count=len(removed)))
+
+
+def progress_bar(elapsed, total, width=15):
+    """A text bar: a marker on a line, placed by elapsed / total."""
+    if not total or total <= 0:
+        return "▬" * width
+    ratio = min(1.0, max(0.0, (elapsed or 0.0) / total))
+    spot = min(width - 1, int(ratio * width))
+    return "▬" * spot + "🔘" + "▬" * (width - spot - 1)
+
+
+def now_playing_embed(player, guild_id, lang=None):
+    """The /nowplaying embed for the playing track."""
+    track = player.now_playing
+    start = track.get("start") or 0.0
+    end = track.get("end") or track.get("duration")
+    total = max(0.0, end - start) if end else None
+    elapsed = min(max(0.0, (player.elapsed() or 0.0) - start), total or 1e12)
+    embed = discord.Embed(title=short(track["title"], 256), color=0x5865F2)
+    if track.get("url"):
+        embed.url = track["url"]
+    times = f"{_mmss(elapsed)} / {_mmss(total)}" if total else _mmss(elapsed)
+    paused = t("np.paused", lang) if player.paused_at is not None else ""
+    embed.description = f"{progress_bar(elapsed, total)}\n`{times}`{paused}"
+    if track.get("thumbnail"):
+        embed.set_thumbnail(url=track["thumbnail"])
+    requester = track.get("requester") or t("np.web", lang)
+    embed.add_field(name=t("np.requester", lang), value=short(requester, 100))
+    source = media.source_of(track.get("url"))
+    embed.add_field(name=t("np.source", lang), value=t(f"np.source.{source}", lang))
+    on, off = t("np.on", lang), t("np.off", lang)
+    embed.add_field(name=t("np.loop", lang), value=t(f"loop.mode.{player.loop}", lang))
+    embed.add_field(name=t("np.autoplay", lang), value=on if player.autoplay else off)
+    embed.add_field(name=t("np.volume", lang), value=f"{volume_for(guild_id)} %")
+    link = public_link(player)
+    if link:
+        embed.add_field(name=t("np.clip_page", lang), value=link, inline=False)
+    return embed
+
+
+@hybrid("nowplaying", "Show the playing track and its progress", aliases=["np"])
+async def nowplaying(ctx):
+    lang = ctx_lang(ctx)
+    player = state.music_players.get(ctx.guild.id)
+    if not player or not player.now_playing or not player.is_playing:
+        await fail(ctx, ControlError("nothing_playing").text(lang))
+        return
+    await ctx.send(embed=now_playing_embed(player, ctx.guild.id, lang))
+
+
+HISTORY_DEFAULT = 10
+HISTORY_MAX = HISTORY_LOG_SIZE
+
+
+@hybrid("history", "Show the last tracks played in this session")
+@app_commands.describe(count="How many tracks to show (default 10, max 25)")
+async def history(ctx, count: int = HISTORY_DEFAULT):
+    lang = ctx_lang(ctx)
+    player = state.music_players.get(ctx.guild.id)
+    if not player or not player.played:
+        await fail_t(ctx, "cmd.history_empty")
+        return
+    count = min(max(1, count), HISTORY_MAX)
+    lines = []
+    for i, track in enumerate(reversed(player.played[-count:]), 1):
+        line = f"{i}. {short(track['title'] or '?', 80)}"
+        if track.get("duration"):
+            line += f" `{_mmss(track['duration'])}`"
+        if track.get("requester"):
+            line += f" — {short(track['requester'], 32)}"
+        lines.append(line)
+    await ctx.send(
+        _fit(t("cmd.history_title", lang), lines, lang),
+        allowed_mentions=_NO_MENTIONS,
+    )
 
 
 @hybrid("crossfade", "Turn crossfade on or off for this session")
@@ -1083,6 +1279,12 @@ HELP_ORDER = (
     "reset",
     "loop",
     "shuffle",
+    "remove",
+    "move",
+    "previous",
+    "clear",
+    "nowplaying",
+    "history",
     "volume",
     "autoplay",
     "playlist",

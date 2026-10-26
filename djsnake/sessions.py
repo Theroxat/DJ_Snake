@@ -184,6 +184,18 @@ def _duration(seconds, lang):
     return t("panel.seconds", lang, count=seconds)
 
 
+def public_link(player):
+    """The clip page URL a public message may show: the control link when the
+    guild leaves control to everyone, else the view-only one (None without a
+    session)."""
+    guild_id = state.sessions.get(player.sid) if player.sid else None
+    if guild_id is None:
+        return None
+    if web_control_restricted(guild_id):
+        return f"{PUBLIC_BASE_URL}/{player.watch_id}" if player.watch_id else None
+    return f"{PUBLIC_BASE_URL}/{player.sid}"
+
+
 def _link_lines(player, lang=None):
     """The panel's links. The view-only link is always public; the control
     link only when the guild leaves control to everyone (WEB_CONTROL, no DJ

@@ -6,6 +6,12 @@ Every command works two ways: as a text message with the prefix, `!` by default 
 | --- | --- |
 | `!play <link or search text>` | Join your voice channel and queue a YouTube video or playlist, a SoundCloud or Bandcamp track or set, a Spotify, Deezer or Apple Music playlist, album or track, or the best YouTube match for the text. |
 | `!list` | Show the current queue. |
+| `!remove <position>` | Remove a queued track by its position in `!list` (1 = next). Autocompletes the queue. Anyone may remove a track they queued themselves. |
+| `!move <from> <to>` | Move a queued track to another position. Autocompletes the queue. |
+| `!previous` | Go back to the previous track, or restart the current one after 5 s of play. |
+| `!clear` | Empty the upcoming queue; the current track keeps playing. |
+| `!nowplaying` (`!np`) | Show the playing track as an embed: requester, source, progress bar with elapsed/total, loop, autoplay and volume, and the clip page link. |
+| `!history [count]` | The last tracks played in this session (default 10, max 25), newest first. |
 | `!next` | Skip to the next track. |
 | `!pause` / `!resume` | Pause or resume playback. |
 | `!seek <pos>` | Jump to a position in the track, in seconds or `mm:ss`, as the clip page shows it. |
@@ -66,6 +72,18 @@ Sets the loop mode for the session, or cycles off, track, queue when called with
 
 Shuffles the upcoming queue once. The current track keeps playing and the order is not kept afterwards. It needs at least two queued tracks.
 
+### `!remove <position>`, `!move <from> <to>`, `!previous`, `!clear`
+
+Queue management that used to exist only on the clip page. Positions are the 1-based numbers `!list` shows (1 is the next track); a position outside the queue gives an "Invalid position" error. As slash commands, `/remove` and `/move` suggest the queued tracks (position and title). `!previous` restarts the current track after 5 s of play (or with no history) and otherwise goes back to the last played one. `!clear` empties the upcoming queue and keeps the current track playing.
+
+### `!nowplaying` (alias `!np`)
+
+An embed with the track title (linked), who requested it, the source (YouTube, SoundCloud, Bandcamp), the thumbnail, a progress bar with elapsed and total time (as the clip page shows them), the loop, autoplay and volume state, and the clip page link. The link follows the usual rules: the control link when control is open to everyone, otherwise the view-only one.
+
+### `!history [count]`
+
+The last tracks played in the session, newest first, with duration and requester. `count` defaults to 10 and is capped at 25; the list is cut to fit Discord's message limit. It is cleared by `!stop`.
+
 ### `!volume [0-150]`
 
 Without an argument, shows the server's volume. With a number from 0 to 150 (a trailing `%` is fine), sets it. 100 is the normal level (tracks are normalised to -14 LUFS); 0 is silent and 150 is about 3.5 dB louder, with a soft limiter so loud peaks are squeezed instead of clipping. The change applies to the playing track at once, without restarting it, and glides over a tenth of a second to avoid clicks. The volume belongs to the server, is shared with the clip page and is saved in `DATA_DIR/volume.json`.
@@ -121,7 +139,7 @@ Needs the **Manage Server** permission. The setting is saved per server in `DATA
 
 With a DJ role set:
 
-- `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!volume`, `!autoplay`, `!stop` and `!reset` need the DJ role or the Manage Server permission. The member who queued the playing track may still skip it with `!next`.
+- `!next`, `!pause`, `!resume`, `!seek`, `!crossfade`, `!loop`, `!shuffle`, `!previous`, `!move`, `!clear`, `!volume`, `!autoplay`, `!stop` and `!reset` need the DJ role or the Manage Server permission. The member who queued the playing track may still skip it with `!next`, and `!remove` is open to whoever queued the track being removed. `!play`, `!list`, `!nowplaying` and `!history` stay open to everyone.
 - `!play` and `!list` stay open to everyone: adding a track never interrupts what plays, and DJs can still skip or remove it.
 - The status message shows only the clip page's view-only link, and the control link posted before stops working (every change of the role gives a live session a new one and retires the server's `!theme edit` links). See [Who controls the music](clip-page.md#who-controls-the-music).
 

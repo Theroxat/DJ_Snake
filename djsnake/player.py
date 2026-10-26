@@ -7,7 +7,7 @@ import time
 
 from . import state, stats
 from . import config
-from .config import HISTORY_SIZE
+from .config import HISTORY_LOG_SIZE, HISTORY_SIZE
 
 
 class MusicPlayer:
@@ -15,6 +15,9 @@ class MusicPlayer:
         self.voice_client = None
         self.queue = []
         self.history = []  # Last played tracks, oldest first (files kept)
+        # Last HISTORY_LOG_SIZE played tracks for /history, oldest first:
+        # {title, url, duration, requester}, no files.
+        self.played = []
         self.is_playing = False  # A track is loaded in the voice client
         self.should_stop = False
         # Bumped by !stop / !reset: download jobs started before it give up,
@@ -178,6 +181,7 @@ class MusicPlayer:
             tracks.append(self.now_playing)
         self.queue.clear()
         self.history.clear()
+        self.played.clear()
         self.now_playing = None
         if self.voice_client and (
             self.voice_client.is_playing() or self.voice_client.is_paused()
@@ -265,6 +269,15 @@ def retire_play(player, guild_id, action):
 
 def push_history(player, track):
     player.history.append(track)
+    player.played.append(
+        {
+            "title": track.get("title"),
+            "url": track.get("url"),
+            "duration": track.get("duration"),
+            "requester": track.get("requester"),
+        }
+    )
+    del player.played[:-HISTORY_LOG_SIZE]
     evicted = []
     while len(player.history) > HISTORY_SIZE:
         evicted.append(player.history.pop(0))

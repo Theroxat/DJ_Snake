@@ -89,6 +89,7 @@ class ControlError(Exception):
         "nothing_playing": 409,
         "track_not_found": 404,
         "bad_index": 400,
+        "queue_empty": 409,
         "bad_loop": 400,
         "nothing_to_shuffle": 409,
         "bad_volume": 400,
@@ -337,6 +338,20 @@ async def control_move(player, track_id, index):
         track = player.queue.pop(i)
         player.queue.insert(index, track)
     return track
+
+
+async def control_clear(player):
+    """Empty the upcoming queue; the current track keeps playing. Returns the
+    removed tracks."""
+    async with player.lock:
+        if not player.in_voice():
+            raise ControlError("not_in_voice")
+        if not player.queue:
+            raise ControlError("queue_empty")
+        removed = list(player.queue)
+        player.queue.clear()
+    discard_tracks(removed)
+    return removed
 
 
 async def control_add(player, guild_id, url):

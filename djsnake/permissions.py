@@ -29,6 +29,9 @@ DJ_COMMANDS = frozenset(
         "crossfade",
         "loop",
         "shuffle",
+        "previous",
+        "move",
+        "clear",
     }
 )
 # Commands that only need a DJ to change a value: with no argument they just
@@ -37,6 +40,10 @@ DJ_COMMANDS = frozenset(
 DJ_WHEN_SETTING = frozenset({"volume", "autoplay"})
 # Commands the member who queued the current track may always use on it.
 REQUESTER_COMMANDS = frozenset({"next"})
+# Commands anyone may start, but that a non-DJ may only apply to a track they
+# queued themselves. The check cannot see the argument, so the command calls
+# `commands.require_dj_or_owner()` once it knows the track.
+OWN_TRACK_COMMANDS = frozenset({"remove"})
 
 
 def load_perms():
@@ -109,6 +116,12 @@ def is_dj(member, guild_id, strict=False):
     if role is None:
         return not strict
     return any(r.id == role for r in getattr(member, "roles", ()))
+
+
+def owns_track(member, track):
+    """True when `member` queued `track`."""
+    requester = (track or {}).get("requester_id")
+    return requester is not None and requester == getattr(member, "id", None)
 
 
 def can_run_dj_command(member, guild_id, command, player):
