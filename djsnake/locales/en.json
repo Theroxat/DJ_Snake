@@ -19,7 +19,7 @@
   "help.cmd.shuffle": "`{prefix}shuffle`: shuffle the upcoming queue once",
   "help.cmd.volume": "`{prefix}volume [0-150]`: show or set the server's volume",
   "help.cmd.autoplay": "`{prefix}autoplay [on|off]`: keep playing related tracks when the queue runs out",
-  "help.cmd.filter": "`{prefix}filter [preset]`: show or set the audio filter (off, bassboost, nightcore, vaporwave, 8d, karaoke, soft, eq low mid high)",
+  "help.cmd.filter": "`{prefix}filter [preset]`: show or set the audio filter ({presets}; `eq` takes low mid high)",
   "help.cmd.stay": "`{prefix}stay [on|off]`: 24/7 mode, stay in the voice channel even when idle",
   "help.cmd.playlist": "`{prefix}playlist save|add|load|show|delete|export <name>`, `{prefix}playlist import <name> <link>` (or with a file attached), `{prefix}playlist list`: saved playlists of the server",
   "help.cmd.djrole": "`{prefix}djrole [role|off]`: the role that may control the music (Manage Server)",

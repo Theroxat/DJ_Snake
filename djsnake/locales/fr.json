@@ -19,7 +19,7 @@
   "help.cmd.shuffle": "`{prefix}shuffle` : mélange une fois la file d’attente",
   "help.cmd.volume": "`{prefix}volume [0-150]` : affiche ou règle le volume du serveur",
   "help.cmd.autoplay": "`{prefix}autoplay [on|off]` : continue avec des titres similaires quand la file d’attente est vide",
-  "help.cmd.filter": "`{prefix}filter [préréglage]` : affiche ou règle le filtre audio (off, bassboost, nightcore, vaporwave, 8d, karaoke, soft, eq graves médiums aigus)",
+  "help.cmd.filter": "`{prefix}filter [préréglage]` : affiche ou règle le filtre audio ({presets} ; `eq` prend graves médiums aigus)",
   "help.cmd.stay": "`{prefix}stay [on|off]` : mode 24h/24, reste dans le salon vocal même sans musique",
   "help.cmd.playlist": "`{prefix}playlist save|add|load|show|delete|export <nom>`, `{prefix}playlist import <nom> <lien>` (ou avec un fichier joint), `{prefix}playlist list` : playlists enregistrées du serveur",
   "help.cmd.djrole": "`{prefix}djrole [rôle|off]` : le rôle autorisé à contrôler la musique (Gérer le serveur)",

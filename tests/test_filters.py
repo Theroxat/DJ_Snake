@@ -387,3 +387,18 @@ def test_real_ffmpeg_runs_every_chain_at_its_rate(tmp_path, name, channels):
     )
     seconds = len(out.stdout) / (48000 * 4)
     assert abs(seconds - 9.0 / filters.rate(name)) < 0.1
+
+
+async def test_eq_bands_are_ignored_for_other_presets(player):
+    player.eq = {"low": 3, "mid": 0, "high": 0}
+    assert await control_filter(player, "bassboost", {"low": 12}) == "bassboost"
+    assert player.eq == {"low": 3, "mid": 0, "high": 0}
+    # Even invalid bands are not an error when they do not apply
+    assert await control_filter(player, "soft", {"low": 99}) == "soft"
+    assert player.eq == {"low": 3, "mid": 0, "high": 0}
+
+
+def test_help_line_lists_the_filter_presets():
+    for lang in ("en", "fr"):
+        line = commands.help_line("filter", lang)
+        assert ", ".join(FILTER_PRESETS) in line and "{" not in line

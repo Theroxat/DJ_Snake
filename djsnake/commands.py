@@ -1815,7 +1815,7 @@ HELP_ORDER = (
 
 def help_line(name, lang):
     key = f"help.cmd.{name}"
-    text = t(key, lang)
+    text = t(key, lang, presets=", ".join(FILTER_PRESETS))
     return text if text != key else f"`{COMMAND_PREFIX}{name}`"
 
 

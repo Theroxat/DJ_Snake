@@ -397,6 +397,8 @@ async def control_filter(player, name, eq=None):
     preset = filters.parse_filter(name)
     if preset is None:
         raise ControlError("bad_filter")
+    if preset != "eq":
+        eq = None  # Band gains only belong to the eq preset: ignored otherwise
     if eq is not None:
         merged = dict(player.eq)
         if not isinstance(eq, dict):
