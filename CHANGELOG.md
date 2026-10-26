@@ -49,6 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Backup and restore of `DATA_DIR`: `python -m djsnake.backup create|restore|verify|list` writes and reads a checksummed `.tar.gz` (SQLite databases copied consistently while the bot runs, lyrics cache optional). `restore` refuses while the bot runs, verifies every checksum, keeps the old data in `.pre-restore-<date>/` and swaps atomically.
 - Automatic backups: `BACKUP_INTERVAL_HOURS` (0 = off) and `BACKUP_KEEP` (7) write rotated archives to `DATA_DIR/backups/` from a background task.
+### Added
+
+- Optional Last.fm scrobbling, off unless `LASTFM_API_KEY` and `LASTFM_API_SECRET` are set. `/lastfm link|unlink|status` lets each user link their own account (the authorisation link is sent privately); linked users in the voice channel get "now playing" and a scrobble after half the track or 4 minutes (tracks under 30 s are skipped). Scrobbles are sent in batches of 50 and retried without ever blocking playback. Session keys are stored in `DATA_DIR/lastfm.json` (mode 0600).
 
 ## [1.4.0] - 2026-10-23
 

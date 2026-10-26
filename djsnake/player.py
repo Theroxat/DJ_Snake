@@ -5,7 +5,7 @@ import os
 import secrets
 import time
 
-from . import state, stats
+from . import lastfm, state, stats
 from . import config
 from .config import HISTORY_LOG_SIZE, HISTORY_SIZE
 
@@ -75,6 +75,8 @@ class MusicPlayer:
         self.autoplay_next = None
         self.autoplay_task = None
         self.recent_ids = []
+        # Last.fm: linked users in the channel when the track started.
+        self.lastfm_listeners = set()
         # Live updates: bumped by notify_state(); the open streams of the
         # page (web.py) each put an asyncio.Event in `watchers`.
         self.state_version = 0
@@ -140,6 +142,7 @@ class MusicPlayer:
             self.play_accum = 0.0
             self.play_wall = time.time()
             self.reset_votes()
+            lastfm.track_started(self)
         self.play_offset = offset
 
     def reset_votes(self):
@@ -295,6 +298,7 @@ def retire_play(player, guild_id, action):
     played = player.played_seconds()
     state.counters["tracks_played"] += 1
     stats.record_play(guild_id, track, player.play_wall, played, action)
+    lastfm.track_ended(player, track, played, player.play_wall)
     player.play_accum = 0.0
 
 

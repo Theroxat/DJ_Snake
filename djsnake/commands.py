@@ -8,7 +8,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from . import catalog, i18n, limits, media, playlist_io, spotify, state
+from . import catalog, i18n, lastfm, limits, media, playlist_io, spotify, state
 from .config import (
     COMMAND_PREFIX,
     HISTORY_LOG_SIZE,
@@ -1219,6 +1219,135 @@ async def weblink(ctx):
     await ack(ctx)
 
 
+# --- Last.fm --------------------------------------------------------------------
+
+
+class LastfmDoneView(discord.ui.View):
+    """The "Done" button under the Last.fm authorisation link."""
+
+    def __init__(self, user_id, lang=None):
+        super().__init__(timeout=900)
+        self.user_id = user_id
+        self.lang = lang
+        self.done.label = t("lastfm.done", lang)
+
+    async def interaction_check(self, interaction):
+        return interaction.user.id == self.user_id
+
+    @discord.ui.button(label="Done", emoji="✅", style=discord.ButtonStyle.success)
+    async def done(self, interaction, button):
+        text = await _lastfm_finish(self.user_id, self.lang)
+        await interaction.response.send_message(text, ephemeral=True)
+
+
+async def _lastfm_finish(user_id, lang):
+    """Complete a link in progress; returns the message for the user."""
+    try:
+        name = await lastfm.complete_link(user_id)
+    except LookupError:
+        return t("lastfm.no_link_in_progress", lang)
+    except lastfm.LastfmError as e:
+        if e.code == lastfm.NOT_AUTHORISED:
+            return t("lastfm.not_authorised", lang)
+        if e.code in lastfm.BAD_TOKEN:
+            state.lastfm_pending_auth.pop(user_id, None)
+            return t("lastfm.token_expired", lang)
+        return t("lastfm.unavailable", lang)
+    except lastfm.LastfmUnavailable:
+        return t("lastfm.unavailable", lang)
+    except OSError:
+        return t("lastfm.save_failed", lang)
+    return t("lastfm.linked", lang, name=name)
+
+
+async def _lastfm_private(ctx, text, view=None):
+    """Reply only to the author: ephemeral for `/`, a direct message for `!`
+    (the link carries a secret token). False when the DM was refused."""
+    if getattr(ctx, "interaction", None) is not None:
+        await ctx.send(text, ephemeral=True, view=view)
+        return True
+    try:
+        await ctx.author.send(text, view=view)
+    except discord.HTTPException:
+        await fail_t(ctx, "lastfm.dm_failed")
+        return False
+    await ctx.send(t("lastfm.dm_sent", ctx_lang(ctx)))
+    return True
+
+
+async def _lastfm_guard(ctx):
+    if lastfm.enabled():
+        return True
+    await fail_t(ctx, "lastfm.disabled")
+    return False
+
+
+@bot.hybrid_group(
+    name="lastfm",
+    description="Scrobble what you listen to on Last.fm",
+    invoke_without_command=True,
+)
+@commands.guild_only()
+async def lastfm_group(ctx):
+    await fail_t(ctx, "lastfm.usage")
+
+
+@lastfm_group.command(name="link", description="Link your Last.fm account")
+async def lastfm_link(ctx):
+    """Send the Last.fm authorisation link, or finish a pending link."""
+    if not await _lastfm_guard(ctx):
+        return
+    await defer(ctx)
+    lang = ctx_lang(ctx)
+    try:
+        kind, value = await lastfm.start_link(ctx.author.id)
+    except OSError:
+        await fail_t(ctx, "lastfm.save_failed")
+        return
+    except (lastfm.LastfmError, lastfm.LastfmUnavailable):
+        await fail_t(ctx, "lastfm.unavailable")
+        return
+    if kind == "linked":
+        await _lastfm_private(ctx, t("lastfm.linked", lang, name=value))
+        return
+    view = LastfmDoneView(ctx.author.id, lang)
+    await _lastfm_private(ctx, t("lastfm.link_prompt", lang, url=value), view)
+
+
+@lastfm_group.command(name="unlink", description="Unlink your Last.fm account")
+async def lastfm_unlink(ctx):
+    """Forget the stored Last.fm session."""
+    if not await _lastfm_guard(ctx):
+        return
+    lang = ctx_lang(ctx)
+    try:
+        was_linked = lastfm.unlink(ctx.author.id)
+    except OSError:
+        await fail_t(ctx, "lastfm.save_failed")
+        return
+    key = "lastfm.unlinked" if was_linked else "lastfm.not_linked"
+    await _lastfm_private(ctx, t(key, lang))
+
+
+@lastfm_group.command(name="status", description="Show your Last.fm link")
+async def lastfm_status(ctx):
+    """Show which Last.fm account is linked."""
+    if not await _lastfm_guard(ctx):
+        return
+    lang = ctx_lang(ctx)
+    link = lastfm.link_of(ctx.author.id)
+    if link is None:
+        text = t("lastfm.not_linked", lang)
+    else:
+        text = t(
+            "lastfm.status",
+            lang,
+            name=link["name"],
+            count=lastfm.pending_count(ctx.author.id),
+        )
+    await _lastfm_private(ctx, text)
+
+
 @hybrid("pause", "Pause playback")
 async def pause(ctx):
     await _run_command_control(ctx, control_pause)
@@ -1635,6 +1764,7 @@ HELP_ORDER = (
     "theme",
     "djrole",
     "weblink",
+    "lastfm",
     "language",
     "help",
 )

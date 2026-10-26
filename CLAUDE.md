@@ -113,7 +113,7 @@ which is no longer read), `TEMP_DIR`, `POT_BASE_URL`, `WEB_PORT` (47823),
 (0, default of the per-session autoplay), `VOTESKIP_PERCENT` (50, default vote-to-skip threshold, 1-100), `STAY_247` (0, default of the per-guild 24/7 mode, see Stay 24/7), `DATA_DIR` (`/app/data`, mounted from
 `./data` by Compose; the container's UID 1000 must be able to write it; it
 holds `themes.json`, `logos/`, `languages.json`, `volume.json`,
-`permissions.json`, `voteskip.json`, `limits.json`, `stay.json`, `playlists.db`, `stats.db` and `lyrics/`),
+`permissions.json`, `voteskip.json`, `limits.json`, `stay.json`, `lastfm.json`, `playlists.db`, `stats.db` and `lyrics/`),
 `SLASH_SYNC_GUILD` (empty: slash commands sync globally at startup; a server ID
 syncs to it only, at once, for development), `WEB_THEME` (`arcade`, the theme of
 guilds that never chose one), `WEB_CONTROL` (`everyone`, or `dj`: the control
@@ -127,7 +127,8 @@ turns the LRCLIB lyrics off), `MAX_QUEUE_SIZE` (200), `MAX_TRACKS_PER_USER` (0),
 `MAX_TRACK_MINUTES` (0) and `PLAY_COOLDOWN_SECONDS` (0) (defaults of the per-guild
 queue limits, see Queue limits; 0 = unlimited/off), `YTDLP_COOKIES` (optional Netscape cookies.txt path; `cookies.py` validates it and copies it to a 0600 temp file at startup, `cookies.options()` is merged into every yt-dlp options dict in `media.py`; `media.classify_error()` and `playback.download_error_text()` map access errors to `play.error_*` messages),
 `BACKUP_INTERVAL_HOURS` (0, automatic backups off) and `BACKUP_KEEP` (7), see
-Backup, and `YTDLP_AUTO_UPDATE` (entrypoint only).
+Backup, `LASTFM_API_KEY` / `LASTFM_API_SECRET` (optional, both
+needed to turn Last.fm scrobbling on, see Last.fm), and `YTDLP_AUTO_UPDATE` (entrypoint only).
 
 ## Architecture (`djsnake/`)
 
@@ -159,6 +160,8 @@ Module map, lowest layer first (each imports only the ones above it):
 - `lyrics.py`: LRCLIB lyrics (`parse_lrc()`, `parse_title()`,
   `lookup_fields()`, `fetch()`, `prefetch()`, `get()`). Imports `config`,
   `state`, `stats.clean_artist` and `spotify`'s HTTP helpers.
+- `lastfm.py`: optional Last.fm scrobbling (see Last.fm). Imports `config`,
+  `state`, `lyrics.lookup_fields` and `themes._write_atomic`.
 - `player.py`: `MusicPlayer`, `notify_state()`, `discard_tracks()`,
   `file_in_use()`, `push_history()`, `retire_play()`, `guild_of()`.
 - `themes.py`: theme storage, logos and `!theme edit` tokens.
@@ -826,6 +829,31 @@ Module map, lowest layer first (each imports only the ones above it):
   automatically. No Discord command. Archives contain secrets (e.g. Last.fm
   session keys), so they are 0600; `cookies.txt` belongs outside `DATA_DIR`.
   Tests: `tests/test_backup.py`.
+- **Last.fm** (`lastfm.py`, off unless `LASTFM_API_KEY` and `LASTFM_API_SECRET`
+  are both set, `enabled()`): `/lastfm link|unlink|status` (a `hybrid_group`).
+  `start_link()` calls `auth.getToken` and returns the `last.fm/api/auth` URL
+  (sent privately: ephemeral on `/`, DM on `!`, with a Done button);
+  `complete_link()` exchanges the token with `auth.getSession` (error 14 = not
+  authorised yet; `/lastfm link` again does the same). Links are
+  `state.lastfm_links` (`{user id: {name, key}}`), persisted to
+  `{DATA_DIR}/lastfm.json` (atomic, `chmod 0600`; keys are never logged or
+  shown). Requests go through `lastfm._request()` (aiohttp, `LASTFM_TIMEOUT`),
+  signed by `sign()` (md5 of the params sorted by name + secret, `format` not
+  signed); tests replace `_request`. Hooks, both no-ops when disabled:
+  `MusicPlayer.mark_started()` (a new play, not a seek) calls
+  `track_started()`: it remembers the linked users in the voice channel
+  (`player.lastfm_listeners`) and sends `track.updateNowPlaying` in a
+  background task; `retire_play()` calls `track_ended()`: when the track lasts
+  30 s or more and was played for half its length or 4 minutes
+  (`should_scrobble()`), every user present at the start and still in the
+  channel gets a scrobble in `state.lastfm_queue` (timestamp = start). Autoplay
+  tracks count. Metadata is `track_info()`: `lyrics.lookup_fields()` (Spotify,
+  Deezer or Apple fields, else the parsed YouTube title; an optional `album`
+  field). `_flush_loop()` sends each user's queue 50 at a time with
+  `track.scrobble`, retrying network errors and codes 8/11/16/29 with a
+  30 s to 10 min backoff (queue capped at `LASTFM_MAX_PENDING` per user, in
+  memory, one last flush at shutdown); error 9 unlinks the user; other
+  refusals drop the batch. Tests: `tests/test_lastfm.py`.
 - **Status panel**: each web session has one message in its text channel
   (`player.panel_message`), edited in place instead of announcing events:
   clip links (see Permissions), now playing / paused / idle, up next, loading progress and the

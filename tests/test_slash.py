@@ -35,6 +35,7 @@ NAMES = {
     "djrole",
     "limits",
     "weblink",
+    "lastfm",
     "language",
     "remove",
     "move",

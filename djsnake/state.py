@@ -76,3 +76,10 @@ streams = {}
 
 # Strong references to fire-and-forget tasks, so they are not collected.
 background_tasks = set()
+
+# Last.fm (see lastfm.py): Discord user id -> {"name", "key"} (persisted),
+# user id -> (auth token, time) while a link is being authorised, and user id
+# -> scrobbles waiting to be sent.
+lastfm_links = {}
+lastfm_pending_auth = {}
+lastfm_queue = {}

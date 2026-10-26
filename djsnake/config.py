@@ -274,6 +274,21 @@ LYRICS_TIMEOUT = 6  # Seconds per LRCLIB request
 LYRICS_MAX_BYTES = 1024 * 1024  # Larger responses are refused
 LYRICS_WAIT_SECONDS = 4.0  # The web route waits this long for a fetch
 
+# Optional Last.fm scrobbling: on only when both the API key and secret are set.
+# Each user links their own account with `/lastfm link`; session keys live in
+# DATA_DIR/lastfm.json (mode 0600).
+LASTFM_API_KEY = os.getenv("LASTFM_API_KEY", "").strip()
+LASTFM_API_SECRET = os.getenv("LASTFM_API_SECRET", "").strip()
+LASTFM_API_URL = "https://ws.audioscrobbler.com/2.0/"
+LASTFM_AUTH_URL = "https://www.last.fm/api/auth/"
+LASTFM_TIMEOUT = 8  # Seconds per request
+LASTFM_FILE = os.path.join(DATA_DIR, "lastfm.json")
+LASTFM_BATCH = 50  # Scrobbles per track.scrobble call (Last.fm's maximum)
+LASTFM_MAX_PENDING = 500  # Scrobbles kept per user while Last.fm is down
+LASTFM_MIN_TRACK_SECONDS = 30  # Shorter tracks are never scrobbled
+LASTFM_MAX_THRESHOLD = 240  # A track counts after half its length or 4 minutes
+LASTFM_TOKEN_MINUTES = 55  # A Last.fm auth token is valid for an hour
+
 # Only create a temp directory if one wasn't provided. Using tempfile.mkdtemp()
 # directly as the default argument would create an orphan directory on every run
 # because default arguments are evaluated eagerly.

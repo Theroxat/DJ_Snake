@@ -6,7 +6,7 @@ import os
 import discord
 
 from . import commands  # noqa: F401  (registers the commands)
-from . import backup, cookies, state, stats
+from . import backup, cookies, lastfm, state, stats
 from .config import COMMAND_PREFIX, SLASH_SYNC_GUILD
 from .controls import voteskip_update
 from .i18n import t
@@ -173,6 +173,11 @@ async def close_bot():
         await stop_web_server()
     except Exception as e:
         print(f"Web server shutdown error: {e}")
+    if lastfm.enabled():
+        try:  # Last try for scrobbles still queued
+            await asyncio.wait_for(lastfm.flush(), timeout=5)
+        except Exception as e:
+            print(f"Last.fm flush on shutdown failed: {type(e).__name__}")
     await _close_bot()
 
 

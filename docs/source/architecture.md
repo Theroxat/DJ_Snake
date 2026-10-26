@@ -15,6 +15,7 @@ Lowest layer first; each module imports only the ones above it.
 | `playlists.py` | Saved playlists in SQLite (`playlists.db`). |
 | `playlist_io.py` | Playlist export (JSON, M3U, TXT) and validated file import. |
 | `backup.py` | Backup and restore of `DATA_DIR` (`python -m djsnake.backup`), plus the automatic backup task. |
+| `lastfm.py` | Optional Last.fm scrobbling: API signature, account linking, now playing, the scrobble queue sent in batches of 50 with retries, and the links stored in `DATA_DIR/lastfm.json` (mode 0600). |
 | `lyrics.py` | Lyrics from LRCLIB: LRC and YouTube title parsing, the lookup run in the background when a track is queued, and its memory and disk cache. |
 | `player.py` | `MusicPlayer` (per-server state), cleanup of files and history helpers. |
 | `themes.py` | Theme storage, logos and `!theme edit` tokens. |
@@ -79,7 +80,7 @@ discord.py drops and resumes the gateway roughly every couple of hours. Do no cl
 
 ### Persistent data
 
-Everything persistent lives in `DATA_DIR`: `themes.json` (per-server themes, written atomically), `languages.json` (per-server languages), `volume.json` (per-server volume), `voteskip.json` (vote-skip thresholds), `permissions.json` (DJ roles), `limits.json` (queue limits), `stay.json` (24/7 mode and its voice channel), `playlists.db` (saved playlists), `logos/`, `stats.db` (SQLite, WAL) and `lyrics/` (lyrics found on LRCLIB, one JSON file per YouTube video id). `backup.py` archives all of it; see [Backup and restore](backup.md).
+Everything persistent lives in `DATA_DIR`: `themes.json` (per-server themes, written atomically), `languages.json` (per-server languages), `volume.json` (per-server volume), `voteskip.json` (vote-skip thresholds), `permissions.json` (DJ roles), `limits.json` (queue limits), `stay.json` (24/7 mode and its voice channel), `lastfm.json` (Last.fm session keys, mode 0600), `playlists.db` (saved playlists), `logos/`, `stats.db` (SQLite, WAL) and `lyrics/` (lyrics found on LRCLIB, one JSON file per YouTube video id). `backup.py` archives all of it; see [Backup and restore](backup.md).
 
 ## Demo site
 

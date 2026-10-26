@@ -105,6 +105,7 @@ Every command is both a `!` command and a slash command (`/play`, `/playlist sav
 | `!reset` | Force a clean voice reconnect. |
 | `!theme [preset\|reset\|edit]` | Show or set the clip page's default theme for the server. `edit` DMs you a private editor link. Needs the Manage Server permission. |
 | `!weblink` | DM you the clip page's control link (and the view-only link). DJs only when control is limited. |
+| `!lastfm link\|unlink\|status` | Link your own Last.fm account to scrobble what you hear with the bot. Only when `LASTFM_API_KEY` and `LASTFM_API_SECRET` are set, see [Last.fm](#lastfm-scrobbling). |
 | `!djrole [role\|off]` | Show, set or remove the DJ role. Needs the Manage Server permission. |
 
 | `!language [code\|reset]` | Show or set the language of the bot and the clip page for the server (`en`, `fr`, `es`, `de`). Needs the Manage Server permission. |
@@ -140,6 +141,10 @@ Limits:
 - Short `spotify.link` links are refused: open them and copy the `open.spotify.com` address.
 
 DJ Snake is not affiliated with or endorsed by Spotify.
+
+## Last.fm scrobbling
+
+Optional and off by default. Create an API account at [last.fm/api/account/create](https://www.last.fm/api/account/create) and set `LASTFM_API_KEY` and `LASTFM_API_SECRET`. Each user then runs `/lastfm link`, opens the link the bot sends privately, allows DJ Snake and presses **Done**. From then on, every linked user who is in the bot's voice channel gets "now playing" when a track starts and a scrobble when it ends after being played for half its length or 4 minutes (tracks under 30 seconds are never scrobbled). Artist, title and album come from the Spotify, Deezer or Apple Music link when there is one, else from the YouTube title ("Artist - Title"). Autoplay tracks count too. `/lastfm unlink` forgets the account. Failed scrobbles are retried in batches of 50 and never block playback. See the [how-to](https://dj-snake.readthedocs.io/en/latest/lastfm.html).
 
 ## Clip page
 
@@ -271,6 +276,7 @@ Set these in `.env` (see `.env.example`).
 | `YTDLP_COOKIES` | empty | Path to a Netscape `cookies.txt` for age-restricted / members-only videos. Use a throwaway account (see below). |
 | `BACKUP_INTERVAL_HOURS` | `0` | Hours between automatic backups of `DATA_DIR` into `DATA_DIR/backups/` (`0` = off). |
 | `BACKUP_KEEP` | `7` | Automatic backups to keep. |
+| `LASTFM_API_KEY` / `LASTFM_API_SECRET` | empty | Optional Last.fm API credentials; both turn on `/lastfm` scrobbling. |
 | `YTDLP_AUTO_UPDATE` | `1` | Upgrade yt-dlp on container start (`0` to skip). |
 | `METRICS` | `0` | `1` serves Prometheus metrics on `GET /metrics`. `GET /healthz` (used by the Docker health check) is always on. |
 

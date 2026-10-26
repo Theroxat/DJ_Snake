@@ -22,6 +22,7 @@
 - **Saved playlists**: save the queue under a name and load it again later.
 - **Plain text search**: `!play never gonna give you up` queues the best YouTube match.
 - **Slash commands**: every command works as `!name` and `/name`.
+- **Optional Last.fm scrobbling**, per user, for everyone listening in the voice channel ([details](lastfm.md)).
 - **Synced lyrics** over the clip, from LRCLIB (`LYRICS=0` turns them off).
 - **Live updates**: the clip page follows the queue in real time, with no refresh.
 - **View-only link and DJ role**: share a page that cannot control playback, and limit who can skip, stop or change settings.
@@ -52,6 +53,7 @@ commands
 clip-page
 spotify
 sources
+lastfm
 youtube
 backup
 troubleshooting
