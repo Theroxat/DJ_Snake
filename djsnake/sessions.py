@@ -93,6 +93,7 @@ def expire_session(player):
         player.expired = True
         refresh_panel(player)
     player.cancel_idle()
+    player.cancel_live()
     if not player.in_voice():
         tracks = list(player.queue) + list(player.history)
         if player.now_playing:
@@ -239,7 +240,11 @@ def render_panel(player):
         lines.append(t("panel.lingering", lang, delay=delay))
     elif player.now_playing:
         title = short(player.now_playing["title"])
+        if player.now_playing.get("live_title"):  # A radio's current song
+            title += f" — {short(player.now_playing['live_title'])}"
         line = t("panel.now_playing", lang, title=title)
+        if player.now_playing.get("live"):
+            line += t("panel.live", lang)
         if player.paused_at is not None:
             line += t("panel.paused", lang)
         if player.now_playing.get("autoplay"):

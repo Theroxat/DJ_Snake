@@ -219,7 +219,20 @@ PERMANENT_ERROR_MARKERS = (
     "members-only",
     "who has blocked it",
     "copyright",
+    "is not currently live",  # Twitch channel offline
+    "live event will begin",  # YouTube live not started yet
 )
+# Live streams (YouTube lives, Twitch channels, internet radios) are never
+# downloaded: FFmpeg reads them as they come, with these reconnect options.
+# There is no automix analysis (one-pass loudnorm instead), no SponsorBlock,
+# no seek and no crossfade. A live item stops after LIVE_MAX_HOURS (0: never),
+# and the queue goes on.
+LIVE_MAX_HOURS = max(0.0, float(os.getenv("LIVE_MAX_HOURS", "4") or 0))
+LIVE_RECONNECT = "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
+LIVE_META_SECONDS = 30  # A radio's ICY "StreamTitle" is read this often
+LIVE_PROBE_TIMEOUT = 8  # Seconds per HTTP request reading a radio link
+LIVE_PLAYLIST_MAX_BYTES = 64 * 1024  # .pls / .m3u files larger are refused
+LIVE_ICY_MAX_METAINT = 256 * 1024  # Audio bytes read before ICY metadata
 # Automix, always on. At download, SponsorBlock "music_offtopic" segments
 # (skits, talking intros) are cut out of the file. One ffmpeg pass then
 # measures loudness (loudnorm, first pass) and leading/trailing silence.

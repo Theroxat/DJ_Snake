@@ -1,14 +1,20 @@
 """YouTube media: URL parsing, yt-dlp search and download, automix analysis
 and FFmpeg playback options. Everything blocking here runs in an executor."""
 
+import http.client
+import ipaddress
 import json
 import math
 import os
 import re
 import secrets
+import shlex
+import socket
 import subprocess
 import time
-from urllib.parse import parse_qs, urlparse
+import urllib.error
+import urllib.request
+from urllib.parse import parse_qs, urljoin, urlparse, urlsplit
 
 import yt_dlp
 from yt_dlp.postprocessor import ModifyChaptersPP, SponsorBlockPP
@@ -23,6 +29,10 @@ from .config import (
     EXTRACTOR_ARGS,
     FADE_IN_SECONDS,
     FADE_OUT_SECONDS,
+    LIVE_ICY_MAX_METAINT,
+    LIVE_PLAYLIST_MAX_BYTES,
+    LIVE_PROBE_TIMEOUT,
+    LIVE_RECONNECT,
     LOUDNORM_KEYS,
     LOUDNORM_TARGET,
     MAX_LEADING_TRIM,
@@ -87,8 +97,9 @@ def parse_youtube_url(url):
         video_id = parsed.path.strip("/")
     elif host in YOUTUBE_HOSTS:
         video_id = query.get("v", [""])[0]
-        if not video_id and parsed.path.startswith("/shorts/"):
-            video_id = parsed.path[len("/shorts/") :].strip("/")
+        for prefix in ("/shorts/", "/live/"):  # /live/<id>: a live stream link
+            if not video_id and parsed.path.startswith(prefix):
+                video_id = parsed.path[len(prefix) :].strip("/")
         if not video_id:
             list_id = query.get("list", [""])[0]
             if _LIST_ID_RE.match(list_id):
@@ -161,12 +172,57 @@ def _parse_bandcamp(host, parsed):
     return kind, f"https://{host}/{match.group(1)}/{match.group(2)}"
 
 
+TWITCH_HOSTS = {"twitch.tv", "www.twitch.tv", "m.twitch.tv"}
+_TWITCH_CHANNEL_RE = re.compile(r"^[A-Za-z0-9_]{3,25}$")
+# Twitch pages that are not a channel.
+_TWITCH_RESERVED = {
+    "directory",
+    "videos",
+    "settings",
+    "search",
+    "downloads",
+    "jobs",
+    "store",
+    "turbo",
+    "subscriptions",
+    "inventory",
+    "wallet",
+    "drops",
+    "friends",
+    "messages",
+    "login",
+    "signup",
+    "logout",
+    "prime",
+    "bits",
+    "broadcast",
+    "moderator",
+    "popout",
+    "team",
+    "products",
+    "privacy",
+}
+
+
+def _parse_twitch(parsed):
+    """A Twitch channel (`twitch.tv/<channel>`): its live stream. VODs and
+    clips are not accepted."""
+    segments = [seg for seg in parsed.path.split("/") if seg]
+    if len(segments) != 1 or not _TWITCH_CHANNEL_RE.match(segments[0]):
+        return None
+    channel = segments[0].lower()
+    if channel in _TWITCH_RESERVED:
+        return None
+    return "single", f"https://www.twitch.tv/{channel}"
+
+
 def parse_media_url(url):
     """Validate a URL from the web page and rebuild it canonically: a YouTube
-    link (see parse_youtube_url) or a SoundCloud or Bandcamp track, set or
-    album. Returns ("single" | "playlist", url) or None. Short links
-    (on.soundcloud.com) and custom Bandcamp domains are refused: the host
-    has to be known before yt-dlp is given the URL."""
+    link (see parse_youtube_url), a SoundCloud or Bandcamp track, set or
+    album, or a Twitch channel. Returns ("single" | "playlist", url) or None.
+    Short links (on.soundcloud.com) and custom Bandcamp domains are refused:
+    the host has to be known before yt-dlp is given the URL. Internet radio
+    links are checked apart, see parse_radio_url()."""
     parsed_youtube = parse_youtube_url(url)
     if parsed_youtube is not None:
         return parsed_youtube
@@ -182,6 +238,8 @@ def parse_media_url(url):
         return None
     if host in SOUNDCLOUD_HOSTS:
         return _parse_soundcloud(parsed)
+    if host in TWITCH_HOSTS:
+        return _parse_twitch(parsed)
     return _parse_bandcamp(host, parsed)
 
 
@@ -205,13 +263,15 @@ def parse_play_url(url):
 
 
 def source_of(url):
-    """Platform of a track URL: youtube, soundcloud or bandcamp (the page
-    labels the download with it)."""
+    """Platform of a track URL: youtube, soundcloud, bandcamp or twitch (the
+    page labels the download with it)."""
     host = (urlparse(url or "").hostname or "").lower()
     if host in SOUNDCLOUD_HOSTS or host.endswith(".soundcloud.com"):
         return "soundcloud"
     if host == "bandcamp.com" or host.endswith(".bandcamp.com"):
         return "bandcamp"
+    if host in TWITCH_HOSTS:
+        return "twitch"
     return "youtube"
 
 
@@ -545,19 +605,35 @@ def _download_once(url, on_title=None, max_seconds=None):
         ydl_opts["progress_hooks"] = [
             lambda d: on_title((d.get("info_dict") or {}).get("title"))
         ]
+    # A live stream cannot be downloaded: stop before the download starts
+    # and play it as a live item instead (see live_from_info).
+    ydl_opts["match_filter"] = _refuse_live
 
     too_long = []
     if max_seconds:
-        ydl_opts["match_filter"] = _duration_filter(max_seconds, too_long)
+        too_long_check = _duration_filter(max_seconds, too_long)
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        print(f"Downloading: {url}")
-        info = ydl.extract_info(url, download=True)
-        if too_long:
-            raise TrackTooLong(too_long[0])
-        filepath = _find_download(info)
-        if source_of(url) == "youtube":  # SponsorBlock only knows YouTube
-            _remove_offtopic(ydl, info, filepath)
+        def live_then_length(info, *, incomplete=False):
+            # A live is refused first (it plays as a live item, no length).
+            _refuse_live(info, incomplete=incomplete)
+            return too_long_check(info, incomplete=incomplete)
+
+        ydl_opts["match_filter"] = live_then_length
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            print(f"Downloading: {url}")
+            info = ydl.extract_info(url, download=True)
+            if too_long:
+                raise TrackTooLong(too_long[0])
+            filepath = _find_download(info)
+            if source_of(url) == "youtube":  # SponsorBlock only knows YouTube
+                _remove_offtopic(ydl, info, filepath)
+    except LiveStream as live:
+        track = live_from_info(live.info, url)
+        if on_title is not None:
+            on_title(track["title"])
+        return track
 
     analysis = analyse_media(filepath)
     duration = analysis["duration"] or info.get("duration")
@@ -752,3 +828,360 @@ def download_media(url, on_title=None, max_seconds=None):
             time.sleep(delay)
 
     raise RuntimeError(f"Error during download: {last_error}")
+
+
+# --- Live streams -------------------------------------------------------------
+#
+# YouTube lives, Twitch channels and internet radios are never downloaded:
+# a live item has no file (`filepath` None) and `live: True`, and FFmpeg reads
+# its `stream_url` as it comes (live_options). No automix analysis, no
+# SponsorBlock, no seek, no crossfade, no known duration.
+
+
+class LiveStream(Exception):
+    """Raised by the yt-dlp match filter when the link is live right now."""
+
+    def __init__(self, info):
+        super().__init__("live stream")
+        self.info = info
+
+
+def is_live_info(info):
+    return bool(info.get("is_live")) or info.get("live_status") == "is_live"
+
+
+def _refuse_live(info, *, incomplete=False):
+    """yt-dlp match_filter: called before the format selection (with
+    `incomplete` the set of format fields not known yet) and again before
+    the download. Whether the video is live is known either way."""
+    if is_live_info(info):
+        raise LiveStream(info)
+    return None
+
+
+_LIVE_PROTOCOLS = ("http", "https", "m3u8", "m3u8_native")
+
+
+def pick_live_format(formats):
+    """The format FFmpeg should read for a live stream: an audio-only one
+    (Twitch's "audio_only") with the best bitrate, else the smallest muxed
+    one of 360p or more (YouTube lives only offer muxed HLS; below 360p the
+    audio is 48 kb/s). Only plain HTTP(S) or HLS URLs. None if nothing fits."""
+    usable = [
+        f
+        for f in formats or []
+        if str(f.get("url") or "").startswith(("http://", "https://"))
+        and (f.get("protocol") or "https") in _LIVE_PROTOCOLS
+        and f.get("acodec") != "none"
+    ]
+    audio = [f for f in usable if f.get("vcodec") == "none"]
+    if audio:
+        return max(audio, key=lambda f: f.get("abr") or f.get("tbr") or 0)
+    if not usable:
+        return None
+    by_size = sorted(usable, key=lambda f: (f.get("height") or 0, f.get("tbr") or 0))
+    for f in by_size:
+        if (f.get("height") or 0) >= 360:
+            return f
+    return by_size[-1]
+
+
+def live_track(url, stream_url, title, source, **fields):
+    """A live queue item: no file, no duration, never analysed."""
+    track = {
+        "id": secrets.token_hex(4),
+        "filepath": None,
+        "live": True,
+        "stream_url": stream_url,
+        "http_headers": {},
+        "title": title or "Live",
+        "duration": None,
+        "start": 0.0,
+        "end": None,
+        "loudnorm": None,
+        "thumbnail": None,
+        # No video file: the page shows the artwork and a LIVE badge.
+        "audio_only": True,
+        "url": url,
+        "video_id": None,
+        "channel": None,
+        "source": source,
+        "live_title": None,  # A radio's current ICY StreamTitle
+    }
+    track.update(fields)
+    return track
+
+
+def live_from_info(info, url):
+    """The live item for a YouTube live or a Twitch channel, from the info
+    yt-dlp extracted (no second request). Raises if no format can be read."""
+    fmt = pick_live_format(info.get("formats"))
+    if fmt is None and str(info.get("url") or "").startswith(("http://", "https://")):
+        fmt = info
+    if fmt is None:
+        raise RuntimeError("No playable format for this live stream")
+    return live_track(
+        info.get("webpage_url") or url,
+        fmt["url"],
+        info.get("fulltitle") or info.get("title"),
+        source_of(url),
+        http_headers=dict(fmt.get("http_headers") or info.get("http_headers") or {}),
+        thumbnail=info.get("thumbnail"),
+        video_id=info.get("id"),
+        channel=info.get("channel") or info.get("uploader"),
+    )
+
+
+def live_options(track):
+    """FFmpeg options for a live item: reconnect on network errors, audio
+    only, a one-pass loudnorm (no measurement is possible) and a short
+    fade-in. No -ss/-t: it plays until it ends or is skipped."""
+    before = LIVE_RECONNECT
+    agent = (track.get("http_headers") or {}).get("User-Agent")
+    if agent:
+        before += f" -user_agent {shlex.quote(str(agent))}"
+    filters = f"loudnorm={LOUDNORM_TARGET},afade=t=in:st=0:d={FADE_IN_SECONDS:.3f}"
+    return {"before_options": before, "options": f"-vn -af {filters}"}
+
+
+# --- Internet radio links ----------------------------------------------------
+
+
+class StreamError(Exception):
+    """A radio link that cannot be played; `code` is a ControlError code."""
+
+    def __init__(self, code):
+        super().__init__(code)
+        self.code = code
+
+
+# Hosts with their own parser (or none): never probed as a radio.
+_NOT_RADIO_HOSTS = (
+    YOUTUBE_HOSTS
+    | SOUNDCLOUD_HOSTS
+    | TWITCH_HOSTS
+    | {"youtu.be", "open.spotify.com", "play.spotify.com", "spotify.link"}
+    | {"www.deezer.com", "deezer.com", "deezer.page.link", "link.deezer.com"}
+    | {"music.apple.com", "itunes.apple.com"}
+)
+_PLAYLIST_TYPES = {
+    "application/vnd.apple.mpegurl",
+    "application/x-mpegurl",
+    "audio/x-mpegurl",
+    "audio/mpegurl",
+    "audio/x-scpls",
+    "application/pls+xml",
+}
+_GENERIC_TYPES = {"text/plain", "application/octet-stream", "binary/octet-stream"}
+_STREAM_TYPES = {"application/ogg"}
+_RADIO_HEADERS = {"User-Agent": "DJSnake/1.0 (radio check)", "Icy-MetaData": "1"}
+
+
+# The last path segment of a radio link: a stream or playlist file
+# ("fip-midfi.mp3", "groovesalad-128-mp3", "live.m3u8", "radio.pls") or a
+# usual mount point ("/stream", "/listen", "/live", Shoutcast's "/;").
+_RADIO_PATH_RE = re.compile(
+    r"([-_.](mp3|aac|aacp|ogg|oga|opus|flac|m3u8?|pls)|^(stream|listen|live|;))$",
+    re.IGNORECASE,
+)
+
+
+def parse_radio_url(url, check_path=True):
+    """A link that may be an internet radio (Icecast, Shoutcast, HLS, .pls or
+    .m3u): http(s), no credentials, not a host with its own parser, not a
+    private IP, and a path that looks like a stream (_RADIO_PATH_RE). Returns
+    the cleaned URL or None. probe_stream() then checks the content type and
+    refuses hosts that resolve to private addresses. Redirects and playlist
+    entries skip the path check (`check_path=False`)."""
+    if not isinstance(url, str) or len(url) > 2048:
+        return None
+    url = url.strip()
+    try:
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower()
+        parsed.port  # Raises on a malformed port
+    except ValueError:
+        return None
+    if parsed.scheme not in ("http", "https") or parsed.username or not host:
+        return None
+    if host in _NOT_RADIO_HOSTS or host.endswith(".bandcamp.com"):
+        return None
+    if any(c.isspace() for c in url):
+        return None
+    try:
+        if not ipaddress.ip_address(host.strip("[]")).is_global:
+            return None
+    except ValueError:
+        pass  # A name: checked when it is resolved
+    # urlsplit: Shoutcast's "/;" is a path here, not URL parameters.
+    segment = urlsplit(url).path.rstrip("/").rsplit("/", 1)[-1]
+    if check_path and not _RADIO_PATH_RE.search(segment):
+        return None
+    return url
+
+
+def _check_public(url):
+    """Refuse a host that resolves to a private, loopback or reserved
+    address: the bot must not be used to reach its own network."""
+    host = urlparse(url).hostname or ""
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except OSError:
+        raise StreamError("stream_unreachable")
+    for info in infos:
+        address = ipaddress.ip_address(str(info[4][0]).split("%")[0])
+        if not address.is_global:
+            raise StreamError("bad_url")
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None  # Each hop is checked by probe_stream itself
+
+
+_radio_opener = urllib.request.build_opener(_NoRedirect)
+
+
+def _open(url):
+    """GET `url` after the address check. Returns the response; a redirect
+    raises urllib.error.HTTPError (3xx)."""
+    _check_public(url)
+    request = urllib.request.Request(url, headers=_RADIO_HEADERS)
+    return _radio_opener.open(request, timeout=LIVE_PROBE_TIMEOUT)
+
+
+def _clean_name(value):
+    if not value:
+        return None
+    if isinstance(value, bytes):
+        value = value.decode("utf-8", "replace")
+    value = "".join(c for c in str(value) if c.isprintable()).strip()
+    return value[:200] or None
+
+
+def parse_playlist_file(body):
+    """First stream URL and title of a .pls or plain .m3u playlist."""
+    text = body.decode("utf-8", "replace")
+    url = title = None
+    if "[playlist]" in text.lower():
+        for line in text.splitlines():
+            key, _, value = line.partition("=")
+            key = key.strip().lower()
+            if key == "file1" and url is None:
+                url = value.strip()
+            elif key == "title1" and title is None:
+                title = value.strip()
+    else:
+        for line in text.splitlines():
+            line = line.strip()
+            if line.upper().startswith("#EXTINF:") and title is None:
+                title = line.partition(",")[2].strip()
+            elif line and not line.startswith("#"):
+                url = line
+                break
+    return url, _clean_name(title)
+
+
+def probe_stream(url, depth=0):
+    """Check that `url` is an audio stream and build its live item: an
+    Icecast/Shoutcast stream (content-type audio/*), an HLS playlist, or a
+    .pls/.m3u file pointing to one (followed once). Redirects are followed
+    up to 3 times, each hop checked again. Blocking: run it in an executor.
+    Raises StreamError."""
+    if depth > 1:
+        raise StreamError("not_a_stream")
+    current = url
+    for _ in range(4):
+        try:
+            response = _open(current)
+        except urllib.error.HTTPError as e:
+            location = e.headers.get("Location") if 300 <= e.code < 400 else None
+            e.close()
+            if not location:
+                raise StreamError("stream_unreachable")
+            current = parse_radio_url(urljoin(current, location), check_path=False)
+            if current is None:
+                raise StreamError("bad_url")
+            continue
+        except http.client.BadStatusLine as e:
+            if "ICY" in str(e):  # Shoutcast v1 answers "ICY 200 OK"
+                return live_track(url, current, urlparse(current).hostname, "radio")
+            raise StreamError("stream_unreachable")
+        except StreamError:
+            raise
+        except Exception:
+            raise StreamError("stream_unreachable")
+        break
+    else:
+        raise StreamError("stream_unreachable")
+
+    with response:
+        ctype = response.headers.get_content_type()
+        name = _clean_name(response.headers.get("icy-name"))
+        path = urlparse(current).path.lower()
+        playlist_ext = path.endswith((".m3u", ".m3u8", ".pls"))
+        if ctype in _PLAYLIST_TYPES or (ctype in _GENERIC_TYPES and playlist_ext):
+            body = response.read(LIVE_PLAYLIST_MAX_BYTES + 1)
+            if len(body) > LIVE_PLAYLIST_MAX_BYTES:
+                raise StreamError("not_a_stream")
+            if b"#EXT-X-" in body:  # HLS: FFmpeg reads the playlist itself
+                title = name or urlparse(current).hostname
+                return live_track(url, current, title, "radio")
+            entry, title = parse_playlist_file(body)
+            entry = parse_radio_url(urljoin(current, entry or ""), check_path=False)
+            if not entry or entry == current:
+                raise StreamError("not_a_stream")
+            track = probe_stream(entry, depth + 1)
+            track["url"] = url
+            if title and track["title"] == urlparse(entry).hostname:
+                track["title"] = title
+            return track
+        if ctype.startswith("audio/") or ctype in _STREAM_TYPES:
+            title = name or urlparse(current).hostname
+            return live_track(url, current, title, "radio")
+    raise StreamError("not_a_stream")
+
+
+_STREAM_TITLE_RE = re.compile(rb"StreamTitle='(.*?)';", re.DOTALL)
+
+
+def parse_icy_metadata(block):
+    """The StreamTitle of one ICY metadata block (bytes), or None."""
+    match = _STREAM_TITLE_RE.search(block or b"")
+    if not match:
+        return None
+    raw = match.group(1)
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        text = raw.decode("latin-1")
+    return _clean_name(text)
+
+
+def _read_exactly(response, size):
+    data = b""
+    while len(data) < size:
+        chunk = response.read(size - len(data))
+        if not chunk:
+            break
+        data += chunk
+    return data
+
+
+def read_icy_title(stream_url):
+    """What a radio plays now (ICY "StreamTitle"), or None: one request that
+    reads up to `icy-metaint` audio bytes and the metadata block after them.
+    Blocking, never raises."""
+    try:
+        with _open(stream_url) as response:
+            metaint = int(response.headers.get("icy-metaint") or 0)
+            if not 0 < metaint <= LIVE_ICY_MAX_METAINT:
+                return None
+            if len(_read_exactly(response, metaint)) < metaint:
+                return None
+            length = _read_exactly(response, 1)
+            if not length:
+                return None
+            return parse_icy_metadata(_read_exactly(response, length[0] * 16))
+    except Exception:
+        return None

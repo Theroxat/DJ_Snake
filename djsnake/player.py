@@ -92,6 +92,9 @@ class MusicPlayer:
         # the current track, and the one message showing the count.
         self.votes = set()
         self.vote_message = None
+        # A playing live item's watcher (playback.watch_live): its time limit
+        # (LIVE_MAX_HOURS) and, for a radio, the ICY title.
+        self.live_task = None
 
     @property
     def loading(self):
@@ -104,6 +107,12 @@ class MusicPlayer:
     def cancel_idle(self):
         """Drop the idle linger timer, if any (it never leaves after this)."""
         task, self.idle_task, self.idle_delay = self.idle_task, None, None
+        if task is not None and not task.done():
+            task.cancel()
+
+    def cancel_live(self):
+        """Drop the live item watcher, if any."""
+        task, self.live_task = self.live_task, None
         if task is not None and not task.done():
             task.cancel()
 
@@ -202,6 +211,7 @@ class MusicPlayer:
 
     def stop_and_clear(self):
         self.cancel_idle()
+        self.cancel_live()
         self.should_stop = True
         self.epoch += 1
         self.drop_autoplay_next()

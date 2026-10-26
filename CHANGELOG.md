@@ -55,6 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Audio filters per session: `!filter [off|bassboost|nightcore|vaporwave|8d|karaoke|soft]` and `!filter eq <low> <mid> <high>` (-12 to 12 dB), a picker in the clip page's volume popover and a `filter` control action. A change restarts the playing track where it is, crossfade keeps working, and setting a filter needs the DJ role when there is one. Nightcore and vaporwave change the real playback speed: `/api/{sid}/state` exposes `filter`, `eq` and `rate`, and the page runs the video, progress bar and lyrics at that rate. The status panel shows the filter when it is on.
+### Added
+
+- Live streams: YouTube lives, Twitch channels and internet radios (Icecast, Shoutcast, HLS `.m3u8`, `.pls`, `.m3u`) play straight from the stream, without a download. The clip page shows a LIVE badge (and a radio's current song) instead of the progress bar; seek is refused, there is no crossfade, and the queue goes on when the stream ends. `LIVE_MAX_HOURS` (4) stops a forgotten live item.
 
 ## [1.4.0] - 2026-10-23
 

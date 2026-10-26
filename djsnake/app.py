@@ -66,6 +66,7 @@ async def on_voice_state_update(member, before, after):
         if guild.id in state.music_players:
             player = state.music_players[guild.id]
             player.cancel_idle()
+            player.cancel_live()
             player.voice_client = None
             player.is_playing = False
             refresh_panel(player)

@@ -155,7 +155,14 @@ def open_track_source(player, track, offset, fade_in=None):
     audio filter. Returns (offset, source, frames, fade_frames): the clamped
     offset, the source, its length in frames (None if unknown) and the
     length of its fade-out (0: cannot crossfade). `fade_in` and the frame
-    counts are wall time: a speed filter plays the file faster or slower."""
+    counts are wall time: a speed filter plays the file faster or slower. A
+    live item always starts at 0, with no known length, no crossfade and no
+    filter."""
+    if track.get("live"):
+        source = discord.FFmpegPCMAudio(
+            track["stream_url"], **media.live_options(track)
+        )
+        return 0.0, source, None, 0
     name, eq = getattr(player, "filter", "off"), getattr(player, "eq", None)
     rate = filters.rate(name)
     eligible = crossfade_eligible(track)
@@ -365,7 +372,8 @@ async def _download_and_queue(
             track.update(extra)
         player.add_to_queue(track)
         player.drop_pending(pending_key)  # Never listed twice on the page
-        lyrics.prefetch(track)  # Background, ready before the track plays
+        if not track.get("live"):
+            lyrics.prefetch(track)  # Background, ready before the track plays
         if quiet:
             refresh_panel(player)
         else:
@@ -635,6 +643,7 @@ async def _advance(ctx, player):
     """Retire the current track according to pending_action and start the
     next one. Must run under player.lock."""
     action, player.pending_action = player.pending_action, None
+    player.cancel_live()  # The live item (if any) is being left
     if action is None:
         player.last_action = None  # The track ended by itself
     if action in ("restart", "seek"):
@@ -659,19 +668,36 @@ async def _advance(ctx, player):
         # Loop queue put that track back at the end of the queue when it
         # ended: it plays now, so drop that copy (no duplicate entries).
         player.queue = [q for q in player.queue if q is not next_track]
-    elif action is None and player.loop == "track" and finished:
-        # Loop track: replay it as a new play (stats count each pass)
+    elif (
+        action is None
+        and player.loop == "track"
+        and finished
+        and not finished.get("live")
+    ):
+        # Loop track: replay it as a new play (stats count each pass). A live
+        # item that ended has nothing to replay: the queue goes on.
         next_track = finished
     else:
         if finished:
             push_history(player, finished)
-            if player.loop == "queue" and action in (None, "next"):
+            # A live stream that ended by itself is not queued again (it
+            # would fail at once, forever); skipped, it comes back.
+            ended_live = finished.get("live") and action is None
+            if player.loop == "queue" and action in (None, "next") and not ended_live:
                 player.queue.append(finished)  # Back to the end of the queue
         next_track = player.next_in_queue()
     if next_track is None and autoplay_wanted(player):
         next_track = _take_autoplay(ctx, player, finished)
 
-    while next_track is not None and not os.path.exists(next_track["filepath"]):
+    if action is None and finished and finished.get("live"):
+        title = short(finished["title"])
+        player.last_action = t("action.live_ended", player_lang(player), title=title)
+
+    while (
+        next_track is not None
+        and not next_track.get("live")
+        and not os.path.exists(next_track["filepath"])
+    ):
         await ctx.send(
             t("play.file_not_found", ctx_lang(ctx), title=next_track["title"])
         )
@@ -753,8 +779,93 @@ async def _advance(ctx, player):
         player.voice_client.pause()
         player.paused_at = now
     player.last_active = state.clock()
+    if next_track.get("live"):
+        watch_live(player, gen, next_track)
     prefetch_autoplay(ctx, player)
     refresh_panel(player)
+
+
+def watch_live(player, gen, track):
+    """Start the playing live item's watcher (player.live_task): it ends the
+    item after LIVE_MAX_HOURS and keeps a radio's ICY title up to date."""
+    player.cancel_live()
+    task = asyncio.get_running_loop().create_task(_watch_live(player, gen, track))
+    player.live_task = task
+    state.background_tasks.add(task)
+    task.add_done_callback(state.background_tasks.discard)
+    return task
+
+
+async def _watch_live(player, gen, track):
+    limit = config.LIVE_MAX_HOURS * 3600
+    deadline = time.monotonic() + limit if limit > 0 else None
+    radio = track.get("source") == "radio"
+    loop = asyncio.get_running_loop()
+    wait = 0.0 if radio else None  # A radio's title is read at once
+    while True:
+        if deadline is not None:
+            left = max(0.0, deadline - time.monotonic())
+            wait = left if wait is None else min(wait, left)
+        if wait is None:
+            return  # No limit and nothing to read
+        await asyncio.sleep(wait)
+        wait = config.LIVE_META_SECONDS if radio else None
+        if gen != player.play_gen or player.now_playing is not track:
+            return
+        if deadline is not None and time.monotonic() >= deadline:
+            await _end_live(player, gen, track)
+            return
+        if radio:
+            title = await loop.run_in_executor(
+                None, media.read_icy_title, track["stream_url"]
+            )
+            if title and title != track.get("live_title") and gen == player.play_gen:
+                track["live_title"] = title
+                refresh_panel(player)
+
+
+async def _end_live(player, gen, track):
+    """LIVE_MAX_HOURS reached: move on as a skip would (the queue goes on)."""
+    async with player.lock:
+        if (
+            gen != player.play_gen
+            or player.now_playing is not track
+            or player.pending_action is not None
+            or not player.is_playing
+            or not player.in_voice()
+        ):
+            return
+        hours = f"{config.LIVE_MAX_HOURS:g}"
+        lang = player_lang(player)
+        player.pending_action = "next"
+        player.last_action = t("action.live_limit", lang, hours=hours)
+        print(f"Live item stopped after {hours} h")
+        player.voice_client.stop()
+    refresh_panel(player)
+
+
+async def queue_live_track(ctx, player, track):
+    """Queue a live item already read (an internet radio, see
+    media.probe_stream) and start it if nothing plays."""
+    if player.should_stop:
+        return None
+    author = getattr(ctx, "author", None)
+    track["requester"] = getattr(author, "display_name", None)
+    track["requester_id"] = getattr(author, "id", None)
+    player.add_to_queue(track)
+    set_action(
+        player, t("action.added", player_lang(player), title=short(track["title"]))
+    )
+    if not player.is_playing:
+        await play_next(ctx)
+    return track
+
+
+async def read_radio(url):
+    """media.probe_stream() in an executor: the radio's live item. Raises
+    media.StreamError."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, media.probe_stream, url)
 
 
 def autoplay_wanted(player):
@@ -771,7 +882,9 @@ def autoplay_wanted(player):
 def _youtube_id(track):
     """The track's YouTube video id, or None (SoundCloud and Bandcamp tracks
     have ids of their own, which YouTube's mixes know nothing about)."""
-    if not track or media.source_of(track.get("url")) != "youtube":
+    if not track or track.get("live"):
+        return None  # A live stream's "mix" is no guide to music
+    if media.source_of(track.get("url")) != "youtube":
         return None
     video_id = track.get("video_id")
     return video_id if media._VIDEO_ID_RE.match(video_id or "") else None
@@ -816,6 +929,8 @@ async def _find_autoplay(player, seed, epoch):
         except Exception as e:
             print(f"Autoplay: download failed: {e}")
             continue
+        if track.get("live"):
+            continue  # Live now: never an autoplay pick (no file to drop)
         duration = track.get("duration")
         if cancelled(player, epoch) or (
             duration and duration > config.AUTOPLAY_MAX_SECONDS

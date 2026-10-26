@@ -371,8 +371,9 @@ async def _run(key, track):
 
 def prefetch(track):
     """Start fetching a track's lyrics in the background (no-op when lyrics
-    are off, cached or already being fetched). Never raises."""
-    if not ENABLED or not track:
+    are off, cached or already being fetched). Never raises. A live stream
+    has no song to look up: nothing is fetched for it."""
+    if not ENABLED or not track or track.get("live"):
         return None
     try:
         key = cache_key(track)
@@ -399,7 +400,7 @@ async def get(track, wait=LYRICS_WAIT_SECONDS):
     UNAVAILABLE (LRCLIB could not be reached) or PENDING (still being
     fetched after `wait` seconds).
     Starts a fetch if none ran yet."""
-    if not ENABLED:
+    if not ENABLED or track.get("live"):
         return None
     key = cache_key(track)
     if key in _cache:

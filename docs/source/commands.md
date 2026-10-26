@@ -4,7 +4,7 @@ Every command works two ways: as a text message with the prefix, `!` by default 
 
 | Command | Description |
 | --- | --- |
-| `!play <link or search text>` | Join your voice channel and queue a YouTube video or playlist, a SoundCloud or Bandcamp track or set, a Spotify, Deezer or Apple Music playlist, album or track, or the best YouTube match for the text. |
+| `!play <link or search text>` | Join your voice channel and queue a YouTube video or playlist, a SoundCloud or Bandcamp track or set, a Spotify, Deezer or Apple Music playlist, album or track, a YouTube live, a Twitch channel or an internet radio, or the best YouTube match for the text. |
 | `!list` | Show the current queue. |
 | `!remove <position>` | Remove a queued track by its position in `!list` (1 = next). Autocompletes the queue. Anyone may remove a track they queued themselves. |
 | `!move <from> <to>` | Move a queued track to another position. Autocompletes the queue. |
@@ -46,8 +46,9 @@ You must be in a voice channel. The bot joins it, posts the clip page link and a
 - **Plain text** (anything that is not a link, e.g. `!play daft punk one more time`, up to 200 characters) searches YouTube and queues the best match, using the same scoring as Spotify tracks. If nothing scores high enough the bot replies that no match was found.
 - **A Spotify link** (`/playlist/`, `/album/` or `/track/`) is matched to YouTube videos. See [Spotify](spotify.md).
 - **A SoundCloud or Bandcamp link** (track, set or album) is downloaded from the platform; **a Deezer or Apple Music link** is matched to YouTube like Spotify. See [More sources](sources.md).
+- **A YouTube live, a Twitch channel or an internet radio** is played as a stream, never downloaded. See [Live streams](sources.md#live-streams).
 
-`!play` and the clip page's add box accept only YouTube, SoundCloud, Bandcamp, Spotify, Deezer and Apple Music hosts. Links are rebuilt in canonical form before use (a YouTube video inside a playlist keeps both ids, for the one-track-or-list prompt); a link from any other host is refused with a "link not accepted" message. Without an argument, the bot answers with a usage message.
+`!play` and the clip page's add box accept only YouTube, SoundCloud, Bandcamp, Twitch, Spotify, Deezer and Apple Music hosts, plus internet radio links (see [Live streams](sources.md#live-streams)). Links are rebuilt in canonical form before use (a YouTube video inside a playlist keeps both ids, for the one-track-or-list prompt); a link from any other host is refused with a "link not accepted" message. Without an argument, the bot answers with a usage message.
 
 ### `!list`
 

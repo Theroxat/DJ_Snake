@@ -64,7 +64,8 @@ the real `ffmpeg` binary are marked `ffmpeg` and skipped without it. Patch
 `media.download_media`, `media.get_playlist_info`, `state.clock` or
 `sessions.PANEL_MIN_INTERVAL` on their module: callers look them up there.
 `conftest.py` also points `stats.DB_PATH`, the theme files and
-`permissions.PERMISSIONS_FILE` at the test's own directory and
+`permissions.PERMISSIONS_FILE` at the test's own directory, replaces
+`media._open` (the radio probe's HTTP) with a function raising `StreamError`, and
 calls `stats.flush()` at teardown; call `stats.flush()` before reading the
 database in a test.
 End-to-end tests live in `tests/e2e/`, marked `e2e`: `pytest.ini`'s `addopts`
@@ -110,7 +111,8 @@ which is no longer read), `TEMP_DIR`, `POT_BASE_URL`, `WEB_PORT` (47823),
 `PUBLIC_BASE_URL` (e.g. `https://dj.example.com`; empty falls back to
 `http://localhost:WEB_PORT`), `SESSION_IDLE_HOURS` (6), `IDLE_DISCONNECT_SECONDS`
 (300, the idle linger before leaving voice once the queue runs out), `AUTOPLAY`
-(0, default of the per-session autoplay), `VOTESKIP_PERCENT` (50, default vote-to-skip threshold, 1-100), `STAY_247` (0, default of the per-guild 24/7 mode, see Stay 24/7), `DATA_DIR` (`/app/data`, mounted from
+(0, default of the per-session autoplay), `VOTESKIP_PERCENT` (50, default vote-to-skip threshold, 1-100), `STAY_247` (0, default of the per-guild 24/7 mode, see Stay 24/7), `LIVE_MAX_HOURS` (4, hours a live
+item plays before the queue moves on; 0: no limit), `DATA_DIR` (`/app/data`, mounted from
 `./data` by Compose; the container's UID 1000 must be able to write it; it
 holds `themes.json`, `logos/`, `languages.json`, `volume.json`,
 `permissions.json`, `voteskip.json`, `limits.json`, `stay.json`, `lastfm.json`, `playlists.db`, `stats.db` and `lyrics/`),
@@ -535,6 +537,41 @@ Module map, lowest layer first (each imports only the ones above it):
   failure or bad payload), `short_link`. Tests:
   `tests/test_sources.py`, fixtures in `tests/fixtures/catalog/`; patch
   `catalog.get_tracks` or `spotify._http`.
+- **Live streams** (`media.py` "Live streams" section, `tests/test_live.py`):
+  YouTube lives, Twitch channels (`parse_media_url()` accepts
+  `twitch.tv/<channel>`, rebuilt as `https://www.twitch.tv/<channel>`, and
+  YouTube `/live/<id>`) and internet radios are never downloaded. A live item
+  is a queue track with `live: True`, `filepath` None, `stream_url`,
+  `http_headers`, `duration`/`end` None, `audio_only` True, `source`
+  (`youtube`, `twitch`, `radio`) and `live_title` (a radio's ICY
+  `StreamTitle`). Detection: `_download_once()` sets yt-dlp's `match_filter`
+  to `_refuse_live()`, which raises `LiveStream(info)` before any download
+  when `is_live`/`live_status == "is_live"`; `live_from_info()` then picks a
+  format (`pick_live_format()`: audio-only first, else the smallest muxed
+  >= 360p; HTTP(S)/HLS only) with no second request. Radios: the web add and
+  `!play` try `media.parse_radio_url()` when `parse_media_url()`/
+  `parse_play_url()` refuse a link (http(s), no credentials, not a known
+  host, no private IP literal, last path segment a stream/playlist file or
+  `/stream`, `/listen`, `/live`, `/;`), then `probe_stream()` in an executor
+  (`playback.read_radio()`, `controls.read_radio_link()`) before answering:
+  every hop resolved to public addresses only (`_check_public()`), no
+  automatic redirects (3 followed by hand, re-checked), content type
+  `audio/*`/ogg, HLS (`#EXT-X-`), or a `.pls`/`.m3u` followed once; codes
+  `not_a_stream` 400, `stream_unreachable` 502, `bad_url`.
+  `queue_live_track()` queues it. Playback: `open_track_source()` opens
+  `stream_url` with `media.live_options()` (`LIVE_RECONNECT` before the
+  input, `-user_agent` from the format headers, `-vn -af
+  loudnorm=<target>,afade` single pass, no `-ss`/`-t`); frames None, so no
+  crossfade either way. `_advance()` skips the file check for live items,
+  never replays an ended live under loop track nor re-queues it under loop
+  queue (a skipped one is), and sets `action.live_ended`. After a live
+  start `watch_live()` runs `player.live_task` (cancelled by `_advance()`,
+  `stop_and_clear()`, expiry, `!reset`, a kick): every `LIVE_META_SECONDS`
+  it reads a radio's title (`read_icy_title()`, executor) and at
+  `LIVE_MAX_HOURS` `_end_live()` acts as a "next" (`action.live_limit`).
+  `control_seek()` raises `live_no_seek` (409). Lyrics (`prefetch`, `get`,
+  the route) and autoplay seeds skip live items; `/media` 404s (no file).
+  Stats record the play with `duration` NULL and its listening time.
 - **Pending downloads** (`player.pending_downloads`, the page's "Downloading"): an ordered list of `{key, title, source}` (`source`
   `youtube`, `spotify`, `deezer`, `apple`, `soundcloud` or `bandcamp`; `title` None until known, the page then shows "Reading
   link…") for every track asked for but not queued yet. `add_pending()`
@@ -606,8 +643,9 @@ Module map, lowest layer first (each imports only the ones above it):
   `GET /api/{sid}/state` returns `{active, in_voice, guild, channel, loading,
   paused, can_previous, can_control, crossfade, loop, volume, autoplay, votes, stay,
   filter, eq, rate, crossfading, server_time, viewers, lang, lyrics, now_playing: {id, title,
-  duration, thumbnail, url, autoplay, video_url, audio_only, elapsed, start,
-  end} | null, queue: [{id, title, duration, thumbnail, url, autoplay}],
+  duration, thumbnail, url, autoplay, live, live_title, video_url,
+  audio_only, elapsed, start, end} | null, queue: [{id, title, duration,
+  thumbnail, url, autoplay, live}],
   downloading: [{key, title, source}], downloading_total, theme: {skin, base,
   bg, text, accent, name, logo_url}}`
   (404 `{"active": false}` when the sid is unknown or
@@ -666,7 +704,11 @@ Module map, lowest layer first (each imports only the ones above it):
   `djsnake_active_players`, `_queued_tracks`, `_downloads_in_progress`,
   `_web_viewers`, `_discord_latency_seconds` and the counter
   `djsnake_tracks_played_total` (`state.counters`, bumped by `retire_play()`).
-  Tests: `tests/test_health.py`.
+  Tests: `tests/test_health.py`. A live item's `now_playing` has `live`
+  true, `video_url` null and `end` null: the page sets `data-live` on
+  `#progline` (the seek bar and times hide, the `#onair` badge and
+  `#onairnow`, the radio's `live_title`, show), loads no video (artwork, or
+  the "On air" overlay without one), skips the sync correction and lyrics.
 - **Live updates** (`web_events()`, `state_body()` builds the JSON shared with
   `/state`): one `data:` event with the full state on connect, then one per
   wake-up, coalesced to one per `SSE_MIN_INTERVAL` (0.1 s, last state wins);
