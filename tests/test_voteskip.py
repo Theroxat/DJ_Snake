@@ -408,3 +408,32 @@ async def test_update_without_votes_does_not_skip(player, playing):
     count, needed, skipped = await voteskip_update(player, GUILD_ID)
     assert (count, skipped) == (0, False)
     assert FakeChannel  # Imported for parity with other test modules
+
+
+async def test_vote_does_not_skip_a_track_that_changed(player, playing, monkeypatch):
+    """The votes were counted for A; if B started before the skip is applied,
+    B must keep playing."""
+    from djsnake import controls
+
+    voters = join(player, 1)
+    player.votes.add(voters[0].id)
+    real_status = voteskip.status
+
+    def status_then_advance(p, gid):
+        result = real_status(p, gid)
+        p.play_gen += 1  # Another track started after the count
+        return result
+
+    monkeypatch.setattr(controls.voteskip, "status", status_then_advance)
+    count, needed, skipped = await voteskip_update(player, GUILD_ID)
+    assert skipped is False and player.pending_action is None
+    assert "skipped" not in " ".join(player.text_channel.log).lower()
+
+
+async def test_vote_not_announced_when_a_transition_is_under_way(player, playing):
+    voters = join(player, 1)
+    player.pending_action = "previous"
+    count, needed, skipped = await control_voteskip(player, GUILD_ID, voters[0])
+    assert (count, needed, skipped) == (1, 1, False)
+    assert player.pending_action == "previous"
+    assert "skipped" not in " ".join(player.text_channel.log).lower()

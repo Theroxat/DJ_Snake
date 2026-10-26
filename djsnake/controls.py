@@ -148,18 +148,24 @@ def _require_playing(player):
         raise ControlError("nothing_playing")
 
 
-async def _stop_with(player, action):
-    """Stop the current track; play_next then applies `action`."""
+async def _stop_with(player, action, gen=None):
+    """Stop the current track; play_next then applies `action`. With `gen`,
+    only while that track (`play_gen`) still plays. Returns True when this
+    call started the transition, False when one was already under way or the
+    track changed."""
     async with player.lock:
         _require_playing(player)
+        if gen is not None and player.play_gen != gen:
+            return False  # Another track started since the caller looked
         if player.pending_action is not None:
-            return  # A transition is already under way
+            return False  # A transition is already under way
         player.pending_action = action
         player.voice_client.stop()
+        return True
 
 
-async def control_next(player):
-    await _stop_with(player, "next")
+async def control_next(player, gen=None):
+    return await _stop_with(player, "next", gen)
 
 
 async def _show_vote(player, text, channel, message, final):
@@ -186,15 +192,17 @@ async def voteskip_update(player, guild_id, channel=None):
     """Recompute the votes of the current track (call after a vote or a voice
     change), skip when enough listeners voted, and show the count in the
     track's one vote message. Returns (count, needed, skipped)."""
+    gen = player.play_gen  # The track these votes are for
     count, needed = voteskip.status(player, guild_id)
     lang = player_lang(player)
     message = player.vote_message
     skipped = False
     if count > 0 and count >= needed:
         try:
-            await control_next(player)
-            skipped = True
+            skipped = await control_next(player, gen=gen)
         except ControlError:
+            return count, needed, False
+        if not skipped:  # The track already changed or is changing
             return count, needed, False
     key = "vote.skipped" if skipped else "vote.progress"
     text = t(key, lang, count=count, needed=needed)
