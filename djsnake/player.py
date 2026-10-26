@@ -79,6 +79,10 @@ class MusicPlayer:
         # page (web.py) each put an asyncio.Event in `watchers`.
         self.state_version = 0
         self.watchers = set()
+        # Vote to skip (see voteskip.py): ids of the members who voted for
+        # the current track, and the one message showing the count.
+        self.votes = set()
+        self.vote_message = None
 
     @property
     def loading(self):
@@ -135,7 +139,13 @@ class MusicPlayer:
         if not same_track:
             self.play_accum = 0.0
             self.play_wall = time.time()
+            self.reset_votes()
         self.play_offset = offset
+
+    def reset_votes(self):
+        """A new track starts (or the session stops): votes begin again."""
+        self.votes = set()
+        self.vote_message = None
 
     def add_to_queue(self, track):
         if not self.should_stop:
@@ -183,6 +193,7 @@ class MusicPlayer:
         self.history.clear()
         self.played.clear()
         self.now_playing = None
+        self.reset_votes()
         if self.voice_client and (
             self.voice_client.is_playing() or self.voice_client.is_paused()
         ):

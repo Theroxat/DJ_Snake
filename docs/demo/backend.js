@@ -134,11 +134,13 @@
       return k >= 0 ? k : rot++;
     };
 
+    const VOTES_NEEDED = 3;
     const S = {
       sid: null, wid: null, inVoice: false, current: null, queue: [], history: [],
       startedAt: 0, pausedAt: null, pausedTotal: 0,
       crossfade: false, loop: "off", volume: 100, autoplay: false, epoch: 0, jobs: 0, single: 0,
       playlists: [], // saved playlists: {name, ids: YouTube video ids}
+      votes: 0, // skip votes of the current track (4 listeners: 3 needed)
       pending: [], // pending_downloads: {key, title (null: link not read), source}
       loadLine: null, loadFinal: false, lastAction: null,
       theme: { skin: "arcade", base: "night", bg: "#101820", text: "#f2f2f2", accent: "#ffb703", name: "", logo_url: null },
@@ -156,7 +158,7 @@
 
     const paused = () => S.pausedAt !== null;
     const elapsed = () => START + Math.max(0, (paused() ? S.pausedAt : now()) - S.startedAt - S.pausedTotal);
-    function play(t) { clearIdle(); S.current = t; S.startedAt = now(); S.pausedAt = null; S.pausedTotal = 0; }
+    function play(t) { clearIdle(); S.votes = 0; S.current = t; S.startedAt = now(); S.pausedAt = null; S.pausedTotal = 0; }
 
     function setAction(text) {
       S.lastAction = text;
@@ -340,6 +342,14 @@
     };
     const C = {
       next() { requirePlaying(); advance(); },
+      // /voteskip by a member without the DJ role: 3 of the 4 listeners skip.
+      vote() {
+        requirePlaying();
+        S.votes++;
+        if (S.votes >= VOTES_NEEDED) { const n = S.votes; advance(); return { count: n, needed: VOTES_NEEDED, skipped: true }; }
+        changed();
+        return { count: S.votes, needed: VOTES_NEEDED, skipped: false };
+      },
       previous() {
         requirePlaying();
         if (elapsed() - START > 5 || !S.history.length) { play(S.current); changed(); return "restart"; }
@@ -454,6 +464,7 @@
       if (S.loop !== "off") lines.push(`🔁 Loop: ${S.loop}`);
       if (S.volume !== 100) lines.push(`🔊 Volume ${S.volume}%`);
       if (S.autoplay) lines.push("📻 Autoplay on");
+      if (S.current && S.votes > 0) lines.push(`🗳️ Skip votes ${S.votes}/${VOTES_NEEDED}`);
       if (S.loadLine) lines.push(S.loadLine);
       else if (S.pending.length > 1) lines.push(`📥 Downloading ${S.pending.length} tracks…`);
       else if (S.single || S.pending.length) lines.push("📥 Downloading…");
@@ -472,6 +483,7 @@
           active: true, in_voice: S.inVoice, guild: "Friday Night", channel: "Lounge",
           loading: S.jobs > 0, paused: !!c && paused(), can_previous: !!c,
           crossfade: S.crossfade, loop: S.loop, volume: S.volume, autoplay: S.autoplay, crossfading: false, server_time: Date.now() / 1000,
+          votes: c && S.votes > 0 ? { count: S.votes, needed: VOTES_NEEDED } : null,
           viewers: viewers(), lang,
           theme: S.theme,
           lyrics: true,

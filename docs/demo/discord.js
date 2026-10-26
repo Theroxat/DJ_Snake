@@ -263,6 +263,7 @@
     `\`${P}play <link or text>\`: play a YouTube, SoundCloud, Bandcamp, Spotify, Deezer or Apple Music link, or the best YouTube match for some text`,
     `\`${P}list\`: show the queue`,
     `\`${P}next\`: skip to the next track`,
+    `\`${P}voteskip\`: vote to skip the current track (\`threshold <1-100>\` sets the share of votes needed, DJs only)`,
     `\`${P}pause\`: pause playback`,
     `\`${P}resume\`: resume playback`,
     `\`${P}seek <position>\`: jump to a position (seconds or mm:ss)`,
@@ -296,6 +297,12 @@
       B.queueLink(link);
     },
     async next(msg) { if (await runControl(msg, () => B.C.next())) B.setAction("⏭️ Skipped"); },
+    async voteskip(msg) {
+      let r = null;
+      if (!(await runControl(msg, () => { r = B.C.vote(); }))) return;
+      botSay(r.skipped ? `⏭️ Skipped by vote (${r.count}/${r.needed})` : `🗳️ Vote to skip: **${r.count}/${r.needed}** votes`);
+      refreshPanel();
+    },
     async pause(msg) { if (await runControl(msg, () => B.C.pause())) refreshPanel(); },
     async resume(msg) { if (await runControl(msg, () => B.C.resume())) refreshPanel(); },
     async seek(msg, arg) {
@@ -399,7 +406,7 @@
       return;
     }
     const [name, ...rest] = text.slice(lead.length).trim().split(/\s+/);
-    const cmd = COMMANDS[(name || "").toLowerCase()];
+    const cmd = COMMANDS[{ vs: "voteskip" }[(name || "").toLowerCase()] || (name || "").toLowerCase()];
     if (!cmd) {
       await later(500);
       tip(`\`${lead}${name || ""}\` is not a command in this demo, so nothing happens. Try \`${P}help\`, \`${P}next\`, \`${P}pause\`, \`${P}list\` or \`${P}play <link>\`.`);

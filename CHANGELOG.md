@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Queue commands that used to exist only on the clip page: `!remove <position>` and `!move <from> <to>` (positions as `!list` shows them, with a queue autocomplete on the slash versions), `!previous` and `!clear` (empties the upcoming queue, the current track keeps playing). `!move`, `!previous` and `!clear` need the DJ role when one is set; `!remove` also works on a track you queued yourself.
 - `!nowplaying` (alias `!np`): an embed with the linked title, requester, source, thumbnail, a progress bar with elapsed and total time, the loop, autoplay and volume state and the clip page link (the view-only one when control is limited).
 - `!history [count]`: the last tracks played in the session (default 10, max 25), newest first.
+### Added
+
+- Vote to skip: `/voteskip` (`!vs`) lets members in the voice channel vote to skip the current track when they cannot use `/next`. More than `VOTESKIP_PERCENT` (default 50) of the non-deafened humans in the channel must vote; DJs and the requester skip at once, votes are recounted when people join, leave or deafen and reset with each track. One message shows the count and is edited in place, then reads "Skipped by vote". `/voteskip threshold <1-100>` (DJs) sets it per server (`DATA_DIR/voteskip.json`). The `/next` refusal suggests `/voteskip`, the status panel shows the count, and `/api/{sid}/state` has `votes: {count, needed}` shown as a small badge on the page.
 
 ## [1.4.0] - 2026-10-23
 

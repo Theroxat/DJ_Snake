@@ -32,6 +32,7 @@ from djsnake import (  # noqa: E402
     stats,
     themes,
     volume,
+    voteskip,
     web,
 )
 from djsnake.player import MusicPlayer  # noqa: E402
@@ -56,6 +57,7 @@ def fresh_state(tmp_path, monkeypatch):
         state.guild_perms,
         state.guild_themes,
         state.guild_volumes,
+        state.guild_voteskip,
         state.guild_languages,
         state.edit_tokens,
         state.viewers,
@@ -72,6 +74,7 @@ def fresh_state(tmp_path, monkeypatch):
     monkeypatch.setattr(themes, "THEMES_FILE", str(data_dir / "themes.json"))
     monkeypatch.setattr(themes, "LOGO_DIR", str(data_dir / "logos"))
     monkeypatch.setattr(volume, "VOLUME_FILE", str(data_dir / "volume.json"))
+    monkeypatch.setattr(voteskip, "VOTESKIP_FILE", str(data_dir / "voteskip.json"))
     monkeypatch.setattr(lyrics, "LYRICS_DIR", str(data_dir / "lyrics"))
     monkeypatch.setattr(lyrics, "ENABLED", True)
 

@@ -5,6 +5,8 @@ import random
 import time
 import types
 
+import discord
+
 from . import catalog, media, playlists, spotify, state
 from .config import (
     LOOP_MODES,
@@ -28,6 +30,7 @@ from .playback import (
 from .player import discard_tracks, guild_of
 from .i18n import ctx_lang, t
 from .sessions import player_lang, refresh_panel
+from . import voteskip
 from .volume import percent_to_gain, save_volumes, valid_volume, volume_for
 
 
@@ -93,6 +96,11 @@ class ControlError(Exception):
         "bad_loop": 400,
         "nothing_to_shuffle": 409,
         "bad_volume": 400,
+        "vote_not_in_channel": 403,
+        "vote_deafened": 403,
+        "vote_already": 409,
+        "bad_threshold": 400,
+        "threshold_not_saved": 500,
         "volume_not_saved": 500,
         "bad_url": 400,
         "short_link": 400,
@@ -152,6 +160,76 @@ async def _stop_with(player, action):
 
 async def control_next(player):
     await _stop_with(player, "next")
+
+
+async def _show_vote(player, text, channel, message, final):
+    """Edit the track's one vote message, or post it in `channel` (best
+    effort). A final text is not kept for the next vote."""
+    gen = player.play_gen
+    if message is not None:
+        try:
+            await message.edit(content=text)
+            return
+        except discord.HTTPException:
+            pass
+    if channel is None:
+        return
+    try:
+        sent = await channel.send(text, allowed_mentions=discord.AllowedMentions.none())
+    except discord.HTTPException:
+        return
+    if not final and player.play_gen == gen and player.now_playing is not None:
+        player.vote_message = sent
+
+
+async def voteskip_update(player, guild_id, channel=None):
+    """Recompute the votes of the current track (call after a vote or a voice
+    change), skip when enough listeners voted, and show the count in the
+    track's one vote message. Returns (count, needed, skipped)."""
+    count, needed = voteskip.status(player, guild_id)
+    lang = player_lang(player)
+    message = player.vote_message
+    skipped = False
+    if count > 0 and count >= needed:
+        try:
+            await control_next(player)
+            skipped = True
+        except ControlError:
+            return count, needed, False
+    key = "vote.skipped" if skipped else "vote.progress"
+    text = t(key, lang, count=count, needed=needed)
+    await _show_vote(player, text, channel or player.text_channel, message, skipped)
+    refresh_panel(player)
+    return count, needed, skipped
+
+
+async def control_voteskip(player, guild_id, member, channel=None):
+    """`member` votes to skip the current track. Returns (count, needed,
+    skipped). One vote per member; only a listener in the bot's channel."""
+    _require_playing(player)
+    voice = getattr(member, "voice", None)
+    if getattr(voice, "channel", None) != player.voice_client.channel:
+        raise ControlError("vote_not_in_channel")
+    if not voteskip.is_listener(member):
+        raise ControlError("vote_deafened")
+    if member.id in player.votes:
+        raise ControlError("vote_already")
+    player.votes.add(member.id)
+    return await voteskip_update(player, guild_id, channel)
+
+
+def control_voteskip_threshold(guild_id, percent):
+    """Set the guild's threshold (1-100); applies even when saving fails."""
+    if not voteskip.valid_percent(percent):
+        raise ControlError("bad_threshold")
+    try:
+        voteskip.set_threshold(guild_id, percent)
+    except OSError as e:
+        print(f"Could not save the vote-skip threshold: {e}")
+        raise ControlError("threshold_not_saved")
+    player = state.music_players.get(guild_id)
+    if player is not None:
+        refresh_panel(player)  # Also notifies the page
 
 
 async def control_previous(player):

@@ -73,6 +73,8 @@ DATA_DIR = os.getenv("DATA_DIR") or "/app/data"
 THEMES_FILE = os.path.join(DATA_DIR, "themes.json")
 LOGO_DIR = os.path.join(DATA_DIR, "logos")
 VOLUME_FILE = os.path.join(DATA_DIR, "volume.json")
+# Per-guild vote-to-skip threshold (`/voteskip threshold`), see voteskip.py.
+VOTESKIP_FILE = os.path.join(DATA_DIR, "voteskip.json")
 # Per-guild DJ role (`!djrole`), see permissions.py.
 PERMISSIONS_FILE = os.path.join(DATA_DIR, "permissions.json")
 # Who gets the clip page's control link: "everyone" (posted in the status
@@ -241,3 +243,18 @@ LYRICS_WAIT_SECONDS = 4.0  # The web route waits this long for a fetch
 # directly as the default argument would create an orphan directory on every run
 # because default arguments are evaluated eagerly.
 TEMP_DIR = os.getenv("TEMP_DIR") or tempfile.mkdtemp()
+
+
+def _percent_env(name, default):
+    """An integer percent 1-100 from the environment, else `default`."""
+    try:
+        value = int(os.getenv(name, "").strip())
+    except ValueError:
+        return default
+    return value if 1 <= value <= 100 else default
+
+
+# Vote to skip: more than this percent of the listeners (humans in the voice
+# channel who are not deafened) must vote to skip. Default of guilds that
+# never ran `/voteskip threshold`.
+VOTESKIP_PERCENT = _percent_env("VOTESKIP_PERCENT", 50)

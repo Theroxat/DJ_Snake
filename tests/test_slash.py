@@ -17,6 +17,7 @@ from conftest import GUILD_ID
 NAMES = {
     "play",
     "next",
+    "voteskip",
     "list",
     "seek",
     "pause",

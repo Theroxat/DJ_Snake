@@ -17,6 +17,7 @@ from .i18n import lang_for, t
 from .permissions import web_control_restricted
 from .player import discard_tracks, guild_of, notify_state
 from .volume import volume_for
+from .voteskip import web_status
 
 # --- Sessions ---------------------------------------------------------------
 
@@ -250,6 +251,9 @@ def render_panel(player):
         lines.append(t("panel.volume", lang, volume=volume))
     if player.autoplay:
         lines.append(t("panel.autoplay_on", lang))
+    votes = web_status(player, state.sessions.get(player.sid))
+    if votes:
+        lines.append(t("panel.votes", lang, **votes))
     if player.load_line:
         lines.append(player.load_line)
     elif len(player.pending_downloads) > 1:
