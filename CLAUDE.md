@@ -136,6 +136,8 @@ Module map, lowest layer first (each imports only the ones above it):
 
 - `config.py`: environment variables and constants, read once at import
   (`WEB_INDEX` resolves `web/index.html` from the repository root).
+- `fileio.py`: `write_atomic()` (temp file + `os.replace()`), shared by every
+  module that persists JSON under `DATA_DIR`. Imports nothing from the package.
 - `state.py`: shared mutable state: the `bot` instance, `music_players`,
   `sessions`, `watch_ids`, `guild_perms`, `guild_themes`, `guild_languages`,
   `guild_volumes`, `guild_stay`, `stay_retries`, `edit_tokens`, `viewers`, `streams` (open live update
@@ -161,14 +163,14 @@ Module map, lowest layer first (each imports only the ones above it):
   `lookup_fields()`, `fetch()`, `prefetch()`, `get()`). Imports `config`,
   `state`, `stats.clean_artist` and `spotify`'s HTTP helpers.
 - `lastfm.py`: optional Last.fm scrobbling (see Last.fm). Imports `config`,
-  `state`, `lyrics.lookup_fields` and `themes._write_atomic`.
+  `state`, `lyrics.lookup_fields` and `fileio`.
 - `player.py`: `MusicPlayer`, `notify_state()`, `discard_tracks()`,
   `file_in_use()`, `push_history()`, `retire_play()`, `guild_of()`.
 - `themes.py`: theme storage, logos and `!theme edit` tokens.
 - `volume.py`: per-server volume storage (`{DATA_DIR}/volume.json`) and
   `percent_to_gain()`.
 - `limits.py`: the queue limits (see Queue limits). Imports `permissions`
-  and `themes`.
+  and `fileio`.
 - `stay.py`: 24/7 mode storage (`{DATA_DIR}/stay.json`: `load_stay()`, `stay_on()`, `stay_channel()`, `set_stay()`, `remember_channel()`).
 - `backup.py`: backup and restore of `DATA_DIR` (see Backup). Imports only `config`.
 - `permissions.py`: the DJ role (`load_perms()`, `set_dj_role()`,

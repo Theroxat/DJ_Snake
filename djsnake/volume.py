@@ -5,7 +5,7 @@ import json
 
 from . import state
 from .config import VOLUME_DEFAULT, VOLUME_FILE, VOLUME_MAX
-from .themes import _write_atomic
+from .fileio import write_atomic
 
 # Stored as {guild id: percent}. Bad entries are dropped on load.
 
@@ -54,7 +54,7 @@ def load_volumes():
 def save_volumes():
     """Persist guild_volumes. Raises OSError (e.g. DATA_DIR not writable)."""
     data = {str(gid): v for gid, v in state.guild_volumes.items()}
-    _write_atomic(VOLUME_FILE, json.dumps(data, indent=2).encode("utf-8"))
+    write_atomic(VOLUME_FILE, json.dumps(data, indent=2).encode("utf-8"))
 
 
 def volume_for(guild_id):

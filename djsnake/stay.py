@@ -6,7 +6,7 @@ import json
 
 from . import state
 from .config import STAY_247, STAY_FILE
-from .themes import _write_atomic
+from .fileio import write_atomic
 
 # Stored as {guild id: {"on": bool, "channel": voice channel id | None}}.
 # A guild with no record follows the STAY_247 default (it still needs a
@@ -42,7 +42,7 @@ def load_stay():
 def save_stay():
     """Persist guild_stay. Raises OSError (e.g. DATA_DIR not writable)."""
     data = {str(gid): record for gid, record in state.guild_stay.items()}
-    _write_atomic(STAY_FILE, json.dumps(data, indent=2).encode("utf-8"))
+    write_atomic(STAY_FILE, json.dumps(data, indent=2).encode("utf-8"))
 
 
 def stay_on(guild_id):

@@ -15,7 +15,7 @@ import json
 
 from . import state
 from .config import VOTESKIP_FILE, VOTESKIP_PERCENT
-from .themes import _write_atomic
+from .fileio import write_atomic
 
 
 def valid_percent(value):
@@ -57,7 +57,7 @@ def load_thresholds():
 def save_thresholds():
     """Persist guild_voteskip. Raises OSError (e.g. DATA_DIR not writable)."""
     data = {str(gid): v for gid, v in state.guild_voteskip.items()}
-    _write_atomic(VOTESKIP_FILE, json.dumps(data, indent=2).encode("utf-8"))
+    write_atomic(VOTESKIP_FILE, json.dumps(data, indent=2).encode("utf-8"))
 
 
 def threshold_for(guild_id):

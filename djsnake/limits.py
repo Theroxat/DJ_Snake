@@ -20,7 +20,7 @@ import math
 
 from . import config, state
 from .permissions import is_dj
-from .themes import _write_atomic
+from .fileio import write_atomic
 
 FIELDS = ("queue_size", "per_user", "track_minutes", "cooldown")
 WEB_BUCKET = "web"
@@ -99,7 +99,7 @@ def load_limits():
 def save_limits():
     """Persist guild_limits. Raises OSError (e.g. DATA_DIR not writable)."""
     data = {str(gid): record for gid, record in state.guild_limits.items()}
-    _write_atomic(config.LIMITS_FILE, json.dumps(data, indent=2).encode("utf-8"))
+    write_atomic(config.LIMITS_FILE, json.dumps(data, indent=2).encode("utf-8"))
 
 
 def set_limit(guild_id, field, value):

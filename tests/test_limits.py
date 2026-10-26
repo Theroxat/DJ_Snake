@@ -680,7 +680,7 @@ def test_a_failed_save_restores_the_previous_value(monkeypatch):
     def broken(*args):
         raise OSError("read-only")
 
-    monkeypatch.setattr(limits, "_write_atomic", broken)
+    monkeypatch.setattr(limits, "write_atomic", broken)
     with pytest.raises(OSError):
         limits.set_limit(GUILD_ID, "per_user", 9)
     assert limits.limits_for(GUILD_ID)["per_user"] == 2

@@ -4,9 +4,9 @@ import json
 import os
 import re
 import secrets
-import tempfile
 import time
 
+from .fileio import write_atomic
 from . import state
 from .config import (
     LOGO_DIR,
@@ -99,27 +99,10 @@ def load_themes():
             state.guild_themes[guild_id] = record
 
 
-def _write_atomic(path, data):
-    """Write bytes to `path` through a temp file and os.replace()."""
-    directory = os.path.dirname(path)
-    os.makedirs(directory, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=directory, prefix=".tmp-")
-    try:
-        with os.fdopen(fd, "wb") as f:
-            f.write(data)
-        os.replace(tmp, path)
-    except BaseException:
-        try:
-            os.remove(tmp)
-        except OSError:
-            pass
-        raise
-
-
 def save_themes():
     """Persist guild_themes. Raises OSError (e.g. DATA_DIR not writable)."""
     data = {str(gid): record for gid, record in state.guild_themes.items()}
-    _write_atomic(THEMES_FILE, json.dumps(data, indent=2).encode("utf-8"))
+    write_atomic(THEMES_FILE, json.dumps(data, indent=2).encode("utf-8"))
 
 
 def theme_for(guild_id):
@@ -188,7 +171,7 @@ def _remove_logo_files(guild_id, keep=None):
 
 def set_logo(guild_id, data, ext):
     """Store the guild's logo (replacing any previous one) and save."""
-    _write_atomic(logo_path(guild_id, ext), data)
+    write_atomic(logo_path(guild_id, ext), data)
     _remove_logo_files(guild_id, keep=ext)
     record = state.guild_themes.setdefault(guild_id, {})
     record["logo"] = {"ext": ext, "v": int(time.time() * 1000)}

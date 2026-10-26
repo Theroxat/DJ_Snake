@@ -46,8 +46,9 @@ def api(monkeypatch):
     return fake
 
 
-def member(user_id, bot=False):
-    return types.SimpleNamespace(id=user_id, bot=bot)
+def member(user_id, bot=False, deaf=False):
+    voice = types.SimpleNamespace(self_deaf=deaf, deaf=False)
+    return types.SimpleNamespace(id=user_id, bot=bot, voice=voice)
 
 
 def link(user_id, name="user", key="sk"):
@@ -445,3 +446,22 @@ async def test_status_and_unlink(api, slash):
     await commands.lastfm_unlink.callback(slash)
     assert "unlinked" in slash.replies[-1][0]
     assert lastfm.link_of(7) is None
+
+
+async def test_deafened_members_are_not_scrobbled(room, api, media_dir):
+    for uid in (1, 2, 3):
+        link(uid, key=f"sk{uid}")
+    room.voice_client.channel.members = [member(1), member(2, deaf=True), member(3)]
+    track = make_track(media_dir, "t", title="Artist - Song", duration=200)
+    start(room, track)
+    await settle_tasks()
+    assert room.lastfm_listeners == {1, 3}
+    # 3 deafens before the end: no scrobble for them either
+    server_deaf = member(3)
+    server_deaf.voice.deaf = True
+    room.voice_client.channel.members = [member(1), member(2, deaf=True), server_deaf]
+    room.play_accum = 150.0
+    retire_play(room, GUILD_ID, None)
+    await settle_tasks()
+    scrobbles = [c for c in api.calls if c["method"] == "track.scrobble"]
+    assert [c["sk"] for c in scrobbles] == ["sk1"]

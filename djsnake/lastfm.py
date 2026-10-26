@@ -21,7 +21,7 @@ import aiohttp
 
 from . import config, state
 from .lyrics import lookup_fields
-from .themes import _write_atomic
+from .fileio import write_atomic
 
 FILE = config.LASTFM_FILE
 RETRY_START = 30.0  # Seconds before the first retry of a failed batch
@@ -133,7 +133,7 @@ def load_links():
 def save_links():
     """Persist the links with owner-only permissions. Raises OSError."""
     data = {str(uid): record for uid, record in state.lastfm_links.items()}
-    _write_atomic(FILE, json.dumps(data, indent=2).encode("utf-8"))
+    write_atomic(FILE, json.dumps(data, indent=2).encode("utf-8"))
     os.chmod(FILE, 0o600)
 
 
@@ -229,15 +229,20 @@ def should_scrobble(duration, played):
     return played >= min(duration / 2, config.LASTFM_MAX_THRESHOLD)
 
 
+def _hears(member):
+    """A human who is not deafened (by themselves or the server): a deafened
+    member does not hear the track, so it is not scrobbled for them."""
+    if getattr(member, "bot", False):
+        return False
+    voice = getattr(member, "voice", None)
+    return not (getattr(voice, "self_deaf", False) or getattr(voice, "deaf", False))
+
+
 def listeners(player):
-    """Ids of the linked users in the bot's voice channel."""
+    """Ids of the linked users in the bot's voice channel who hear it."""
     channel = getattr(player.voice_client, "channel", None)
     members = getattr(channel, "members", None) or []
-    return {
-        m.id
-        for m in members
-        if not getattr(m, "bot", False) and m.id in state.lastfm_links
-    }
+    return {m.id for m in members if _hears(m) and m.id in state.lastfm_links}
 
 
 def track_started(player):

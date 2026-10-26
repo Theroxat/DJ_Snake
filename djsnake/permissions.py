@@ -12,7 +12,7 @@ import json
 
 from . import state
 from .config import PERMISSIONS_FILE, WEB_CONTROL
-from .themes import _write_atomic
+from .fileio import write_atomic
 
 # Discord commands that change playback for everyone. A new mutating command
 # only has to be added here. `!play` stays open: adding a track is how anyone
@@ -72,7 +72,7 @@ def load_perms():
 def save_perms():
     """Persist guild_perms. Raises OSError (e.g. DATA_DIR not writable)."""
     data = {str(gid): record for gid, record in state.guild_perms.items()}
-    _write_atomic(PERMISSIONS_FILE, json.dumps(data, indent=2).encode("utf-8"))
+    write_atomic(PERMISSIONS_FILE, json.dumps(data, indent=2).encode("utf-8"))
 
 
 def dj_role(guild_id):
