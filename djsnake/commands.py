@@ -57,7 +57,7 @@ from .playback import (
     queue_spotify,
     schedule_idle_disconnect,
 )
-from .player import MusicPlayer, discard_tracks, retire_play
+from .player import MusicPlayer, discard_tracks, mark_deliberate_leave, retire_play
 from .sessions import (
     ack,
     open_session,
@@ -435,8 +435,9 @@ async def reset_voice(ctx):
 
     player = state.music_players.get(ctx.guild.id)
 
-    # Disconnect completely
+    # Disconnect completely. On purpose: not a drop for 24/7 mode.
     if ctx.guild.voice_client:
+        mark_deliberate_leave(ctx.guild.id)
         await ctx.guild.voice_client.disconnect(force=True)
 
     # Clean the player. The web session survives a reset: same link.
@@ -978,7 +979,8 @@ async def stay(ctx, mode: str = None):
     if mode == "off":
         await ctx.send(t("cmd.stay_off", lang))
         if player.in_voice() and not player.is_playing and not player.queue:
-            schedule_idle_disconnect(ctx, player)  # Back to the normal linger
+            # Back to the normal linger; the timer outlives an interaction.
+            schedule_idle_disconnect(ChannelContext(ctx), player)
     else:
         player.cancel_idle()
         remembered = stay_channel(ctx.guild.id)

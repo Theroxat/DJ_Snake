@@ -208,6 +208,8 @@ class MusicPlayer:
     async def disconnect_voice_client(self):
         """Safely disconnect and cleanup voice client"""
         if self.voice_client:
+            guild = getattr(self.voice_client, "guild", None)
+            mark_deliberate_leave(getattr(guild, "id", None))
             try:
                 if self.voice_client.is_playing():
                     self.voice_client.stop()
@@ -217,6 +219,24 @@ class MusicPlayer:
                 print(f"Error during voice client disconnect: {e}")
             finally:
                 self.voice_client = None
+
+
+# How long a deliberate leave mark is honoured (the voice-state event arrives
+# within a few seconds of the disconnect).
+DELIBERATE_LEAVE_SECONDS = 30
+
+
+def mark_deliberate_leave(guild_id):
+    """The bot is about to leave voice on purpose: the coming voice-state
+    event is not a drop (no 24/7 rejoin, no 24/7 give-up)."""
+    if guild_id is not None:
+        state.deliberate_leaves[guild_id] = state.clock()
+
+
+def left_deliberately(guild_id):
+    """True (once) when the bot left voice on purpose just before."""
+    at = state.deliberate_leaves.pop(guild_id, None)
+    return at is not None and state.clock() - at < DELIBERATE_LEAVE_SECONDS
 
 
 def notify_state(player):

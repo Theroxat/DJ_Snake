@@ -373,3 +373,62 @@ async def test_moved_bot_remembers_new_channel(player, monkeypatch):
         me, types.SimpleNamespace(channel=old), types.SimpleNamespace(channel=new)
     )
     assert stay.stay_channel(GUILD_ID) == CHANNEL_ID + 1
+
+
+async def _bot_left(monkeypatch, guild):
+    me = types.SimpleNamespace(id=7, bot=True, guild=guild)
+    monkeypatch.setattr(app, "bot", types.SimpleNamespace(user=me))
+    real_sleep = asyncio.sleep
+
+    async def quick(seconds):
+        await real_sleep(0)
+
+    monkeypatch.setattr(app.asyncio, "sleep", quick)
+    old = types.SimpleNamespace(name="Lounge", guild=guild, id=CHANNEL_ID, members=[])
+    await app.on_voice_state_update(
+        me, types.SimpleNamespace(channel=old), types.SimpleNamespace(channel=None)
+    )
+
+
+async def test_reset_is_not_a_drop(player, ctx, connects, monkeypatch):
+    """!reset disconnects on purpose: no 24/7 rejoin, and a second !reset
+    within STAY_RETRY_WINDOW does not turn 24/7 off."""
+    stay.set_stay(GUILD_ID, True, CHANNEL_ID)
+    guild = fake_guild(voice_channel())
+    for _ in range(2):
+        ctx.guild.voice_client = FakeVoiceClient()
+        await commands.reset_voice.callback(ctx)
+        await _bot_left(monkeypatch, guild)  # Also makes asyncio.sleep quick
+
+    assert stay.stay_on(GUILD_ID)
+    assert connects.calls == []
+
+
+async def test_real_drops_still_recover(player, connects, monkeypatch):
+    stay.set_stay(GUILD_ID, True, CHANNEL_ID)
+    guild = fake_guild(voice_channel())
+    await _bot_left(monkeypatch, guild)
+    assert len(connects.calls) == 1 and stay.stay_on(GUILD_ID)
+    await _bot_left(monkeypatch, guild)  # Dropped again at once: give up
+    assert not stay.stay_on(GUILD_ID)
+
+
+async def test_deliberate_mark_expires(fake_clock):
+    from djsnake.player import left_deliberately, mark_deliberate_leave
+
+    mark_deliberate_leave(GUILD_ID)
+    assert left_deliberately(GUILD_ID) and not left_deliberately(GUILD_ID)
+    mark_deliberate_leave(GUILD_ID)
+    fake_clock(60)
+    assert not left_deliberately(GUILD_ID)
+
+
+async def test_stay_off_linger_uses_a_channel_context(player, channel, monkeypatch):
+    stay.set_stay(GUILD_ID, True, CHANNEL_ID)
+    seen = []
+    monkeypatch.setattr(
+        commands, "schedule_idle_disconnect", lambda c, p, *a: seen.append(c)
+    )
+    ctx = make_slash_ctx(GUILD_ID, channel, member(1, manager=True))
+    await commands.stay.callback(ctx, "off")
+    assert seen and isinstance(seen[0], commands.ChannelContext)

@@ -12,7 +12,14 @@ from . import config
 from .config import CROSSFADE_SECONDS, FADE_OUT_SECONDS, FRAMES_PER_SECOND
 from .media import crossfade_eligible, playback_options
 from .mixer import CrossfadeMixer
-from .player import MusicPlayer, discard_tracks, guild_of, push_history, retire_play
+from .player import (
+    MusicPlayer,
+    discard_tracks,
+    guild_of,
+    mark_deliberate_leave,
+    push_history,
+    retire_play,
+)
 from .i18n import ctx_lang, t
 from .sessions import (
     open_session,
@@ -40,10 +47,12 @@ async def safe_voice_connect(voice_channel, max_attempts=3):
             print(
                 f"🔄 Switching from {guild.voice_client.channel.name} to {voice_channel.name}"
             )
+            mark_deliberate_leave(guild.id)
             await guild.voice_client.disconnect(force=True)
             await asyncio.sleep(2)
     elif guild.voice_client:
         print(f"🔄 Cleaning up disconnected voice client")
+        mark_deliberate_leave(guild.id)
         await guild.voice_client.disconnect(force=True)
         await asyncio.sleep(2)
 

@@ -58,6 +58,9 @@ play_times = {}
 guild_stay = {}
 # Guild id -> clock() of the last 24/7 rejoin after a drop (see playback.py).
 stay_retries = {}
+# Guild id -> clock() when the bot left voice on purpose (!reset, !stop, a
+# channel switch): the voice-state handler then does not take it for a drop.
+deliberate_leaves = {}
 # Guild id -> language code chosen with `!language` (see i18n.py).
 guild_languages = {}
 # `!theme edit` links: token -> (guild id, expiry on clock()). In memory only.

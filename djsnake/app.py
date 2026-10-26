@@ -11,6 +11,7 @@ from .config import COMMAND_PREFIX, SLASH_SYNC_GUILD
 from .controls import voteskip_update
 from .i18n import t
 from .playback import idle_channel_emptied, recover_stay, restore_stay
+from .player import left_deliberately
 from .sessions import refresh_panel, session_cleanup_loop
 from .stay import remember_channel, stay_on
 from .web import start_web_server, stop_web_server
@@ -55,6 +56,7 @@ async def on_voice_state_update(member, before, after):
         print(f"Bot was disconnected from voice channel: {before.channel.name}")
 
         guild = before.channel.guild
+        deliberate = left_deliberately(guild.id)  # !reset, a channel switch...
         # The client's own handler runs in a separate task, so give it time to
         # settle. A stale event from an old disconnect (!stop then !play) then
         # sees a live client and is ignored; a real kick sees it disconnected.
@@ -68,8 +70,9 @@ async def on_voice_state_update(member, before, after):
             player.is_playing = False
             refresh_panel(player)
             # The web session stays; it expires after SESSION_IDLE_HOURS.
-        if stay_on(guild.id):
-            # 24/7: rejoin once, else turn it off (no reconnect loop).
+        if stay_on(guild.id) and not deliberate:
+            # 24/7: rejoin once, else turn it off (no reconnect loop). A
+            # deliberate leave (!reset, a channel switch) is no drop.
             await recover_stay(guild)
 
 
