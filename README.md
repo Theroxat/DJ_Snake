@@ -283,6 +283,7 @@ Set these in `.env` (see `.env.example`).
 | `LASTFM_API_KEY` / `LASTFM_API_SECRET` | empty | Optional Last.fm API credentials; both turn on `/lastfm` scrobbling. |
 | `YTDLP_AUTO_UPDATE` | `1` | Upgrade yt-dlp on container start (`0` to skip). |
 | `METRICS` | `0` | `1` serves Prometheus metrics on `GET /metrics`. `GET /healthz` (used by the Docker health check) is always on. |
+| `SHARD_COUNT` | automatic | Gateway shard count (positive integer); empty lets discord.py choose. One process runs all shards, enough for a few thousand servers. Discord requires sharding from 2,500 servers. |
 
 ## Running without Docker
 

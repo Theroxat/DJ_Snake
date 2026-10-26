@@ -131,10 +131,24 @@ from .voteskip import web_status
 #   GET /icons/{name}          the default PNG icons (a fixed list of names)
 #   GET /healthz               200 {"status": "ok", ...} when the bot is connected
 #                              to Discord, else 503 {"status": "unavailable",
-#                              ...}; no ids, names or secrets
+#                              ...}; "degraded" (still 200) when some but not
+#                              all shards are down, with a "shards" list; no
+#                              ids, names or secrets
 #   GET /metrics               Prometheus text; 404 unless METRICS is on
 # Paths are never built from the request: tracks are looked up by id, themes
 # and logos by the session's guild id.
+
+
+def _shard_states():
+    """[(shard id, latency in seconds, up)] for every gateway shard. A shard is
+    up when its websocket is open and answers heartbeats. Empty before the
+    first connection."""
+    states = []
+    for shard_id, shard in sorted(state.bot.shards.items()):
+        latency = shard.latency
+        up = not shard.is_closed() and math.isfinite(latency)
+        states.append((shard_id, latency, up))
+    return states
 
 
 def _discord_problem():
@@ -146,7 +160,11 @@ def _discord_problem():
         return "closed"
     if not bot.is_ready():
         return "not ready"
-    if not math.isfinite(bot.latency):  # No websocket, or no heartbeat answer
+    shards = _shard_states()
+    if shards:
+        if not any(up for _, _, up in shards):
+            return "websocket closed"
+    elif not math.isfinite(bot.latency):  # No websocket, or no heartbeat answer
         return "websocket closed"
     return None
 
@@ -161,10 +179,24 @@ async def web_healthz(request):
     if problem is not None:
         body = {"status": "unavailable", "discord": problem, "uptime_s": _uptime_s()}
         return web.json_response(body, status=503, headers=headers)
+    shards = _shard_states()
+    degraded = any(not up for _, _, up in shards)
+    up_latencies = [lat for _, lat, up in shards if up]
+    latency = sum(up_latencies) / len(up_latencies) if up_latencies else None
+    if latency is None:
+        latency = state.bot.latency
     body = {
-        "status": "ok",
-        "discord": "connected",
-        "latency_ms": round(state.bot.latency * 1000, 1),
+        "status": "degraded" if degraded else "ok",
+        "discord": "degraded" if degraded else "connected",
+        "latency_ms": round(latency * 1000, 1),
+        "shards": [
+            {
+                "id": shard_id,
+                "status": "up" if up else "down",
+                "latency_ms": round(lat * 1000, 1) if math.isfinite(lat) else None,
+            }
+            for shard_id, lat, up in shards
+        ],
         "guilds": len(state.bot.guilds),
         "players": sum(1 for p in state.music_players.values() if p.in_voice()),
         "uptime_s": _uptime_s(),
@@ -187,7 +219,12 @@ async def web_metrics(request):
     viewers = sum(
         1 for seen in list(state.viewers.values()) for t in seen.values() if t >= cutoff
     )
-    latency = state.bot.latency
+    shards = _shard_states()
+    up_latencies = [lat for _, lat, up in shards if up]
+    if up_latencies:
+        latency = sum(up_latencies) / len(up_latencies)
+    else:
+        latency = state.bot.latency
     lines = []
     _metric(
         lines,
@@ -224,6 +261,22 @@ async def web_metrics(request):
         "Discord gateway heartbeat latency (NaN without a connection).",
         f"{latency:.6f}" if math.isfinite(latency) else "NaN",
     )
+    _metric(
+        lines,
+        "djsnake_shards",
+        "gauge",
+        "Gateway shards this process runs.",
+        len(shards),
+    )
+    lines.append("# HELP djsnake_shard_up 1 when the shard's websocket is connected.")
+    lines.append("# TYPE djsnake_shard_up gauge")
+    for shard_id, _, up in shards:
+        lines.append(f'djsnake_shard_up{{shard="{shard_id}"}} {int(up)}')
+    lines.append("# HELP djsnake_shard_latency_seconds Per-shard heartbeat latency.")
+    lines.append("# TYPE djsnake_shard_latency_seconds gauge")
+    for shard_id, lat, _ in shards:
+        value = f"{lat:.6f}" if math.isfinite(lat) else "NaN"
+        lines.append(f'djsnake_shard_latency_seconds{{shard="{shard_id}"}} {value}')
     _metric(
         lines,
         "djsnake_tracks_played_total",

@@ -36,6 +36,7 @@ DJ Snake is configured through environment variables. With Docker Compose, put t
 | `LASTFM_API_KEY` / `LASTFM_API_SECRET` | empty | Optional Last.fm API credentials. Both are needed to turn on scrobbling. See [Last.fm](lastfm.md). |
 | `YTDLP_AUTO_UPDATE` | `1` | Upgrade yt-dlp on container start (`0` to skip). Used by the container entrypoint only. |
 | `METRICS` | `0` | Set to `1` to serve Prometheus metrics on `GET /metrics` (same port as the clip page). Off, the route answers 404. See [Troubleshooting](troubleshooting.md#health-check-and-metrics). |
+| `SHARD_COUNT` | automatic | Number of gateway shards. Empty lets discord.py use the count Discord recommends; set a positive integer to force one. Anything else is ignored with a warning. One process runs every shard. See [Architecture](architecture.md#sharding). |
 | `DJ_SNAKE_TAG` | `latest` | Image tag to pull (Compose only), for example `1.0.0`. |
 
 ```{note}

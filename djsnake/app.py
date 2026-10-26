@@ -24,7 +24,7 @@ _stay_restored = False  # on_ready runs again after gateway reconnects
 async def on_ready():
     print(f"{bot.user} is connected and ready!")
     print(f"Bot ID: {bot.user.id}")
-    print(f"Connected to {len(bot.guilds)} guilds")
+    print(f"Connected to {len(bot.guilds)} guilds on {bot.shard_count or 1} shard(s)")
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.listening,
@@ -37,6 +37,16 @@ async def on_ready():
         task = asyncio.get_running_loop().create_task(restore_stay(list(bot.guilds)))
         state.background_tasks.add(task)
         task.add_done_callback(state.background_tasks.discard)
+
+
+@bot.event
+async def on_shard_ready(shard_id):
+    print(f"Shard {shard_id} is ready")
+
+
+@bot.event
+async def on_shard_disconnect(shard_id):
+    print(f"Shard {shard_id} disconnected")
 
 
 @bot.event

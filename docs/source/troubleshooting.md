@@ -45,6 +45,8 @@
 
 The web server answers `GET /healthz` on `WEB_PORT`. It returns `200` with a small JSON body when the bot is connected to Discord, and `503` with the reason otherwise (`not ready`, `websocket closed`, `closed`). It never contains tokens, server names or ids.
 
+The body lists each gateway shard (`shards`: id, `up` or `down`, latency). If only some shards are down, the status is `degraded` and the code stays `200`; `503` is returned only when every shard is down. `latency_ms` is the average of the shards that are up.
+
 ```bash
 curl -s http://127.0.0.1:47823/healthz
 # {"status": "ok", "discord": "connected", "latency_ms": 42.0, "guilds": 3, "players": 1, "uptime_s": 5120, "version": "1.3.0"}
@@ -52,7 +54,7 @@ curl -s http://127.0.0.1:47823/healthz
 
 The Docker image checks it every 30 seconds (60 seconds of grace at startup, 3 failures in a row to turn `unhealthy`, so a routine Discord reconnect does not trip it). `docker compose ps` shows the result, and `docker inspect --format '{{json .State.Health}}' dj-snake` shows the last probes. An `unhealthy` container usually means a bad `DISCORD_TOKEN`, missing intents or no network to Discord: read `docker compose logs dj-snake`. `restart: unless-stopped` does not restart on `unhealthy`; restart it yourself, or use a tool that does.
 
-Set `METRICS=1` to also serve `GET /metrics` in the Prometheus text format: `djsnake_active_players`, `djsnake_queued_tracks`, `djsnake_downloads_in_progress`, `djsnake_web_viewers`, `djsnake_discord_latency_seconds` and the counter `djsnake_tracks_played_total`. The metrics carry no server data, but they are served on the same port as the clip page, so keep `WEB_BIND` on `127.0.0.1` or block `/metrics` in your reverse proxy if the port is public.
+Set `METRICS=1` to also serve `GET /metrics` in the Prometheus text format: `djsnake_active_players`, `djsnake_queued_tracks`, `djsnake_downloads_in_progress`, `djsnake_web_viewers`, `djsnake_discord_latency_seconds`, the per-shard `djsnake_shards`, `djsnake_shard_up{shard="N"}` and `djsnake_shard_latency_seconds{shard="N"}`, and the counter `djsnake_tracks_played_total`. The metrics carry no server data, but they are served on the same port as the clip page, so keep `WEB_BIND` on `127.0.0.1` or block `/metrics` in your reverse proxy if the port is public.
 
 ## FAQ
 

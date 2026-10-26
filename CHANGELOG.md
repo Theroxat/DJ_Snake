@@ -58,6 +58,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Live streams: YouTube lives, Twitch channels and internet radios (Icecast, Shoutcast, HLS `.m3u8`, `.pls`, `.m3u`) play straight from the stream, without a download. The clip page shows a LIVE badge (and a radio's current song) instead of the progress bar; seek is refused, there is no crossfade, and the queue goes on when the stream ends. `LIVE_MAX_HOURS` (4) stops a forgotten live item.
+### Added
+
+- Sharding: the bot runs as `commands.AutoShardedBot` (single process), with an optional `SHARD_COUNT`. `/healthz` and `/metrics` report each shard; `/healthz` answers `degraded` (still 200) when only some shards are down and 503 when all are.
 
 ## [1.4.0] - 2026-10-23
 
