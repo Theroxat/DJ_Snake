@@ -255,6 +255,81 @@ async def test_no_duration_limit_by_default(busy, channel, downloads):
     assert await download_and_queue_song(ctx, busy, url("x"), duration=36000)
 
 
+async def test_single_link_length_is_refused_before_download(
+    busy, channel, monkeypatch
+):
+    """A !play or page link has no length up front: download_media() gets
+    max_seconds and refuses from the metadata, so nothing is downloaded."""
+    set_limits(track_minutes=5)
+    seen = []
+
+    def download_media(url_, **kwargs):
+        seen.append(kwargs.get("max_seconds"))
+        raise media.TrackTooLong(20 * 60)
+
+    monkeypatch.setattr(media, "download_media", download_media)
+    ctx = ctx_of(channel, member())
+    assert await download_and_queue_song(ctx, busy, url("huge")) is None
+    assert seen == [300]
+    assert "lasts 20 min; the limit is 5 min" in channel.log[-1]
+    assert busy.queue == []
+
+
+async def test_no_max_seconds_without_a_length_limit(busy, channel, downloads):
+    seen = []
+    real = media.download_media
+
+    def spy(url_, **kwargs):
+        seen.append(kwargs)
+        return real(url_, **kwargs)
+
+    media.download_media = spy
+    try:
+        await download_and_queue_song(ctx_of(channel, member()), busy, url("a"))
+    finally:
+        media.download_media = real
+    assert "max_seconds" not in seen[0]
+
+
+def test_duration_filter_refuses_long_metadata():
+    seen = []
+    check = media._duration_filter(300, seen)
+    assert check({"duration": 300}) is None
+    assert check({"duration": None}, incomplete=True) is None
+    assert check({}) is None
+    assert check({"duration": 301})
+    assert seen == [301]
+
+
+def test_download_once_raises_before_downloading(monkeypatch, tmp_path):
+    """With the real _download_once, the match_filter stops yt-dlp before any
+    file is written and TrackTooLong is raised (not retried)."""
+    calls = []
+
+    class FakeYDL:
+        def __init__(self, opts):
+            self.opts = opts
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def extract_info(self, url_, download=True):
+            info = {"id": "x", "title": "Long", "duration": 4000}
+            calls.append(url_)
+            if self.opts["match_filter"](info, incomplete=False):
+                return info  # yt-dlp skips the download
+            raise AssertionError("should not download")
+
+    monkeypatch.setattr(media.yt_dlp, "YoutubeDL", FakeYDL)
+    monkeypatch.setattr(media, "TEMP_DIR", str(tmp_path))
+    with pytest.raises(media.TrackTooLong) as e:
+        media.download_media(url("x"), max_seconds=600)
+    assert e.value.duration == 4000 and len(calls) == 1
+
+
 # --- Playlists -------------------------------------------------------------------------
 
 
@@ -471,6 +546,23 @@ async def test_invalid_requests_do_not_start_the_cooldown(
     ctx = make_slash_ctx(GUILD_ID, channel, alice)
     await commands.play.callback(ctx, query=None)  # Usage error
     await play(channel, alice)
+    assert len(play_env) == 1
+
+
+async def test_failed_join_does_not_start_the_cooldown(channel, play_env, monkeypatch):
+    monkeypatch.setattr(state, "clock", lambda: 1000.0)
+    set_limits(cooldown=30)
+    joined = [False]
+
+    async def join(ctx):
+        return joined[0]
+
+    monkeypatch.setattr(commands, "join_voice_channel", join)
+    alice = member(10)
+    await play(channel, alice)  # The bot could not join
+    assert play_env == []
+    joined[0] = True
+    await play(channel, alice)  # No wait: the failed try did not count
     assert len(play_env) == 1
 
 

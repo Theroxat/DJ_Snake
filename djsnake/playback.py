@@ -304,15 +304,21 @@ async def _download_and_queue(
             player.single_downloads += 1
             refresh_panel(player)
         try:
-            download = media.download_media
+            options = {}
             if any(
                 item["key"] == pending_key and item["title"] is None
                 for item in player.pending_downloads
             ):
-                download = functools.partial(
-                    download, on_title=_title_reporter(player, pending_key)
-                )
-            track = await loop.run_in_executor(None, download, url)
+                options["on_title"] = _title_reporter(player, pending_key)
+            max_minutes = limits.limits_for(ctx.guild.id)["track_minutes"]
+            if max_minutes:  # Refused from the metadata, before downloading
+                options["max_seconds"] = max_minutes * 60
+            download = functools.partial(media.download_media, **options)
+            try:
+                track = await loop.run_in_executor(None, download, url)
+            except media.TrackTooLong as e:
+                await refuse(ctx, limits.too_long(ctx.guild.id, e.duration), skips)
+                return None
         finally:
             if not quiet:
                 player.single_downloads = max(0, player.single_downloads - 1)

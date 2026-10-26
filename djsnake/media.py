@@ -491,9 +491,34 @@ def analyse_media(filepath):
         return _parse_analysis("")
 
 
-def _download_once(url, on_title=None):
+class TrackTooLong(Exception):
+    """The track lasts more than the `max_seconds` given to download_media();
+    nothing was downloaded. `duration` is in seconds."""
+
+    def __init__(self, duration):
+        super().__init__(f"track lasts {duration} s")
+        self.duration = duration
+
+
+def _duration_filter(max_seconds, seen):
+    """A yt-dlp match_filter refusing, before any download, a track longer
+    than `max_seconds`; the refused duration goes in `seen`."""
+
+    def check(info, incomplete=False):
+        duration = info.get("duration")
+        if isinstance(duration, (int, float)) and duration > max_seconds:
+            seen.append(duration)
+            return f"longer than {max_seconds} s"
+        return None
+
+    return check
+
+
+def _download_once(url, on_title=None, max_seconds=None):
     """Single download attempt. Raises on any failure. `on_title` is called
-    (from this thread) with the title as soon as yt-dlp knows it."""
+    (from this thread) with the title as soon as yt-dlp knows it. With
+    `max_seconds`, a longer track is refused from its metadata before the
+    download starts (TrackTooLong)."""
     # Ensure temp directory exists
     os.makedirs(TEMP_DIR, exist_ok=True)
 
@@ -514,9 +539,15 @@ def _download_once(url, on_title=None):
             lambda d: on_title((d.get("info_dict") or {}).get("title"))
         ]
 
+    too_long = []
+    if max_seconds:
+        ydl_opts["match_filter"] = _duration_filter(max_seconds, too_long)
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         print(f"Downloading: {url}")
         info = ydl.extract_info(url, download=True)
+        if too_long:
+            raise TrackTooLong(too_long[0])
         filepath = _find_download(info)
         if source_of(url) == "youtube":  # SponsorBlock only knows YouTube
             _remove_offtopic(ydl, info, filepath)
@@ -648,17 +679,20 @@ def _is_permanent_failure(message):
     return any(marker in lowered for marker in PERMANENT_ERROR_MARKERS)
 
 
-def download_media(url, on_title=None):
+def download_media(url, on_title=None, max_seconds=None):
     """Download one track (video+audio mp4), retrying transient YouTube refusals.
 
     Runs in an executor thread (see download_and_queue_song), so the blocking
-    sleep between attempts does not stall the bot's event loop.
+    sleep between attempts does not stall the bot's event loop. With
+    `max_seconds`, a longer track raises TrackTooLong before downloading.
     """
     last_error = None
 
     for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
         try:
-            return _download_once(url, on_title)
+            return _download_once(url, on_title, max_seconds)
+        except TrackTooLong:
+            raise
         except Exception as e:
             last_error = str(e)
             print(

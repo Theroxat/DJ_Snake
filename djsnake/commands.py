@@ -285,7 +285,7 @@ async def play(ctx, *, query: str = None):
             await fail(ctx, ControlError("bad_url").text(lang))
             return
 
-    # The cooldown starts once the request is valid; DJs skip it.
+    # The cooldown is checked once the request is valid; DJs skip it.
     skip_cooldown = limits.bypasses(ctx.author, ctx.guild.id)
     wait = limits.cooldown_remaining(
         ctx.guild.id, getattr(ctx.author, "id", None), skip_cooldown
@@ -293,10 +293,10 @@ async def play(ctx, *, query: str = None):
     if wait:
         await fail_t(ctx, "limits.cooldown", seconds=wait)
         return
-    limits.start_cooldown(ctx.guild.id, getattr(ctx.author, "id", None), skip_cooldown)
-
     if not await join_voice_channel(ctx):
         return
+    # Started only once the bot could join: a failed join costs no wait.
+    limits.start_cooldown(ctx.guild.id, getattr(ctx.author, "id", None), skip_cooldown)
 
     if ctx.guild.id not in state.music_players:
         state.music_players[ctx.guild.id] = MusicPlayer()

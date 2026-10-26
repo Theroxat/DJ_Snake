@@ -159,11 +159,16 @@ def check_enqueue(player, guild_id, bucket, bypass=False, duration=None):
         return USER_FULL, {"max": limit["per_user"]}
     if limit["track_minutes"] and duration:
         if duration > limit["track_minutes"] * 60:
-            return TOO_LONG, {
-                "max": limit["track_minutes"],
-                "minutes": math.ceil(duration / 60),
-            }
+            return too_long(guild_id, duration)
     return None
+
+
+def too_long(guild_id, duration):
+    """The TOO_LONG refusal for a track of `duration` seconds."""
+    return TOO_LONG, {
+        "max": limits_for(guild_id)["track_minutes"],
+        "minutes": math.ceil(duration / 60),
+    }
 
 
 def cooldown_remaining(guild_id, member_id, bypass=False):
