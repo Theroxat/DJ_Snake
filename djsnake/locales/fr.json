@@ -231,6 +231,7 @@
   "control.import_too_big": "Ce fichier est trop volumineux (la limite est de {max_kb} Ko).",
   "control.import_nothing": "Rien n’a pu être importé : aucun titre utilisable n’a été trouvé.",
   "control.import_not_list": "Ce lien désigne un seul titre. Utilisez un lien de playlist, d’album ou de set.",
+  "control.import_busy": "Une importation est déjà en cours sur ce serveur. Réessayer une fois terminée.",
   "help.cmd.remove": "`{prefix}remove <position>` : retire un titre de la file d’attente (position affichée par `{prefix}list`)",
   "help.cmd.move": "`{prefix}move <de> <vers>` : déplace un titre de la file d’attente",
   "help.cmd.previous": "`{prefix}previous` : revient au titre précédent, ou relance celui-ci",

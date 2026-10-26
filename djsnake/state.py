@@ -61,6 +61,8 @@ stay_retries = {}
 # Guild id -> clock() when the bot left voice on purpose (!reset, !stop, a
 # channel switch): the voice-state handler then does not take it for a drop.
 deliberate_leaves = {}
+# Guild ids with a `/playlist import` running: one at a time per guild.
+importing = set()
 # Guild id -> language code chosen with `!language` (see i18n.py).
 guild_languages = {}
 # `!theme edit` links: token -> (guild id, expiry on clock()). In memory only.

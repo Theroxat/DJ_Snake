@@ -107,7 +107,7 @@ def detect_format(filename, text):
 def _raw_json(text):
     try:
         data = json.loads(text)
-    except ValueError:
+    except (ValueError, RecursionError):  # Deeply nested arrays overflow
         raise ImportFileError("import_bad_file")
     if not isinstance(data, dict) or data.get("schema") != SCHEMA:
         raise ImportFileError("import_bad_file")

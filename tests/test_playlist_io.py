@@ -484,3 +484,49 @@ async def test_import_replaces_an_existing_playlist_for_its_creator(monkeypatch)
             GUILD_ID, "mix", PL_URL, author_id=BOB
         )
     assert e.value.code == "playlist_exists"
+
+
+def test_deeply_nested_json_is_a_bad_file():
+    depth = min(200000, playlist_io.MAX_FILE_BYTES // 2 - 10)
+    data = b"[" * depth + b"]" * depth
+    with pytest.raises(playlist_io.ImportFileError) as e:
+        playlist_io.parse_import(data, "x.json")
+    assert e.value.code == "import_bad_file"
+
+
+async def test_one_import_at_a_time_per_guild(monkeypatch):
+    import asyncio
+
+    started, release = asyncio.Event(), asyncio.Event()
+
+    async def slow_progress(done, total):
+        started.set()
+        await release.wait()
+
+    monkeypatch.setattr(
+        catalog,
+        "get_tracks",
+        lambda prov, kind, ref, limit: [spotify.make_track("One", ["A"], 100000)],
+    )
+    monkeypatch.setattr(spotify, "find_youtube_match", lambda track: yt(1))
+    link = "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"
+    first = asyncio.create_task(
+        controls.control_playlist_import_url(
+            GUILD_ID, "one", link, ALICE, progress=slow_progress
+        )
+    )
+    await started.wait()
+    with pytest.raises(ControlError) as e:
+        await controls.control_playlist_import_url(GUILD_ID, "two", link, ALICE)
+    assert e.value.code == "import_busy" and e.value.status == 409
+    with pytest.raises(ControlError) as e:
+        await controls.control_playlist_import_file(
+            GUILD_ID, "three", yt(2).encode(), "x.txt", ALICE
+        )
+    assert e.value.code == "import_busy"
+    # Another guild is not blocked
+    await controls.control_playlist_import_file(2, "other", yt(3).encode(), "x.txt")
+    release.set()
+    assert (await first)["count"] == 1
+    # Done: the guild may import again
+    await controls.control_playlist_import_url(GUILD_ID, "two", link, ALICE)

@@ -231,6 +231,7 @@
   "control.import_too_big": "That file is too big (the limit is {max_kb} KB).",
   "control.import_nothing": "Nothing could be imported: no usable track was found.",
   "control.import_not_list": "That link is a single track. Use a playlist, album or set link.",
+  "control.import_busy": "An import is already running on this server. Try again once it is done.",
   "help.cmd.remove": "`{prefix}remove <position>`: remove a track from the queue (position as `{prefix}list` shows it)",
   "help.cmd.move": "`{prefix}move <from> <to>`: move a queued track to another position",
   "help.cmd.previous": "`{prefix}previous`: go back to the previous track, or restart this one",

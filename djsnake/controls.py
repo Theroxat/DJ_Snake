@@ -1,6 +1,7 @@
 """Controls shared by Discord commands and the web page."""
 
 import asyncio
+import contextlib
 import random
 import time
 import types
@@ -126,6 +127,7 @@ class ControlError(Exception):
         "import_too_big": 413,
         "import_nothing": 400,
         "import_not_list": 400,
+        "import_busy": 409,
     }
 
     def __init__(self, code, **params):
@@ -672,11 +674,29 @@ async def _import_save(guild_id, name, tracks, skipped, truncated, author, admin
     return result
 
 
+@contextlib.contextmanager
+def _one_import(guild_id):
+    """One `/playlist import` at a time per guild (a link import can match
+    up to MAX_SAVED_TRACKS tracks on YouTube): a second one is refused."""
+    if guild_id in state.importing:
+        raise ControlError("import_busy")
+    state.importing.add(guild_id)
+    try:
+        yield
+    finally:
+        state.importing.discard(guild_id)
+
+
 async def control_playlist_import_file(
     guild_id, name, data, filename="", author_id=None, is_admin=False
 ):
     """Create or replace a playlist from an uploaded JSON, M3U or TXT file.
     Returns {name, count, skipped, truncated}."""
+    with _one_import(guild_id):
+        return await _import_file(guild_id, name, data, filename, author_id, is_admin)
+
+
+async def _import_file(guild_id, name, data, filename, author_id, is_admin):
     await _playlist_call(playlists.check_writable, guild_id, name, author_id, is_admin)
     try:
         tracks, skipped, truncated = playlist_io.parse_import(data, filename)
@@ -723,6 +743,11 @@ async def control_playlist_import_url(
     playlist stores ordinary links, so loading it later needs no matching);
     `progress(done, total)` is awaited before each match. Returns {name,
     count, skipped, truncated}."""
+    with _one_import(guild_id):
+        return await _import_url(guild_id, name, url, author_id, is_admin, progress)
+
+
+async def _import_url(guild_id, name, url, author_id, is_admin, progress):
     await _playlist_call(playlists.check_writable, guild_id, name, author_id, is_admin)
     try:
         link = catalog.check_link(url)

@@ -65,6 +65,7 @@ def fresh_state(tmp_path, monkeypatch):
         state.guild_stay,
         state.stay_retries,
         state.deliberate_leaves,
+        state.importing,
         state.guild_languages,
         state.edit_tokens,
         state.viewers,
