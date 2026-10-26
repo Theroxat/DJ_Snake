@@ -872,6 +872,39 @@ button.statclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-hei
   .heat .cell { aspect-ratio: 1; }
 }
 
+/* Keyboard shortcuts help: a native <dialog> in the theme's tokens */
+dialog.kbdlg {
+  padding: 0; border: 0; background: transparent; color: var(--text); overflow: visible;
+  width: min(580px, calc(100vw - 32px)); max-width: none; max-height: none; margin: auto;
+}
+dialog.kbdlg::backdrop { background: rgba(0, 0, 0, .62); }
+.kbcard {
+  background: var(--surface); color: var(--text); border: var(--bw) solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-frame); padding: 16px 18px 18px; max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px);
+  overflow-y: auto; display: flex; flex-direction: column; gap: 12px; box-sizing: border-box; min-width: 0;
+}
+.kbhead { display: flex; align-items: center; gap: 12px; }
+.kbhead h2 { margin: 0; font-size: 22px; flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+button.kbclose { min-width: 40px; padding: 4px 10px; font-size: 26px; line-height: 1; }
+.kbnote { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.kbtable { width: 100%; border-collapse: collapse; font-size: 14px; }
+.kbtable th { text-align: left; color: var(--muted); font-weight: 400; font-size: 12px; padding: 0 8px 6px 0; }
+.kbtable td { padding: 6px 8px 6px 0; border-top: 1px solid var(--hair); vertical-align: top; overflow-wrap: anywhere; }
+.kbtable td.keys { width: 42%; }
+.kbtable tr.off td { opacity: .5; }
+.kbtable .or { color: var(--muted); font-size: 12px; margin: 0 3px; }
+.kbtable .tag { color: var(--muted); font-size: 11px; margin-left: 6px; }
+kbd {
+  display: inline-block; font: 600 12px/1.4 var(--font-body); min-width: 1.6em; text-align: center; padding: 1px 6px;
+  border: var(--bw) solid var(--border); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--text) 8%, transparent);
+  box-shadow: 0 1px 0 var(--hair); color: var(--text); margin: 1px 0;
+}
+@media (max-width: 420px) {
+  .kbcard { padding: 12px; }
+  .kbtable td.keys { width: 46%; }
+  button.kbclose { min-height: 44px; min-width: 44px; }
+}
+
 #toast {
   position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 120; max-width: min(92vw, 560px);
   background: var(--surface); color: var(--text); border: var(--bw) solid var(--accent-3); border-radius: var(--radius-sm); box-shadow: var(--shadow-pop);
@@ -1051,6 +1084,9 @@ html.demo-embedded .demo-ribbon { display: none; }
     <button id="statsbtn" class="ghost palette" type="button" aria-haspopup="dialog" aria-controls="stats" aria-label="Stats" title="Stats" data-i18n-aria="stats" data-i18n-title="stats">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16v2H4zM5 11h3v7H5zM10.5 4h3v14h-3zM16 8h3v10h-3z"/></svg>
     </button>
+    <button id="kbbtn" class="ghost palette" type="button" aria-haspopup="dialog" aria-controls="kbdlg" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" data-i18n-aria="kb_btn" data-i18n-title="kb_btn_title">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm1 2v10h16V7zm2 1.500h2v2H6zm3.500 0h2v2h-2zm3.500 0h2v2h-2zm3.500 0H18v2h-1.500zM6 12h2v2H6zm3.500 0h5v2h-5zm6.500 0h2v2h-2zM8 15h8v1.500H8z"/></svg>
+    </button>
     <button id="palbtn" class="ghost palette" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="thememenu" aria-label="Change theme" title="Change theme" data-i18n-aria="change_theme" data-i18n-title="change_theme">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0 0 18c1.4 0 2-.9 2-1.8 0-.5-.2-.9-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.4 17 3 12 3zM7.5 12a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>
     </button>
@@ -1202,6 +1238,20 @@ html.demo-embedded .demo-ribbon { display: none; }
 </main>
 
 <div id="toast" role="status" aria-live="polite" hidden></div>
+
+<dialog id="kbdlg" class="kbdlg" aria-labelledby="kbh">
+  <div class="kbcard">
+    <div class="kbhead">
+      <h2 class="display" id="kbh" data-i18n="kb_title">Keyboard shortcuts</h2>
+      <button type="button" class="ghost kbclose" id="kbclose" aria-label="Close shortcuts" title="Close (Esc)" data-i18n-aria="kb_close_aria" data-i18n-title="kb_close">×</button>
+    </div>
+    <p class="kbnote" id="kbnote"></p>
+    <table class="kbtable" aria-labelledby="kbh">
+      <thead><tr><th scope="col" data-i18n="kb_col_keys">Keys</th><th scope="col" data-i18n="kb_col_action">Action</th></tr></thead>
+      <tbody id="kbrows"></tbody>
+    </table>
+  </div>
+</dialog>
 
 <div id="stats" class="statsdlg" role="dialog" aria-modal="true" aria-labelledby="stath" hidden>
   <div class="statscard" id="statscard">
@@ -1420,6 +1470,36 @@ html.demo-embedded .demo-ribbon { display: none; }
       lyr_plain_note: "These lyrics aren't synced to the track.",
       lyr_loading: "Looking for lyrics…",
       lyr_none: "No lyrics found",
+      kb_btn: "Keyboard shortcuts",
+      kb_btn_title: "Keyboard shortcuts (?)",
+      kb_title: "Keyboard shortcuts",
+      kb_close_aria: "Close shortcuts",
+      kb_close: "Close (Esc)",
+      kb_col_keys: "Keys",
+      kb_col_action: "Action",
+      kb_note: "Shortcuts are off while you type in a field or hold Ctrl, Alt or Cmd. Letters follow the character on your key, so they work on AZERTY, QWERTZ and other layouts.",
+      kb_note_view: "This is a view-only link: playback shortcuts are off. Fullscreen, lyrics, theme and this help still work.",
+      kb_off: "off",
+      kb_or: "or",
+      kb_space: "Space",
+      kb_playpause: "Play or pause",
+      kb_seekb: "Back 10 s (Shift: 30 s)",
+      kb_seekf: "Forward 10 s (Shift: 30 s)",
+      kb_next: "Next track",
+      kb_prev: "Previous track",
+      kb_shuffle: "Shuffle the queue",
+      kb_loop: "Cycle loop: off, track, queue",
+      kb_mute: "Mute or unmute",
+      kb_volup: "Volume up 5%",
+      kb_voldn: "Volume down 5%",
+      kb_fs: "Fullscreen",
+      kb_lyr: "Show or hide lyrics",
+      kb_theme: "Theme menu",
+      kb_help: "Open this help",
+      kb_esc: "Close a dialog or menu",
+      kb_t_loop: "Loop: {mode}",
+      kb_t_vol: "Volume: {n}%",
+      kb_t_muted: "Muted",
     },
     fr: {
       doc_title: "DJ Snake — Soirée clips",
@@ -1603,6 +1683,36 @@ html.demo-embedded .demo-ribbon { display: none; }
       lyr_plain_note: "Ces paroles ne sont pas synchronisées avec le titre.",
       lyr_loading: "Recherche des paroles…",
       lyr_none: "Aucune parole trouvée",
+      kb_btn: "Raccourcis clavier",
+      kb_btn_title: "Raccourcis clavier (?)",
+      kb_title: "Raccourcis clavier",
+      kb_close_aria: "Fermer les raccourcis",
+      kb_close: "Fermer (Échap)",
+      kb_col_keys: "Touches",
+      kb_col_action: "Action",
+      kb_note: "Les raccourcis sont inactifs pendant la saisie dans un champ ou avec Ctrl, Alt ou Cmd. Les lettres suivent le caractère de la touche : elles fonctionnent en AZERTY, QWERTZ et autres dispositions.",
+      kb_note_view: "Lien en lecture seule : les raccourcis de lecture sont désactivés. Le plein écran, les paroles, le thème et cette aide restent disponibles.",
+      kb_off: "inactif",
+      kb_or: "ou",
+      kb_space: "Espace",
+      kb_playpause: "Lecture ou pause",
+      kb_seekb: "Reculer de 10 s (Maj : 30 s)",
+      kb_seekf: "Avancer de 10 s (Maj : 30 s)",
+      kb_next: "Titre suivant",
+      kb_prev: "Titre précédent",
+      kb_shuffle: "Mélanger la file",
+      kb_loop: "Changer de boucle : aucune, titre, file",
+      kb_mute: "Couper ou rétablir le son",
+      kb_volup: "Volume +5 %",
+      kb_voldn: "Volume −5 %",
+      kb_fs: "Plein écran",
+      kb_lyr: "Afficher ou masquer les paroles",
+      kb_theme: "Menu du thème",
+      kb_help: "Ouvrir cette aide",
+      kb_esc: "Fermer une boîte de dialogue ou un menu",
+      kb_t_loop: "Boucle : {mode}",
+      kb_t_vol: "Volume : {n} %",
+      kb_t_muted: "Son coupé",
     },
   };
   const LANGS = Object.keys(I18N);
@@ -3326,6 +3436,151 @@ html.demo-embedded .demo-ribbon { display: none; }
       if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
       else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
     }
+  });
+
+  // ---- keyboard shortcuts (one module: the map, the help dialog, one keydown listener)
+  // SHORTCUTS is the single map. `keys` lists alternatives (each a combo of <kbd>);
+  // `ctl` rows need the control link and an active session (view-only pages skip them).
+  // Matching: letters go by the character of the key (event.key), so AZERTY and
+  // QWERTZ users press the letter printed on the key; only when the layout gives no
+  // Latin letter (Cyrillic, Greek...) does event.code (KeyJ = physical J) stand in.
+  // "?" is matched by character too (Shift+, on AZERTY), never by position.
+  const SHORTCUTS = [
+    { ctl: 1, keys: [["kb_space"], ["K"]], label: "kb_playpause" },
+    { ctl: 1, keys: [["J"], ["←"]], label: "kb_seekb" },
+    { ctl: 1, keys: [["L"], ["→"]], label: "kb_seekf" },
+    { ctl: 1, keys: [["N"]], label: "kb_next" },
+    { ctl: 1, keys: [["P"]], label: "kb_prev" },
+    { ctl: 1, keys: [["S"]], label: "kb_shuffle" },
+    { ctl: 1, keys: [["R"]], label: "kb_loop" },
+    { ctl: 1, keys: [["M"]], label: "kb_mute" },
+    { ctl: 1, keys: [["↑"]], label: "kb_volup" },
+    { ctl: 1, keys: [["↓"]], label: "kb_voldn" },
+    { keys: [["F"]], label: "kb_fs" },
+    { keys: [["Y"]], label: "kb_lyr" },
+    { keys: [["T"]], label: "kb_theme" },
+    { keys: [["?"]], label: "kb_help" },
+    { keys: [["Esc"]], label: "kb_esc" },
+  ];
+  const kbDlg = $("kbdlg"), kbBtn = $("kbbtn");
+  let kbOpener = null;
+  function buildHelp() {
+    $("kbnote").textContent = t(canControl ? "kb_note" : "kb_note_view");
+    const body = $("kbrows");
+    body.textContent = "";
+    for (const row of SHORTCUTS) {
+      const tr = document.createElement("tr"), keys = document.createElement("td"), what = document.createElement("td");
+      keys.className = "keys";
+      row.keys.forEach((combo, i) => {
+        if (i) { const o = document.createElement("span"); o.className = "or"; o.textContent = t("kb_or"); keys.appendChild(o); }
+        combo.forEach((k) => {
+          const kb = document.createElement("kbd");
+          kb.textContent = k.startsWith("kb_") ? t(k) : k;
+          keys.appendChild(kb);
+        });
+      });
+      what.textContent = t(row.label);
+      if (row.ctl && !canControl) {
+        tr.className = "off";
+        const tag = document.createElement("span");
+        tag.className = "tag";
+        tag.textContent = "(" + t("kb_off") + ")";
+        what.appendChild(tag);
+      }
+      tr.append(keys, what);
+      body.appendChild(tr);
+    }
+  }
+  function openHelp() {
+    if (kbDlg.open) return;
+    kbOpener = document.activeElement;
+    buildHelp();
+    if (typeof kbDlg.showModal === "function") kbDlg.showModal(); else kbDlg.setAttribute("open", "");
+    kbBtn.setAttribute("aria-expanded", "true");
+    $("kbclose").focus();
+  }
+  function closeHelp() {
+    if (!kbDlg.open) return;
+    if (typeof kbDlg.close === "function") kbDlg.close(); else kbDlg.removeAttribute("open");
+    kbClosed();
+  }
+  function kbClosed() {
+    if (kbBtn.getAttribute("aria-expanded") !== "true") return; // already handled
+    kbBtn.setAttribute("aria-expanded", "false");
+    const back = kbOpener && document.contains(kbOpener) && kbOpener !== document.body ? kbOpener : kbBtn;
+    kbOpener = null;
+    try { back.focus(); } catch (x) {}
+  }
+  kbBtn.setAttribute("aria-expanded", "false");
+  kbBtn.addEventListener("click", openHelp);
+  $("kbclose").addEventListener("click", closeHelp);
+  kbDlg.addEventListener("click", (e) => { if (e.target === kbDlg) closeHelp(); }); // the backdrop
+  kbDlg.addEventListener("close", kbClosed); // Esc closes a modal <dialog> natively
+  kbDlg.addEventListener("keydown", (e) => {
+    if (e.key === "Tab") { // keep focus inside the dialog
+      const f = [...kbDlg.querySelectorAll("button, [href], [tabindex]:not([tabindex='-1'])")].filter((b) => !b.disabled);
+      if (!f.length) { e.preventDefault(); return; }
+      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+    } else if (e.key === "?") { e.preventDefault(); closeHelp(); }
+  });
+  langListeners.push(() => { if (kbDlg.open) buildHelp(); });
+
+  // Feedback for actions with no visible change: the toast is a polite live region.
+  // Throttled so a held arrow does not flood a screen reader; the last value wins.
+  let kbSayAt = 0, kbSayTimer = null;
+  function kbSay(msg) {
+    clearTimeout(kbSayTimer);
+    const go = () => { kbSayAt = Date.now(); toast(msg, "ok"); };
+    const wait = kbSayAt + 250 - Date.now();
+    if (wait <= 0) go(); else kbSayTimer = setTimeout(go, wait);
+  }
+  function kbLetter(e) {
+    if (/^[a-z]$/i.test(e.key)) return e.key.toLowerCase();
+    const m = /^Key([A-Z])$/.exec(e.code || "");
+    return m ? m[1].toLowerCase() : "";
+  }
+  const kbClick = (id) => { const b = $(id); if (b && !b.disabled && !b.hidden) { b.click(); return true; } return false; };
+  let kbPreMute = 100;
+  function kbMute() {
+    if (vol > 0) { kbPreMute = vol; setVolume(0); kbSay(t("kb_t_muted")); }
+    else { setVolume(kbPreMute || 100); kbSay(t("kb_t_vol", { n: vol })); }
+  }
+  document.addEventListener("keydown", (e) => {
+    if (e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
+    const tg = e.target instanceof Element ? e.target : document.body;
+    if (tg.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return;
+    if (kbDlg.open || !statsDlg.hidden) return; // a dialog is open: it owns the keyboard
+    const ctl = active();
+    const viaButton = !!tg.closest('button, a, summary, [role="button"], [role="switch"], [role="menuitem"]');
+    const own = !!tg.closest('#seek, #queue, [role="menu"], [role="slider"]'); // they handle arrows themselves
+    let used = false;
+    if (e.key === "?") { openHelp(); used = true; }
+    else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      if (!own && ctl && seekOn()) { seekTo(curElapsed() + (e.key === "ArrowLeft" ? -1 : 1) * (e.shiftKey ? 30 : 10)); used = true; }
+    } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      if (!own && !e.shiftKey && canControl) { setVolume(vol + (e.key === "ArrowUp" ? 5 : -5)); kbSay(vol === 0 ? t("kb_t_muted") : t("kb_t_vol", { n: vol })); used = true; }
+    } else if (e.key === " ") {
+      if (!viaButton && !e.repeat && ctl) used = kbClick("pp") || true; // a focused button keeps its own Space
+    } else if (!e.repeat) {
+      const k = kbLetter(e);
+      if (e.shiftKey && k !== "j" && k !== "l") return;
+      if (k === "k" && ctl) used = kbClick("pp") || true;
+      else if ((k === "j" || k === "l") && ctl && seekOn()) { seekTo(curElapsed() + (k === "j" ? -1 : 1) * (e.shiftKey ? 30 : 10)); used = true; }
+      else if (k === "n" && ctl) used = kbClick("next") || true;
+      else if (k === "p" && ctl) used = kbClick("prev") || true;
+      else if (k === "s" && ctl) used = kbClick("shuffle") || true; // its click toasts
+      else if (k === "r" && ctl) {
+        const was = loopMode;
+        kbClick("loop");
+        if (loopMode !== was) kbSay(t("kb_t_loop", { mode: t("loop_" + loopMode) }));
+        used = true;
+      } else if (k === "m" && canControl) { kbMute(); used = true; }
+      else if (k === "f") used = kbClick("fs");
+      else if (k === "y") used = kbClick("lyrbtn");
+      else if (k === "t") used = kbClick("palbtn");
+    }
+    if (used) e.preventDefault();
   });
 
   async function poll() {

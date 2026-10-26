@@ -61,6 +61,27 @@ Lyrics come from [LRCLIB](https://lrclib.net), a free lyrics database that needs
 
 Timing can be off for music videos with a long intro that SponsorBlock does not cut, or for a different edit of the song than the one LRCLIB has.
 
+### Keyboard shortcuts
+
+The page can be driven from the keyboard; press `?` (or use the keyboard button in the header) for the same list in a dialog, in English or French.
+
+| Keys | Action |
+| --- | --- |
+| `Space`, `K` | Play or pause |
+| `J`, `←` / `L`, `→` | Seek back / forward 10 s (`Shift`: 30 s) |
+| `N` / `P` | Next / previous track |
+| `S` | Shuffle the queue |
+| `R` | Cycle loop: off, track, queue |
+| `M` | Mute or unmute |
+| `↑` / `↓` | Volume up / down 5 % |
+| `F` | Fullscreen |
+| `Y` | Show or hide lyrics |
+| `T` | Theme menu |
+| `?` | Open the shortcuts help |
+| `Esc` | Close a dialog or menu |
+
+Shortcuts are ignored while you type in a field and when `Ctrl`, `Alt` or `Cmd` is held. On a view-only link only `F`, `Y`, `T`, `?` and `Esc` work. Letters match the character printed on the key, not its position, so they work on AZERTY and QWERTZ; layouts with no Latin letters (Cyrillic, Greek) fall back to the physical key. Actions with no visible change (loop mode, volume, mute) are announced in a short message that screen readers read out.
+
 ### Listening stats
 
 The chart button shows, for the last week, month or all time: top tracks and artists, the most skipped track, hours played, number of tracks and sessions, peak listeners, and a day-by-hour heatmap shown in your browser's time zone.

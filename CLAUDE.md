@@ -696,6 +696,16 @@ Module map, lowest layer first (each imports only the ones above it):
   `--bg`, and shows an "Install app" item in the palette menu on
   `beforeinstallprompt` (hidden when standalone or dismissed, `djsnake.installHidden`).
   Tests: `tests/test_pwa.py`.
+- **Keyboard shortcuts** (`web/index.html`, one block before `poll()`): the
+  `SHORTCUTS` array is the documented map and feeds the help `<dialog id="kbdlg">`
+  (opened by `?` or the header keyboard button; `kb_*` keys in both `I18N`
+  halves); one `keydown` listener skips fields, Ctrl/Alt/Meta, open dialogs and
+  controls that own the key, matches letters by `event.key` (`event.code` only
+  when the layout has no Latin letter), clicks the existing buttons so their
+  guards apply, and needs `active()` for control keys (view-only keeps F, Y, T,
+  `?`, Esc). Silent actions go through the throttled `toast()`. Tests:
+  `tests/test_keyboard_shortcuts.py` (the browser part needs Playwright, else it
+  is skipped).
 - **Themes**: the page is fully token-driven: each preset is a `[data-skin]`
   block of CSS custom properties on `<html>` (Arcade is the original look;
   the presets are `THEME_PRESETS` in `config.py`: arcade, minimal, night,
