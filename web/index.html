@@ -932,11 +932,17 @@ kbd {
 }
 
 /* Playlist size choice: a small native <dialog>, same card as the shortcuts help */
-dialog.plsdlg { width: min(460px, calc(100vw - 32px)); }
-.plsbtns { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
-.plsbtns button { min-height: 44px; }
+dialog.plsdlg { width: min(620px, calc(100vw - 32px)); }
+.plsbtns { display: flex; gap: 10px; align-items: center; }
+.plsbtns button { min-height: 44px; white-space: nowrap; }
 .plsbtns button.plscancel { margin-right: auto; }
-@media (max-width: 420px) { .plsbtns button { flex: 1 1 100%; } .plsbtns button.plscancel { order: 3; margin-right: 0; } }
+/* The default choice looks like the Add button: the page's primary action */
+.plsbtns button.plsprimary { background: var(--accent); color: var(--on-accent); border-color: var(--pp-border); }
+@media (max-width: 560px) {
+  .plsbtns { flex-direction: column; align-items: stretch; }
+  .plsbtns button { white-space: normal; }
+  .plsbtns button.plscancel { order: 3; margin-right: 0; }
+}
 
 #toast {
   position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 120; max-width: min(92vw, 560px);
@@ -1300,9 +1306,9 @@ button.synctoggle[aria-pressed="true"] { color: var(--accent-3); border-color: v
     <p id="plstext"></p>
     <p class="kbnote" id="plsnote" hidden></p>
     <div class="plsbtns">
-      <button type="button" class="ghost plscancel" id="plscancel" data-i18n="plsize_cancel">Cancel</button>
-      <button type="button" class="ghost" id="plsfull"></button>
-      <button type="button" id="plsdefault"></button>
+      <button type="button" class="plscancel" id="plscancel" data-i18n="plsize_cancel">Cancel</button>
+      <button type="button" id="plsfull"></button>
+      <button type="button" class="plsprimary" id="plsdefault"></button>
     </div>
   </div>
 </dialog>
