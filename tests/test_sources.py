@@ -325,7 +325,7 @@ def test_get_tracks_apple_album_uses_the_lookup_api(http):
     tracks = catalog.get_tracks("apple", "album", ref, 30)
     assert len(tracks) == 2
     assert http.calls == [
-        "https://itunes.apple.com/lookup?id=697194953&country=us&entity=song"
+        "https://itunes.apple.com/lookup?id=697194953&country=us&entity=song&limit=30"
     ]
 
 
@@ -422,6 +422,7 @@ async def test_deezer_playlist_respects_max_size(
     web_add, player, monkeypatch, source_env
 ):
     monkeypatch.setattr(controls, "MAX_PLAYLIST_SIZE", 2)
+    monkeypatch.setattr(controls, "MAX_PLAYLIST_FULL", 2)
     await web_add("https://www.deezer.com/playlist/908622995")
     await asyncio.sleep(0.4)
     assert player.load_line == "✅ 1/2 tracks loaded (1 not found on YouTube)"
@@ -478,6 +479,7 @@ async def test_web_add_soundcloud_set_is_listed_with_its_url(
         return track
 
     monkeypatch.setattr(controls, "MAX_PLAYLIST_SIZE", 2)
+    monkeypatch.setattr(controls, "MAX_PLAYLIST_FULL", 2)
     monkeypatch.setattr(media, "get_playlist_info", fake_info)
     monkeypatch.setattr(media, "download_media", fake_download)
     status, _ = await web_add("https://soundcloud.com/forss/sets/soulhack?si=1")

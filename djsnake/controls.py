@@ -11,6 +11,7 @@ import discord
 from . import catalog, filters, limits, media, playlist_io, playlists, spotify, state
 from .config import (
     LOOP_MODES,
+    MAX_PLAYLIST_FULL,
     MAX_PLAYLIST_SIZE,
     MAX_SAVED_PLAYLISTS,
     MAX_SAVED_TRACKS,
@@ -135,13 +136,15 @@ class ControlError(Exception):
         "not_a_stream": 400,
         "radio_hls": 400,
         "stream_unreachable": 502,
+        "playlist_choice": 409,
     }
 
-    def __init__(self, code, **params):
+    def __init__(self, code, choice=None, **params):
         super().__init__(code)
         self.code = code
         self.params = params
         self.status = self.STATUS[code]
+        self.choice = choice  # playlist_choice: the size_choice() dict
 
     def text(self, lang=None):
         """The message in `lang` (default: BOT_LANGUAGE)."""
@@ -505,6 +508,54 @@ async def control_clear(player):
     return removed
 
 
+# --- Playlist size choice ------------------------------------------------------
+
+SIZES = ("default", "full")
+
+
+def size_choice(entries, room):
+    """What to offer for a playlist of `entries` (read up to
+    MAX_PLAYLIST_FULL + 1) when `room` more tracks fit in the queue, or None
+    when there is nothing to choose: the list fits in MAX_PLAYLIST_SIZE, or
+    loading more would not fit.
+
+    {count: tracks listed (at most MAX_PLAYLIST_FULL), more: the list is
+    longer than that, default: MAX_PLAYLIST_SIZE, max: what "full" loads,
+    whole: "full" is the whole list, truncated: the source may hide some}"""
+    found = len(entries)
+    count = min(found, MAX_PLAYLIST_FULL)
+    full = min(count, max(0, room))
+    if found <= MAX_PLAYLIST_SIZE or full <= MAX_PLAYLIST_SIZE:
+        return None
+    return {
+        "count": count,
+        "more": found > MAX_PLAYLIST_FULL,
+        "default": MAX_PLAYLIST_SIZE,
+        "max": full,
+        "whole": full == found,
+        "truncated": bool(getattr(entries, "truncated", False)),
+    }
+
+
+def sized(entries, size, choice):
+    """The entries to load for `size` ("default" or "full"; anything else
+    and no choice mean the default MAX_PLAYLIST_SIZE)."""
+    if choice is not None and size == "full":
+        return list(entries[: choice["max"]])
+    return list(entries[:MAX_PLAYLIST_SIZE])
+
+
+def _web_size(player, guild_id, entries, size):
+    """The page's entries for `size`; without one, a list that offers a
+    choice raises playlist_choice (the page asks, then sends `size`)."""
+    room = limits.room(player, guild_id, limits.WEB_BUCKET)
+    choice = size_choice(entries, room)
+    if choice is not None and size is None:
+        total = f"{choice['count']}+" if choice["more"] else str(choice["count"])
+        raise ControlError("playlist_choice", choice=choice, total=total)
+    return sized(entries, size, choice)
+
+
 def _check_web_limits(player, guild_id):
     """Refuse a page add up front when the queue is full or the page's
     "web" bucket is at its per-user limit (the duration is checked once the
@@ -514,9 +565,11 @@ def _check_web_limits(player, guild_id):
         raise ControlError(refusal[0], **refusal[1])
 
 
-async def control_add(player, guild_id, url):
+async def control_add(player, guild_id, url, size=None):
     """Validate a link and download it in the background. A Spotify link's
-    track list is read first, so its errors reach the caller."""
+    track list is read first, so its errors reach the caller; so is a
+    playlist's, and one longer than MAX_PLAYLIST_SIZE raises playlist_choice
+    unless `size` ("default" or "full", see size_choice()) is given."""
     if player.in_voice():
         _check_web_limits(player, guild_id)
     try:
@@ -530,6 +583,8 @@ async def control_add(player, guild_id, url):
         tracks = await read_spotify(*link)
         if player.epoch != epoch:
             return  # Stopped or reset while the link was being read
+        if link[0] != "track":
+            tracks = _web_size(player, guild_id, tracks, size)
         _background(_add_spotify_from_web(player, guild_id, link[0], tracks))
         return
     parsed = parse_media_url(url)
@@ -548,7 +603,26 @@ async def control_add(player, guild_id, url):
     if not player.in_voice():
         raise ControlError("not_in_voice")
     kind, clean_url = parsed
-    _background(_add_from_web(player, guild_id, kind, clean_url))
+    entries = None
+    if kind != "single":
+        epoch = player.epoch
+        entries = await _read_web_playlist(player, clean_url)
+        if player.epoch != epoch:
+            return  # Stopped or reset while the list was being read
+        if entries:
+            entries = _web_size(player, guild_id, entries, size)
+    _background(_add_from_web(player, guild_id, kind, clean_url, entries))
+
+
+async def _read_web_playlist(player, url):
+    """A playlist's flat entries, listed on the page as a pending link while
+    they are read."""
+    loop = asyncio.get_running_loop()
+    key = player.add_pending(None)
+    try:
+        return await loop.run_in_executor(None, media.get_playlist_info, url)
+    finally:
+        player.drop_pending(key)
 
 
 async def _add_radio(player, guild_id, url):
@@ -573,12 +647,14 @@ async def read_radio_link(url):
 
 async def read_spotify(kind, ref, provider="spotify", limit=None):
     """Track list of a Spotify, Deezer or Apple Music link (up to `limit`,
-    MAX_PLAYLIST_SIZE by default). Raises ControlError with the reason it cannot be read.
+    by default MAX_PLAYLIST_FULL + 1, see size_choice()). Raises ControlError
+    with the reason it cannot be read.
     """
     loop = asyncio.get_running_loop()
+    limit = limit or MAX_PLAYLIST_FULL + 1
     try:
         return await loop.run_in_executor(
-            None, catalog.get_tracks, provider, kind, ref, limit or MAX_PLAYLIST_SIZE
+            None, catalog.get_tracks, provider, kind, ref, limit
         )
     except spotify.SpotifyError as e:
         print(f"{provider} {kind} {ref}: {e}")
@@ -619,7 +695,7 @@ async def _add_search_from_web(player, guild_id, query):
         await play_next(ctx)
 
 
-async def _add_from_web(player, guild_id, kind, url):
+async def _add_from_web(player, guild_id, kind, url, entries=None):
     ctx = WebContext(guild_id, player)
     epoch = player.epoch
     # Counts as loading, so the queue running out meanwhile keeps the bot in
@@ -630,20 +706,12 @@ async def _add_from_web(player, guild_id, kind, url):
             await download_and_queue_song(
                 ctx, player, url, skip_voice_check=True, from_web=True
             )
+        elif cancelled(player, epoch):
+            pass
+        elif not entries:  # Read and sized by control_add()
+            await ctx.send(t("play.web_playlist_failed", ctx_lang(ctx)))
         else:
-            loop = asyncio.get_running_loop()
-            key = player.add_pending(None)  # The link, until its list is read
-            try:
-                entries = await loop.run_in_executor(None, media.get_playlist_info, url)
-            finally:
-                player.drop_pending(key)
-            if cancelled(player, epoch):
-                pass
-            elif not entries:
-                await ctx.send(t("play.web_playlist_failed", ctx_lang(ctx)))
-            else:
-                entries = entries[:MAX_PLAYLIST_SIZE]
-                await queue_playlist(ctx, player, entries, from_web=True)
+            await queue_playlist(ctx, player, entries, from_web=True)
     except Exception as e:
         print(f"Web add failed: {e}")
     finally:

@@ -14,7 +14,6 @@ from .config import (
     FILTER_PRESETS,
     HISTORY_LOG_SIZE,
     LOOP_MODES,
-    MAX_PLAYLIST_SIZE,
     MAX_SAVED_TRACKS,
     MAX_SEARCH_LENGTH,
     PUBLIC_BASE_URL,
@@ -54,6 +53,8 @@ from .controls import (
     read_radio_link,
     read_spotify,
     seek_label,
+    size_choice,
+    sized,
 )
 from .i18n import ctx_lang, lang_for, language_name, t
 from .media import get_video_id_from_url, looks_like_url
@@ -175,17 +176,60 @@ def error_message(error, command=None, slash=False, guild=None):
     return t("cmd.error_generic", lang, error=error)
 
 
-class PlaylistChoiceView(discord.ui.View):
-    """Buttons shown when a link contains both a specific song and a playlist,
-    letting the user pick just the song or the whole playlist."""
+PLAYLIST_CHOICE_SECONDS = 30  # Then the default: the track, or the first tracks
 
-    def __init__(self, author_id, timeout=30, lang=None):
+
+class PlaylistChoiceView(discord.ui.View):
+    """Buttons asking what to load from a playlist link: only the track a
+    radio or mix link points at ("single", with `single`), the first
+    MAX_PLAYLIST_SIZE tracks ("default") or, with a size_choice() dict in
+    `choice`, up to its `max` ("full"). `choice` stays None (timeout) until
+    the requester presses one."""
+
+    def __init__(
+        self,
+        author_id,
+        timeout=PLAYLIST_CHOICE_SECONDS,
+        lang=None,
+        single=True,
+        entries=(),
+        choice=None,
+    ):
         super().__init__(timeout=timeout)
         self.author_id = author_id
         self.lang = lang
-        self.choice = None  # "single" | "playlist" | None (timeout)
-        self.single.label = t("cmd.choice_single", lang)
-        self.playlist.label = t("cmd.choice_playlist", lang)
+        self.choice = None  # "single" | "default" | "full" | None (timeout)
+        primary, secondary = discord.ButtonStyle.primary, discord.ButtonStyle.secondary
+        if single:
+            self._button("single", t("cmd.choice_single", lang), "🎵", primary)
+        first = len(sized(entries, "default", choice))
+        if choice is None:
+            # No size to pick: the playlist button loads what fits by default.
+            label = (
+                t("cmd.choice_playlist", lang)
+                if first == len(entries)
+                else t("cmd.choice_first", lang, n=first)
+            )
+            self._button("default", label, "📋", secondary)
+            return
+        style = secondary if single else primary
+        self._button("default", t("cmd.choice_first", lang, n=first), "📋", style)
+        full = choice["max"]
+        label = t(
+            "cmd.choice_whole" if choice["whole"] else "cmd.choice_first", lang, n=full
+        )
+        self._button("full", label, "📚", secondary)
+
+    def _button(self, value, label, emoji, style):
+        button = discord.ui.Button(label=label, emoji=emoji, style=style)
+
+        async def pressed(interaction):
+            self.choice = value
+            await interaction.response.defer()
+            self.stop()
+
+        button.callback = pressed
+        self.add_item(button)
 
     async def interaction_check(self, interaction):
         # Only the person who ran the command may use the buttons.
@@ -196,21 +240,60 @@ class PlaylistChoiceView(discord.ui.View):
             return False
         return True
 
-    @discord.ui.button(
-        label="This track only", emoji="🎵", style=discord.ButtonStyle.primary
-    )
-    async def single(self, interaction, button):
-        self.choice = "single"
-        await interaction.response.defer()
-        self.stop()
 
-    @discord.ui.button(
-        label="Whole playlist", emoji="📋", style=discord.ButtonStyle.secondary
+def _choice_text(lang, entries, choice, single):
+    if choice is None:
+        return t("cmd.playlist_prompt", lang, count=len(entries))
+    total = f"{choice['count']}+" if choice["more"] else str(choice["count"])
+    key = "cmd.size_prompt_mix" if single else "cmd.size_prompt"
+    lines = [t(key, lang, total=total)]
+    if not choice["whole"] and not choice["more"]:
+        lines.append(t("cmd.size_room", lang, max=choice["max"]))
+    if choice["truncated"]:
+        lines.append(t("cmd.spotify_capped", lang, max=spotify.EMBED_MAX_TRACKS))
+    return "\n".join(lines)
+
+
+async def ask_playlist_size(ctx, entries, choice, single=False):
+    """Ask the requester what to load from a playlist (see
+    PlaylistChoiceView). Returns "single", "default" or "full"; with no
+    answer within PLAYLIST_CHOICE_SECONDS the prompt says what was picked."""
+    lang = ctx_lang(ctx)
+    view = PlaylistChoiceView(
+        getattr(ctx.author, "id", None),
+        timeout=PLAYLIST_CHOICE_SECONDS,
+        lang=lang,
+        single=single,
+        entries=entries,
+        choice=choice,
     )
-    async def playlist(self, interaction, button):
-        self.choice = "playlist"
-        await interaction.response.defer()
-        self.stop()
+    prompt = await ctx.send(_choice_text(lang, entries, choice, single), view=view)
+    # Our own clock too: discord.py only times a view out once it is bound
+    # to a message it tracks.
+    waiter = asyncio.ensure_future(view.wait())
+    await asyncio.wait({waiter}, timeout=PLAYLIST_CHOICE_SECONDS)
+    view.stop()  # A no-op after a press
+    try:
+        if view.choice is None:
+            n = len(sized(entries, "default", choice))
+            key = "cmd.choice_timeout_single" if single else "cmd.choice_timeout_first"
+            await prompt.edit(content=t(key, lang, n=n), view=None)
+        else:
+            await prompt.delete()
+    except Exception:
+        pass
+    return view.choice or ("single" if single else "default")
+
+
+def _author_room(ctx, player):
+    """How many more tracks the author of `ctx` may queue (limits.room())."""
+    author = ctx.author
+    return limits.room(
+        player,
+        ctx.guild.id,
+        limits.bucket_of(getattr(author, "id", None)),
+        limits.bypasses(author, ctx.guild.id),
+    )
 
 
 class NotDJ(commands.CheckFailure):
@@ -366,29 +449,23 @@ async def play(ctx, *, query: str = None):
             refresh_panel(player)
 
         if playlist_entries:
-            # It's a playlist
-            # If the link targets a specific song *and* carries a playlist/radio
-            # (e.g. watch?v=XXX&list=RD...), ask the user what they want.
+            # It's a playlist. If the link targets a specific song *and*
+            # carries a playlist/radio (e.g. watch?v=XXX&list=RD...), or the
+            # list is longer than MAX_PLAYLIST_SIZE, ask what to load: one
+            # prompt for both.
             specific_video_id = get_video_id_from_url(url)
-            if specific_video_id:
-                view = PlaylistChoiceView(ctx.author.id, lang=lang)
-                prompt = await ctx.send(
-                    t("cmd.playlist_prompt", lang, count=len(playlist_entries)),
-                    view=view,
+            choice = size_choice(playlist_entries, _author_room(ctx, player))
+            size = "default"
+            if specific_video_id or choice:
+                size = await ask_playlist_size(
+                    ctx, playlist_entries, choice, single=bool(specific_video_id)
                 )
-                await view.wait()
-                try:
-                    await prompt.delete()
-                except Exception:
-                    pass
-
-                # Default to the single track on timeout (choice is None).
-                if view.choice != "playlist":
+                # The single track is also the default on timeout.
+                if size == "single":
                     single_url = f"https://www.youtube.com/watch?v={specific_video_id}"
                     if not player.should_stop:
                         await download_and_queue_song(ctx, player, single_url)
                     return
-                # Otherwise fall through and load the whole playlist.
 
             # Make sure we're connected
             if not player.voice_client or not player.voice_client.is_connected():
@@ -396,9 +473,9 @@ async def play(ctx, *, query: str = None):
                     await ctx.send(t("cmd.cannot_join", lang))
                     return
 
-            # Limit based on configuration
-            playlist_entries = playlist_entries[:MAX_PLAYLIST_SIZE]
-            await queue_playlist(ctx, player, playlist_entries)
+            if player.should_stop:
+                return  # Stopped while the prompt was open
+            await queue_playlist(ctx, player, sized(playlist_entries, size, choice))
         else:
             # It's a single video
             if not player.should_stop:
@@ -424,6 +501,10 @@ async def _play_spotify(ctx, player, kind, ref, provider="spotify"):
         finally:
             player.load_line = None
             refresh_panel(player)
+        if kind != "track":
+            choice = size_choice(tracks, _author_room(ctx, player))
+            size = await ask_playlist_size(ctx, tracks, choice) if choice else None
+            tracks = sized(tracks, size, choice)
         if not player.should_stop:
             await queue_spotify(ctx, player, kind, tracks)
     except ControlError as e:

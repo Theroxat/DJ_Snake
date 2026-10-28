@@ -39,6 +39,7 @@ from .config import (
 )
 from .controls import (
     ControlError,
+    SIZES as PLAYLIST_SIZES,
     control_add,
     control_autoplay,
     control_filter,
@@ -844,6 +845,8 @@ async def web_control(request):
         return _fail(request, 400, "web.bad_position")
     if action == "add" and not isinstance(data.get("url"), str):
         return _fail(request, 400, "web.missing_link")
+    if action == "add" and data.get("size") not in (None, *PLAYLIST_SIZES):
+        return _fail(request, 400, "web.bad_playlist_size")
     if action in ("crossfade", "autoplay") and not isinstance(
         data.get("enabled"), bool
     ):
@@ -926,9 +929,14 @@ async def web_control(request):
             )
             return web.json_response({"ok": True}, status=202)
         elif action == "add":
-            await control_add(player, guild_id, data["url"])
+            await control_add(player, guild_id, data["url"], size=data.get("size"))
             return web.json_response({"ok": True}, status=202)
     except ControlError as e:
+        if e.choice is not None:  # playlist_choice: the page asks, then resends
+            return web.json_response(
+                {"ok": False, "error": e.text(lang), "choice": e.choice},
+                status=e.status,
+            )
         return _control_error(e.status, e.text(lang))
     return web.json_response({"ok": True})
 

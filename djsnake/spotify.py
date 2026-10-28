@@ -26,6 +26,17 @@ from .config import (
 )
 
 KINDS = ("playlist", "album", "track")
+# The embed page lists at most this many tracks of a playlist or album.
+EMBED_MAX_TRACKS = 100
+
+
+class TrackList(list):
+    """A track list; `truncated` is True when the source may have listed
+    only part of it (the embed page's 100-track cap)."""
+
+    truncated = False
+
+
 SPOTIFY_HOSTS = {"open.spotify.com", "play.spotify.com"}
 SHORT_LINK_HOSTS = {"spotify.link", "spotify.app.link"}
 _ID_RE = re.compile(r"^[0-9A-Za-z]{22}$")
@@ -335,13 +346,15 @@ def fetch_api_tracks(kind, spotify_id, limit):
 
 
 def get_tracks(kind, spotify_id, limit):
-    """Up to `limit` tracks of a Spotify playlist, album or track (blocking).
+    """Up to `limit` tracks of a Spotify playlist, album or track (blocking),
+    as a TrackList (`truncated` when the embed page may have hidden some).
 
     Uses the Web API when configured and falls back to the embed page if it
     fails (Spotify hides some playlists from new API apps). Raises
     SpotifyError, including "spotify_empty" when nothing usable is listed.
     """
     tracks = None
+    capped = False
     if api_configured():
         try:
             tracks = fetch_api_tracks(kind, spotify_id, limit)
@@ -349,7 +362,12 @@ def get_tracks(kind, spotify_id, limit):
             print(f"Spotify Web API failed ({e}), trying the embed page")
     if tracks is None:
         tracks = fetch_embed_tracks(kind, spotify_id)
-    tracks = tracks[:limit]
+        # A full page may hide more tracks; it only matters if we wanted more.
+        capped = (
+            kind != "track" and len(tracks) >= EMBED_MAX_TRACKS and limit > len(tracks)
+        )
+    tracks = TrackList(tracks[:limit])
+    tracks.truncated = capped
     if not tracks:
         raise SpotifyError("spotify_empty")
     return tracks

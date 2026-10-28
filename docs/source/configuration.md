@@ -6,7 +6,8 @@ DJ Snake is configured through environment variables. With Docker Compose, put t
 | --- | --- | --- |
 | `DISCORD_TOKEN` | none (required) | Bot token. A `token` file is a fallback. |
 | `COMMAND_PREFIX` | `!` | Prefix for text commands. |
-| `MAX_PLAYLIST_SIZE` | `30` | Maximum tracks loaded from a playlist (YouTube, Spotify, SoundCloud, Bandcamp, Deezer or Apple Music). |
+| `MAX_PLAYLIST_SIZE` | `30` | Tracks loaded from a playlist (YouTube, Spotify, SoundCloud, Bandcamp, Deezer or Apple Music) by default. A longer one asks whether to load these or the whole list. |
+| `MAX_PLAYLIST_FULL` | `200` | Most tracks "Whole playlist" loads (never below `MAX_PLAYLIST_SIZE`). The room left in the queue (`MAX_QUEUE_SIZE`, `MAX_TRACKS_PER_USER`, `/limits`) also caps it. |
 | `MAX_QUEUE_SIZE` | `200` | Maximum tracks waiting in a server's queue. |
 | `MAX_TRACKS_PER_USER` | `0` | Maximum tracks one member may have waiting (`0` = unlimited). The clip page counts as one member. |
 | `MAX_TRACK_MINUTES` | `0` | Longest single track accepted, in minutes (`0` = unlimited). |
@@ -47,5 +48,5 @@ An invalid `WEB_THEME` is ignored with a warning in the logs, and `arcade` is us
 
 - **`PUBLIC_BASE_URL` matters.** It is only used to build the link the bot posts in Discord. If it is empty, the link points to `http://localhost:47823`, which only works on the machine running the bot.
 - **`MEDIA_FORMAT`** replaces the old `AUDIO_FORMAT` variable, which is no longer read. The clip page needs a video stream, so choose a format that includes one.
-- **`MAX_PLAYLIST_SIZE`** is also the limit for Spotify lists, on top of Spotify's own 100-track limit without credentials.
+- **`MAX_PLAYLIST_SIZE` and `MAX_PLAYLIST_FULL`** apply to Spotify lists too. Without credentials Spotify's embed page lists at most 100 tracks; the prompt then says the list may be longer.
 - **Never commit `.env`**, a `token` file or any real token.

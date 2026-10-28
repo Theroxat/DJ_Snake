@@ -583,6 +583,7 @@ async def test_spotify_playlist_respects_max_size(
     web_add, player, monkeypatch, spotify_env
 ):
     monkeypatch.setattr(controls, "MAX_PLAYLIST_SIZE", 2)
+    monkeypatch.setattr(controls, "MAX_PLAYLIST_FULL", 2)
     await web_add(f"https://open.spotify.com/playlist/{ID}")
     await asyncio.sleep(0.4)
     assert player.load_line == "✅ 1/2 tracks loaded (1 not found on YouTube)"

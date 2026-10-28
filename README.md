@@ -253,7 +253,8 @@ Set these in `.env` (see `.env.example`).
 | --- | --- | --- |
 | `DISCORD_TOKEN` | none (required) | Bot token. A `token` file is a fallback. |
 | `COMMAND_PREFIX` | `!` | Prefix for text commands. |
-| `MAX_PLAYLIST_SIZE` | `30` | Maximum tracks loaded from a playlist. |
+| `MAX_PLAYLIST_SIZE` | `30` | Tracks loaded from a playlist by default. A longer one asks whether to load these or the whole list. |
+| `MAX_PLAYLIST_FULL` | `200` | Most tracks "Whole playlist" loads (never below `MAX_PLAYLIST_SIZE`; the room left in the queue also caps it). |
 | `MAX_QUEUE_SIZE` | `200` | Maximum tracks waiting in a server's queue; `/limits` overrides these four per server (Manage Server). |
 | `MAX_TRACKS_PER_USER` | `0` | Maximum tracks one member may have waiting (`0` = unlimited). The clip page counts as one member. |
 | `MAX_TRACK_MINUTES` | `0` | Longest single track accepted, in minutes (`0` = unlimited). |
@@ -341,7 +342,7 @@ At startup the bot checks that the file exists and looks like Netscape format (a
 
 ## Limits and disclaimer
 
-- YouTube, SoundCloud and Bandcamp audio only (Spotify, Deezer and Apple Music links are matched to YouTube videos), at most 720p, and playlists are capped at `MAX_PLAYLIST_SIZE`.
+- YouTube, SoundCloud and Bandcamp audio only (Spotify, Deezer and Apple Music links are matched to YouTube videos), at most 720p, and playlists are capped at `MAX_PLAYLIST_SIZE` unless the requester picks the whole list (at most `MAX_PLAYLIST_FULL`).
 - This project is for personal use. Respect YouTube's Terms of Service and the copyright of the content you play; you are responsible for how you use it.
 
 ## Demo site

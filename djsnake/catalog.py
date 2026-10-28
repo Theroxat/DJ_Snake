@@ -294,7 +294,8 @@ def fetch_apple(kind, ref, limit):
         if status != 200:
             raise SpotifyError("link_unreadable", f"HTTP {status}")
         return parse_apple_playlist_html(body.decode("utf-8", "replace"))
-    entity = "&entity=song" if kind == "album" else ""
+    # The Lookup API returns 50 songs of an album unless asked for more.
+    entity = f"&entity=song&limit={min(int(limit), 200)}" if kind == "album" else ""
     data = _get_json(f"{ITUNES_LOOKUP}id={apple_id}&country={storefront}{entity}")
     return parse_itunes_lookup(data, kind)
 

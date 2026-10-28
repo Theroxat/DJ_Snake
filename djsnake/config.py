@@ -99,6 +99,9 @@ def _int_env(name, default):
 
 
 MAX_QUEUE_SIZE = max(1, _int_env("MAX_QUEUE_SIZE", 200))  # Tracks waiting
+# A playlist longer than MAX_PLAYLIST_SIZE asks whether to load the first
+# MAX_PLAYLIST_SIZE tracks or the whole list, up to this many (never fewer).
+MAX_PLAYLIST_FULL = max(MAX_PLAYLIST_SIZE, _int_env("MAX_PLAYLIST_FULL", 200))
 MAX_TRACKS_PER_USER = _int_env("MAX_TRACKS_PER_USER", 0)  # 0 = unlimited
 MAX_TRACK_MINUTES = _int_env("MAX_TRACK_MINUTES", 0)  # 0 = unlimited
 PLAY_COOLDOWN_SECONDS = _int_env("PLAY_COOLDOWN_SECONDS", 0)  # 0 = none

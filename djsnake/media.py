@@ -38,7 +38,7 @@ from .config import (
     LOUDNORM_KEYS,
     LOUDNORM_TARGET,
     MAX_LEADING_TRIM,
-    MAX_PLAYLIST_SIZE,
+    MAX_PLAYLIST_FULL,
     MEDIA_FORMAT,
     MIN_PLAYED_SECONDS,
     PERMANENT_ERROR_MARKERS,
@@ -296,7 +296,8 @@ def entry_url(entry):
 
 def get_playlist_info(url, limit=None):
     """Extract playlist information without downloading (at most `limit`
-    entries, default MAX_PLAYLIST_SIZE)."""
+    entries, default MAX_PLAYLIST_FULL + 1: one more than can ever be loaded,
+    so a caller can tell a list of exactly MAX_PLAYLIST_FULL from a longer one)."""
     try:
         print(f"Extracting playlist from: {url}")
 
@@ -306,7 +307,7 @@ def get_playlist_info(url, limit=None):
             "quiet": True,  # Reduce log spam
             "no_warnings": True,
             "ignoreerrors": True,  # Continue even if some videos have errors
-            "playlistend": limit or MAX_PLAYLIST_SIZE,  # Limit based on config
+            "playlistend": limit or MAX_PLAYLIST_FULL + 1,
             "remote_components": REMOTE_COMPONENTS,
             "extractor_args": EXTRACTOR_ARGS,
             **cookies.options(),

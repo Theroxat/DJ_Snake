@@ -934,6 +934,13 @@ kbd {
   button.kbclose { min-height: 44px; min-width: 44px; }
 }
 
+/* Playlist size choice: a small native <dialog>, same card as the shortcuts help */
+dialog.plsdlg { width: min(460px, calc(100vw - 32px)); }
+.plsbtns { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.plsbtns button { min-height: 44px; }
+.plsbtns button.plscancel { margin-right: auto; }
+@media (max-width: 420px) { .plsbtns button { flex: 1 1 100%; } .plsbtns button.plscancel { order: 3; margin-right: 0; } }
+
 #toast {
   position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 120; max-width: min(92vw, 560px);
   background: var(--surface); color: var(--text); border: var(--bw) solid var(--accent-3); border-radius: var(--radius-sm); box-shadow: var(--shadow-pop);
@@ -1303,6 +1310,19 @@ html.demo-embedded .demo-ribbon { display: none; }
   </div>
 </dialog>
 
+<dialog id="plsdlg" class="kbdlg plsdlg" aria-labelledby="plsh" aria-describedby="plstext">
+  <div class="kbcard">
+    <div class="kbhead"><h2 class="display" id="plsh" data-i18n="plsize_title">Long playlist</h2></div>
+    <p id="plstext"></p>
+    <p class="kbnote" id="plsnote" hidden></p>
+    <div class="plsbtns">
+      <button type="button" class="ghost plscancel" id="plscancel" data-i18n="plsize_cancel">Cancel</button>
+      <button type="button" class="ghost" id="plsfull"></button>
+      <button type="button" id="plsdefault"></button>
+    </div>
+  </div>
+</dialog>
+
 <div id="stats" class="statsdlg" role="dialog" aria-modal="true" aria-labelledby="stath" hidden>
   <div class="statscard" id="statscard">
     <div class="stathead">
@@ -1434,6 +1454,14 @@ html.demo-embedded .demo-ribbon { display: none; }
       dl_more_one: "+ {n} more",
       dl_more_other: "+ {n} more",
       added: "Added — downloading…",
+      plsize_title: "Long playlist",
+      plsize_text: "This playlist has {n} tracks. How many should be loaded?",
+      plsize_text_more: "This playlist has more than {n} tracks. How many should be loaded?",
+      plsize_room: "The queue has room for {n} more tracks.",
+      plsize_capped: "Spotify shows only the first {n} tracks without API credentials.",
+      plsize_first: "First {n}",
+      plsize_whole: "Whole playlist ({n})",
+      plsize_cancel: "Cancel",
       action_failed: "Action failed (error {status}).",
       st_period: "Period",
       st_week: "Week",
@@ -1667,6 +1695,14 @@ html.demo-embedded .demo-ribbon { display: none; }
       dl_more_one: "+ {n} autre",
       dl_more_other: "+ {n} autres",
       added: "Ajouté — téléchargement…",
+      plsize_title: "Longue playlist",
+      plsize_text: "Cette playlist contient {n} titres. Combien en charger ?",
+      plsize_text_more: "Cette playlist contient plus de {n} titres. Combien en charger ?",
+      plsize_room: "La file a encore de la place pour {n} titres.",
+      plsize_capped: "Sans identifiants d’API, Spotify n’affiche que les {n} premiers titres.",
+      plsize_first: "Les {n} premiers",
+      plsize_whole: "Toute la playlist ({n})",
+      plsize_cancel: "Annuler",
       action_failed: "Échec de l’action (erreur {status}).",
       st_period: "Période",
       st_week: "Semaine",
@@ -1900,6 +1936,14 @@ html.demo-embedded .demo-ribbon { display: none; }
       dl_more_one: "+ {n} más",
       dl_more_other: "+ {n} más",
       added: "Añadida — descargando…",
+      plsize_title: "Lista larga",
+      plsize_text: "Esta lista tiene {n} canciones. ¿Cuántas quieres cargar?",
+      plsize_text_more: "Esta lista tiene más de {n} canciones. ¿Cuántas quieres cargar?",
+      plsize_room: "La cola tiene sitio para {n} canciones más.",
+      plsize_capped: "Sin credenciales de la API, Spotify solo muestra las primeras {n} canciones.",
+      plsize_first: "Las primeras {n}",
+      plsize_whole: "Toda la lista ({n})",
+      plsize_cancel: "Cancelar",
       action_failed: "La acción ha fallado (error {status}).",
       st_period: "Periodo",
       st_week: "Semana",
@@ -2133,6 +2177,14 @@ html.demo-embedded .demo-ribbon { display: none; }
       dl_more_one: "+ {n} weiterer",
       dl_more_other: "+ {n} weitere",
       added: "Hinzugefügt — wird heruntergeladen…",
+      plsize_title: "Lange Playlist",
+      plsize_text: "Diese Playlist hat {n} Titel. Wie viele sollen geladen werden?",
+      plsize_text_more: "Diese Playlist hat mehr als {n} Titel. Wie viele sollen geladen werden?",
+      plsize_room: "In der Warteschlange ist noch Platz für {n} Titel.",
+      plsize_capped: "Ohne API-Zugangsdaten zeigt Spotify nur die ersten {n} Titel.",
+      plsize_first: "Erste {n}",
+      plsize_whole: "Ganze Playlist ({n})",
+      plsize_cancel: "Abbrechen",
       action_failed: "Aktion fehlgeschlagen (Fehler {status}).",
       st_period: "Zeitraum",
       st_week: "Woche",
@@ -3795,6 +3847,8 @@ html.demo-embedded .demo-ribbon { display: none; }
         if (action === "add") toast(t("added"), "ok");
         if (action === "load_playlist") toast(t("pl_loading"), "ok");
         if (action === "save_playlist") { toast(t("pl_saved"), "ok"); loadPlaylists(); }
+      } else if (action === "add" && j && j.choice && !(extra && extra.size)) {
+        openSizeChoice(extra.url, j.choice); // a long playlist: ask, then resend with `size`
       } else {
         toast((j && j.error) || t("action_failed", { status: r.status }), "err");
       }
@@ -3841,6 +3895,65 @@ html.demo-embedded .demo-ribbon { display: none; }
     if (!url || !active() || pending.has("add")) return;
     if (await send("add", { url })) inp.value = "";
   });
+
+  // ---- playlist size: an add over MAX_PLAYLIST_SIZE answers 409 with `choice`
+  // ({count, more, default, max, whole, truncated}); the dialog resends it with `size`.
+  const plsDlg = $("plsdlg");
+  let plsUrl = null, plsChoice = null, plsOpener = null;
+  function renderSizeChoice() {
+    const c = plsChoice;
+    if (!c) return;
+    $("plstext").textContent = t(c.more ? "plsize_text_more" : "plsize_text", { n: nf(c.count) });
+    const notes = [];
+    if (!c.whole && !c.more) notes.push(t("plsize_room", { n: nf(c.max) }));
+    if (c.truncated) notes.push(t("plsize_capped", { n: nf(100) }));
+    $("plsnote").textContent = notes.join(" ");
+    $("plsnote").hidden = !notes.length;
+    $("plsdefault").textContent = t("plsize_first", { n: nf(c.default) });
+    $("plsfull").textContent = t(c.whole ? "plsize_whole" : "plsize_first", { n: nf(c.max) });
+  }
+  function openSizeChoice(url, c) {
+    if (!c || typeof c.max !== "number") return;
+    plsUrl = url;
+    plsChoice = c;
+    plsOpener = document.activeElement;
+    renderSizeChoice();
+    if (typeof plsDlg.showModal === "function") plsDlg.showModal(); else plsDlg.setAttribute("open", "");
+    $("plsdefault").focus();
+  }
+  function plsClosed() {
+    if (plsChoice === null) return; // already handled
+    plsUrl = plsChoice = null;
+    const back = plsOpener && document.contains(plsOpener) && plsOpener !== document.body ? plsOpener : $("addurl");
+    plsOpener = null;
+    try { back.focus(); } catch (x) {}
+  }
+  function closeSizeChoice() {
+    if (!plsDlg.open) return;
+    if (typeof plsDlg.close === "function") plsDlg.close(); else plsDlg.removeAttribute("open");
+    plsClosed();
+  }
+  async function pickSize(size) {
+    const url = plsUrl;
+    closeSizeChoice();
+    if (!url || !active() || pending.has("add")) return;
+    if (await send("add", { url, size })) {
+      const inp = $("addurl");
+      if (inp.value.trim() === url) inp.value = "";
+    }
+  }
+  $("plsdefault").addEventListener("click", () => pickSize("default"));
+  $("plsfull").addEventListener("click", () => pickSize("full"));
+  $("plscancel").addEventListener("click", closeSizeChoice);
+  plsDlg.addEventListener("close", plsClosed); // Esc closes a modal <dialog> natively
+  plsDlg.addEventListener("click", (e) => { if (e.target === plsDlg) closeSizeChoice(); }); // the backdrop
+  plsDlg.addEventListener("keydown", (e) => {
+    if (e.key !== "Tab") return; // keep focus inside the dialog
+    const f = [...plsDlg.querySelectorAll("button")].filter((b) => !b.disabled);
+    if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+  });
+  langListeners.push(renderSizeChoice);
 
   // ---- saved playlists: a picker (GET .../playlists) plus save/load controls
   async function loadPlaylists() {
@@ -4189,7 +4302,7 @@ html.demo-embedded .demo-ribbon { display: none; }
     if (e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
     const tg = e.target instanceof Element ? e.target : document.body;
     if (tg.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], [contenteditable="plaintext-only"]')) return;
-    if (kbDlg.open || !statsDlg.hidden) return; // a dialog is open: it owns the keyboard
+    if (kbDlg.open || plsDlg.open || !statsDlg.hidden) return; // a dialog is open: it owns the keyboard
     const ctl = active();
     const viaButton = !!tg.closest('button, a, summary, [role="button"], [role="switch"], [role="menuitem"]');
     const own = !!tg.closest('#seek, #queue, [role="menu"], [role="slider"]'); // they handle arrows themselves

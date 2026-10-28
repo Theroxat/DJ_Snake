@@ -104,7 +104,8 @@ The demo's entry page, `docs/demo/index.html` (a mock Discord client, with
 
 Read from the environment (`.env`, loaded via python-dotenv, and passed to the
 container by `env_file`): `DISCORD_TOKEN` (required; a `token` file is the
-fallback), `COMMAND_PREFIX` (`!`), `MAX_PLAYLIST_SIZE` (30), `MEDIA_FORMAT`
+fallback), `COMMAND_PREFIX` (`!`), `MAX_PLAYLIST_SIZE` (30), `MAX_PLAYLIST_FULL` (200, see Long playlists;
+never below `MAX_PLAYLIST_SIZE`), `MEDIA_FORMAT`
 (max 720p H.264 + m4a, see `DEFAULT_MEDIA_FORMAT`; it replaces `AUDIO_FORMAT`,
 which is no longer read), `TEMP_DIR`, `POT_BASE_URL`, `WEB_PORT` (47823),
 `WEB_BIND` (host IP the web port is published on, compose only, default
@@ -379,8 +380,8 @@ Module map, lowest layer first (each imports only the ones above it):
   sources) and rebuilds a canonical URL (no SSRF via yt-dlp), or a Spotify,
   Deezer or Apple Music link (see Spotify links; `control_add()` is async), or
   non-link text (see Text search). For YouTube, `v=` means one track,
-  otherwise `list=` loads up to `MAX_PLAYLIST_SIZE` in the background with a
-  `WebContext` (no author, so it can never join voice). `!play` uses
+  otherwise `list=` is read before answering (see Long playlists) and loads
+  in the background with a `WebContext` (no author, so it can never join voice). `!play` uses
   `media.parse_play_url()`: the same allowlist and canonical URL, except that
   a YouTube `v=` link also keeps its `list=` id for the playlist prompt; any
   other host gets the `bad_url` error. Web actions are announced in the
@@ -432,6 +433,26 @@ Module map, lowest layer first (each imports only the ones above it):
   `play_next()` from disconnecting when the queue briefly runs empty during
   that loading. `!stop` sets `should_stop` and bumps `epoch`, which every
   download step checks, and deletes queue, current and history files.
+- **Long playlists** (`controls.size_choice()` / `sized()`): every track-list
+  reader (`media.get_playlist_info()`, `controls.read_spotify()`) fetches up to
+  `MAX_PLAYLIST_FULL + 1`, so the count is real and "more than 200" shows.
+  `size_choice(entries, room)` is None when the list fits `MAX_PLAYLIST_SIZE`
+  or the queue has no more room than that (`limits.room()`: queue size and
+  the per-user limit unless bypassed), else `{count, more, default, max,
+  whole, truncated}` (`max` = what "full" loads: capped by
+  `MAX_PLAYLIST_FULL` and the room); `sized(entries, size, choice)` slices
+  (`"full"` takes `max`, anything else `MAX_PLAYLIST_SIZE`). Discord:
+  `ask_playlist_size()` posts `PlaylistChoiceView`, one prompt with "This
+  track only" (mix/radio link with `v=`), "First 30" and "Whole playlist (N)"
+  or "First M"; only the requester may press, and after
+  `PLAYLIST_CHOICE_SECONDS` (30) the default (the track, else the first 30)
+  applies and the prompt is edited to say so. Web: `control_add(..., size)`
+  reads the list before answering; over the threshold without a `size` it
+  raises `ControlError("playlist_choice")`, sent as 409 `{"ok": false,
+  "error", "choice": {...}}`; the page's dialog (`#plsdlg`) resends add with
+  `size: "default"|"full"` (anything else is 400 `web.bad_playlist_size`).
+  The demo's lists are short, so it never asks. Saved playlists and imports
+  keep their own `MAX_SAVED_TRACKS` cap. Tests: `tests/test_playlist_size.py`.
 - **Saved playlists** (`playlists.py`, `{DATA_DIR}/playlists.db`, WAL, schema
   in `PRAGMA user_version`): tables `playlists` (guild_id, case-folded `key`
   unique per guild, display `name`, `creator_id` NULL when saved from the
@@ -490,8 +511,9 @@ Module map, lowest layer first (each imports only the ones above it):
   (`spotify_short_link`: following them would mean an arbitrary redirect).
   Requests are rebuilt from the id, sent by `_http()` (urllib, no redirects
   followed, `SPOTIFY_TIMEOUT`, `SPOTIFY_MAX_BYTES`) and run in an executor.
-  `get_tracks()` returns `[{title, artists, duration}]` up to
-  `MAX_PLAYLIST_SIZE`: from the Web API (client credentials, paginated, token
+  `get_tracks()` returns a `TrackList` of `[{title, artists, duration}]` up to
+  its `limit` (`MAX_PLAYLIST_FULL + 1` from `read_spotify()`; `truncated`
+  when the embed page filled its 100 tracks): from the Web API (client credentials, paginated, token
   only sent to `api.spotify.com`) when both credentials are set, else or on
   failure from the embed page `open.spotify.com/embed/{kind}/{id}`, whose
   `__NEXT_DATA__` JSON holds `props.pageProps.state.data.entity` (`trackList`
@@ -701,7 +723,8 @@ Module map, lowest layer first (each imports only the ones above it):
   `GET /api/{sid}/playlists` lists the saved playlists (see Saved playlists).
   `POST /api/{sid}/control` takes `{action:
   next|previous|pause|resume|remove|move|add|seek|jump|crossfade|loop|shuffle|volume|autoplay|filter|save_playlist|load_playlist,
-  id?, index?, url?, position?, enabled?, mode?, value?, name?, preset?, eq?}` (body <= 4 KB;
+  id?, index?, url?, size?, position?, enabled?, mode?, value?, name?, preset?, eq?}` (body <= 4 KB;
+  add takes an optional `size` `default|full` for a long playlist, see Long playlists;
   crossfade and autoplay take a boolean `enabled`; volume an integer `value`
   0-150, valid out of voice too; seek restarts the track at `position` seconds
   (file time), clamped, staying paused if it was, unannounced; jump plays a
@@ -712,7 +735,8 @@ Module map, lowest layer first (each imports only the ones above it):
   download in the background) or `{"ok": false, "error": "<message>"}` (in
   the session's language, `_fail(request, status, key)`) with 400 (bad input,
   unsupported link), 403 (view-only id, see Permissions), 404 (unknown sid or
-  track id) or 409 (not in voice, nothing playing).
+  track id) or 409 (not in voice, nothing playing; for add, `playlist_choice`
+  with a `choice` object: ask, then resend with `size`).
   `GET /media/{sid}/{id}` streams the playing, a queued or a history
   track's mp4 with Range support. Files are found by track id, never by a path
   from the request. `GET /api/{sid}/lyrics/{id}` (same tracks, see Lyrics)

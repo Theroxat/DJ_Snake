@@ -163,6 +163,16 @@ def check_enqueue(player, guild_id, bucket, bypass=False, duration=None):
     return None
 
 
+def room(player, guild_id, bucket, bypass=False):
+    """How many more tracks `bucket` may queue now: the queue size, and the
+    per-user limit unless `bypass` (see check_enqueue())."""
+    limit = limits_for(guild_id)
+    free = limit["queue_size"] - len(player.queue)
+    if limit["per_user"] and not bypass and bucket != AUTOPLAY_BUCKET:
+        free = min(free, limit["per_user"] - queued_by(player, bucket))
+    return max(0, free)
+
+
 def too_long(guild_id, duration):
     """The TOO_LONG refusal for a track of `duration` seconds."""
     return TOO_LONG, {
