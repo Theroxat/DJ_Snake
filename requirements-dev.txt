@@ -2,7 +2,7 @@
 -r requirements.txt
 
 pytest>=9.1.1
-pytest-asyncio>=1.4.0
+pytest-asyncio>=1.4.1
 black>=26.10.1
 flake8>=7.4.1
 # End-to-end tests of the clip page (`pytest -m e2e`), then run
