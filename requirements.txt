@@ -6,7 +6,7 @@
 discord.py>=2.7.1
 # YouTube breaks older extractors regularly: an out-of-date yt-dlp returns
 # HTTP 403 on the media download. Keep this floor recent and rebuild often.
-yt-dlp>=2026.10.21
+yt-dlp>=2026.10.26
 python-dotenv==1.2.4
 # Web server for the synced clip page (already pulled in by discord.py).
 aiohttp>=3.14.5
